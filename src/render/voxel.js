@@ -21,16 +21,23 @@ export class VoxelBuilder {
   }
 
   // Box centered at (x, y, z) with size (w, h, d). `jitter` varies brightness a little
-  // so flat colors get a hand-made pixel feel.
-  box(x, y, z, w, h, d, color, jitter = 0.06) {
+  // so flat colors get a hand-made feel. Side faces get darker toward the bottom
+  // (cheap ambient occlusion) so blocks look grounded. `tint(vx, vz)` can return a
+  // brightness factor per top vertex, used for smooth color blending across tiles.
+  box(x, y, z, w, h, d, color, jitter = 0.06, { ao = 0.72, tint = null } = {}) {
     tmp.set(color);
     const k = 1 + (Math.random() * 2 - 1) * jitter;
     for (const face of FACES) {
       const base = this.pos.length / 3;
       for (const [cx, cy, cz] of face.c) {
-        this.pos.push(x + (cx * w) / 2, y + (cy * h) / 2, z + (cz * d) / 2);
+        const vx = x + (cx * w) / 2, vy = y + (cy * h) / 2, vz = z + (cz * d) / 2;
+        this.pos.push(vx, vy, vz);
         this.norm.push(face.n[0], face.n[1], face.n[2]);
-        this.col.push(tmp.r * k, tmp.g * k, tmp.b * k);
+        let s = k;
+        if (face.n[1] === 0 && cy < 0) s *= ao;
+        else if (face.n[1] < 0) s *= ao;
+        if (tint && face.n[1] > 0) s *= tint(vx, vz);
+        this.col.push(tmp.r * s, tmp.g * s, tmp.b * s);
       }
       this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }

@@ -11,4 +11,6 @@ export const FEATURES = {
   dialogue: true,       // talk to villagers (E / gamepad A or Y)
   shop: true,           // Mina's shop: spend coins on gear
   gamepad: true,        // controller support
+  retroPixels: false,   // chunky low-res pixel look instead of HD rendering
+  grassBlades: true,    // thousands of small grass blades (turn off on slow machines)
 };

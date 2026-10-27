@@ -15,24 +15,46 @@ import Npc from '../entities/Npc.js';
 import Hud from '../ui/Hud.js';
 import { makeCoin } from '../render/models.js';
 
-const PIXEL_SCALE = 3;   // render at 1/3 resolution, then scale up for chunky pixels
+const RETRO_SCALE = 3;   // retro mode renders at 1/3 resolution for chunky pixels
+const MAX_PIXEL_RATIO = 2;
 const WORLD_SEED = 1337;
 const MAX_ENEMIES = 14;
 const SPAWN_EVERY = 4;   // seconds
 const TALK_RANGE = 1.6;  // tiles
-const SKY = '#8fd3ff';
+const SKY_TOP = '#4a8fe0';
+const SKY_HORIZON = '#cdeaff';
+
+function skyTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, SKY_TOP);
+  grad.addColorStop(0.75, SKY_HORIZON);
+  grad.addColorStop(1, SKY_HORIZON);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 2, 256);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 export default class Game {
   constructor(container) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: false });
-    this.renderer.setPixelRatio(1);
+    const retro = FEATURES.retroPixels;
+    this.renderer = new THREE.WebGLRenderer({ antialias: !retro, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(retro ? 1 : Math.min(devicePixelRatio, MAX_PIXEL_RATIO));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.BasicShadowMap;
+    this.renderer.shadowMap.type = retro ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.domElement.style.imageRendering = retro ? 'pixelated' : 'auto';
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(SKY);
-    this.scene.fog = new THREE.Fog(SKY, 22, 42);
+    this.scene.background = skyTexture();
+    this.scene.fog = new THREE.Fog(SKY_HORIZON, 24, 46);
     this.camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 120);
     this.addLights();
 
@@ -72,19 +94,23 @@ export default class Game {
   }
 
   addLights() {
-    this.scene.add(new THREE.HemisphereLight('#d6efff', '#4a6a3a', 1.6));
-    const sun = new THREE.DirectionalLight('#fff1d6', 2.2);
+    this.scene.add(new THREE.HemisphereLight('#d6efff', '#4a6a3a', 1.5));
+    const sun = new THREE.DirectionalLight('#fff1d6', 2.6);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    Object.assign(sun.shadow.camera, { left: -18, right: 18, top: 18, bottom: -18, near: 1, far: 60 });
-    sun.shadow.bias = -0.002;
+    const size = FEATURES.retroPixels ? 1024 : 2048;
+    sun.shadow.mapSize.set(size, size);
+    Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 60 });
+    sun.shadow.bias = -0.0005;
+    sun.shadow.normalBias = 0.02;
+    sun.shadow.radius = 3;
     this.scene.add(sun, sun.target);
     this.sun = sun;
   }
 
   resize() {
     const w = innerWidth, h = innerHeight;
-    this.renderer.setSize(Math.ceil(w / PIXEL_SCALE), Math.ceil(h / PIXEL_SCALE), false);
+    const scale = FEATURES.retroPixels ? RETRO_SCALE : 1;
+    this.renderer.setSize(Math.ceil(w / scale), Math.ceil(h / scale), false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }

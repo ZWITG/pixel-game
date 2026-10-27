@@ -14,10 +14,13 @@ Switches live in `src/config/features.js`. Set one to `false` to remove that fea
 | Menus: choose / confirm / leave | W S / E Space Enter / Q Esc | Stick or D-pad / A / B |
 | Restart after falling | R | Start or A |
 
-## In the game (v0.3.0, 3D)
+## In the game (v0.3.1, 3D)
 | Feature | Switch | Notes |
 |---|---|---|
-| 3D voxel world | — | Three.js, rendered at 1/3 resolution for chunky pixels; shadows, fog, animated water; 60×40 seeded map (`src/world/`) |
+| 3D voxel world, HD | — | Three.js at full resolution with anti-aliasing, soft shadows, filmic tone mapping, gradient sky, fog; 60×40 seeded map (`src/world/`) |
+| Retro pixel mode | `retroPixels` | Off by default: renders at 1/3 resolution for a chunky pixel look |
+| Grass blades | `grassBlades` | ~8,000 instanced blades; turn off on slow machines |
+| Block shading | — | Darker block bottoms (fake ambient occlusion), smooth ground color blending, glossy water |
 | Two cameras | `cameraToggle` | Angled top-down (orbit with right stick) and behind-the-hero with free look (`src/core/CameraRig.js`) |
 | Voxel hero | — | Blocky anime-style model with walk cycle and sword swing (`src/render/models.js`) |
 | Controller support | `gamepad` | Any standard-layout gamepad (Xbox, PlayStation, etc.), via `src/systems/controls.js` |
@@ -52,6 +55,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-10-27 v0.3.1: HD rendering (full resolution, anti-aliasing, soft shadows, tone mapping), grass blades, smooth ground, glossy water, sky gradient; retro mode kept as a switch
 - 2026-10-27 v0.3.0: rebuilt in 3D (Three.js, voxel pixel style), top-down and behind-the-hero cameras, camera-relative movement, mouse/right-stick camera
 - 2026-10-27 v0.2.0: village Lumen Hollow, 4 villagers with dialogue, Mina's shop, controller support
 - 2026-10-27 v0.1.0: first playable (overworld, combat, slimes, XP, coins, death screen)

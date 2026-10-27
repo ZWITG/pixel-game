@@ -63,7 +63,11 @@ export function makeHumanoid(look, { sword = false } = {}) {
     .box(0.07, 0.1, 0.21, 0.1, 0.06, 0.05, look.hair)
     .box(-0.08, 0.3, 0.02, 0.14, 0.08, 0.16, look.hairShine)
     .box(0.1, 0.29, -0.08, 0.12, 0.06, 0.14, look.hair);
-  if (look.helmet) h.box(0, 0.25, 0, 0.5, 0.12, 0.48, '#94b0c2').box(0, 0.33, 0, 0.08, 0.08, 0.3, '#e04060');
+  if (look.helmet) {
+    h.box(0, 0.24, -0.01, 0.48, 0.14, 0.46, '#94b0c2')
+      .box(0, 0.17, 0.22, 0.5, 0.05, 0.08, '#566c86')
+      .box(0, 0.35, -0.04, 0.05, 0.09, 0.26, '#a02848');
+  }
   head.add(voxelMesh(h, mat));
   root.add(head);
 

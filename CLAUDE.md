@@ -1,6 +1,6 @@
 # Pixel RPG
 
-An original anime-fantasy action RPG in 3D voxel pixel style, built with Three.js (JS) + Vite.
+An original anime-fantasy action RPG in 3D voxel style, rendered in HD (the user wants it high quality, not low-res), built with Three.js (JS) + Vite.
 It grows feature by feature with the user, who plays and tests with a controller.
 
 ## Run
@@ -14,7 +14,8 @@ It grows feature by feature with the user, who plays and tests with a controller
 - Fake a controller by overriding `navigator.getGamepads` with an object that has `buttons[i].pressed` and `axes`
   (standard mapping: A 0, B 1, X 2, Y 3, LB 4, RB 5, Select 8, Start 9, R3 11, D-pad 12-15; axes 0-1 left stick, 2-3 right stick).
 - Keyboard: `dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }))`, then keyup.
-- After rendering by hand, wait two animation frames before a screenshot, or it may show an old frame.
+- Never await requestAnimationFrame in pane scripts: it never fires while the pane is hidden. Step frames, then screenshot
+  (if the screenshot shows an old frame, take it again).
 - Screenshots crop to 800×600 of a 1024×768 page, so HUD items on the right/bottom edge can be cut off.
 
 ## Layout

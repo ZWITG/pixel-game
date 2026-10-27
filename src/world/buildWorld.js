@@ -1,13 +1,18 @@
 import * as THREE from 'three';
 import { TILE } from './generateWorld.js';
+import { FEATURES } from '../config/features.js';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
 import { makeTreeGeometry, makeHouse, makeStall } from '../render/models.js';
 
-const GRASS = ['#4f9e4c', '#4a964a', '#55a552'];
-const PATH = ['#c9a46a', '#c09a60', '#d1ad74'];
+const GRASS = '#55a64e';
+const PATH = '#c9a46a';
 const FLOWERS = ['#ffcd75', '#f4f4f4', '#ef7d57', '#ff8fb1'];
 const ROOFS = { red: ['#b13e53', '#8a2e40'], blue: ['#3b5dc9', '#2c4498'], green: ['#257179', '#1a535a'] };
 const OUTER_RING = 4; // extra forest drawn past the map edge
+
+// Smooth brightness field so the ground blends across tiles instead of a checkerboard.
+const meadow = (x, z) => 0.84 + 0.1 * Math.sin(x * 0.31 + z * 0.17) + 0.07 * Math.sin(z * 0.53 - x * 0.21) + 0.04 * Math.sin(x * 1.7 + z * 1.3);
+const dirt = (x, z) => 0.93 + 0.05 * Math.sin(x * 0.9 + z * 0.7) + 0.03 * Math.sin(x * 2.3 - z * 1.9);
 
 function seeded(seed) {
   return () => {
@@ -25,20 +30,27 @@ export function buildWorld(scene, data, village) {
   const ground = new VoxelBuilder();
   const water = new VoxelBuilder();
   const trees = [];
+  const blades = [];
 
   for (let z = 0; z < H; z++) {
     for (let x = 0; x < W; x++) {
       const t = data[z][x], cx = x + 0.5, cz = z + 0.5;
       if (t === TILE.WATER) {
         ground.box(cx, -0.55, cz, 1, 0.1, 1, '#2b4a6e', 0.05);
-        water.box(cx, -0.15, cz, 1, 0.04, 1, '#41a6f6', 0.03);
+        water.box(cx, -0.15, cz, 1, 0.04, 1, '#3f9be8', 0.02);
         continue;
       }
-      ground.box(cx, -0.25, cz, 1, 0.5, 1, t === TILE.PATH ? pick(PATH) : pick(GRASS), 0.03);
+      if (t === TILE.PATH) ground.box(cx, -0.25, cz, 1, 0.5, 1, PATH, 0, { tint: dirt });
+      else ground.box(cx, -0.25, cz, 1, 0.5, 1, GRASS, 0, { tint: meadow });
+      if (t === TILE.GRASS || t === TILE.FLOWERS) {
+        for (let i = 0; i < 4; i++) blades.push([x + 0.08 + rand() * 0.84, z + 0.08 + rand() * 0.84, 0.6 + rand() * 0.8, rand() * Math.PI]);
+      }
       if (t === TILE.FLOWERS) {
-        for (let i = 0; i < 3; i++) ground.box(x + 0.2 + rand() * 0.6, 0.04, z + 0.2 + rand() * 0.6, 0.1, 0.08, 0.1, pick(FLOWERS), 0);
-      } else if (t === TILE.GRASS && rand() < 0.3) {
-        ground.box(x + 0.15 + rand() * 0.7, 0.05, z + 0.15 + rand() * 0.7, 0.08, 0.1, 0.08, '#2f7a3e', 0.1);
+        for (let i = 0; i < 3; i++) {
+          const fx = x + 0.2 + rand() * 0.6, fz = z + 0.2 + rand() * 0.6;
+          ground.box(fx, 0.08, fz, 0.025, 0.16, 0.025, '#2f7a3e', 0);
+          ground.box(fx, 0.17, fz, 0.1, 0.05, 0.1, pick(FLOWERS), 0);
+        }
       } else if (t === TILE.PATH && rand() < 0.15) {
         ground.box(x + 0.2 + rand() * 0.6, 0.03, z + 0.2 + rand() * 0.6, 0.12, 0.06, 0.1, '#8a8a8a', 0.1);
       }
@@ -60,8 +72,29 @@ export function buildWorld(scene, data, village) {
   groundMesh.receiveShadow = true;
   scene.add(groundMesh);
 
-  const waterMesh = new THREE.Mesh(water.build(), vmat({ transparent: true, opacity: 0.78 }));
+  const waterMesh = new THREE.Mesh(water.build(), new THREE.MeshPhongMaterial({
+    vertexColors: true, transparent: true, opacity: 0.8, shininess: 90, specular: new THREE.Color('#bfe6ff'),
+  }));
+  waterMesh.receiveShadow = true;
   scene.add(waterMesh);
+
+  if (FEATURES.grassBlades && blades.length) {
+    const bladeGeo = new VoxelBuilder()
+      .box(0, 0.05, 0, 0.035, 0.1, 0.035, '#3f8a3c', 0, { ao: 0.6 })
+      .box(0, 0.14, 0, 0.03, 0.08, 0.03, '#7cc95e', 0, { ao: 1 })
+      .build();
+    const grass = new THREE.InstancedMesh(bladeGeo, vmat(), blades.length);
+    const d = new THREE.Object3D();
+    blades.forEach(([x, z, s, r], i) => {
+      d.position.set(x, 0, z);
+      d.rotation.set((rand() - 0.5) * 0.3, r, (rand() - 0.5) * 0.3);
+      d.scale.set(1, s, 1);
+      d.updateMatrix();
+      grass.setMatrixAt(i, d.matrix);
+    });
+    grass.receiveShadow = true;
+    scene.add(grass);
+  }
 
   const forest = new THREE.InstancedMesh(makeTreeGeometry(), vmat(), trees.length);
   const dummy = new THREE.Object3D();
