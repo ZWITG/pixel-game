@@ -22,7 +22,7 @@ export default class Hud {
     this.v = new THREE.Vector3();
     this.el = {
       hearts: $('hearts'), level: $('level'), lv: $('lv'), xpfill: $('xpfill'),
-      coins: $('coins'), coinCount: $('coin-count'), bagInfo: $('bag-info'), satchelInfo: $('satchel-info'),
+      clock: $('clock'), coins: $('coins'), coinCount: $('coin-count'), bagInfo: $('bag-info'), satchelInfo: $('satchel-info'),
       cam: $('cam-hint'), actionHint: $('action-hint'), banner: $('banner'),
       prompt: $('prompt'), floats: $('floats'), flash: $('flash'),
       target: $('target'), targetName: $('target-name'), targetFill: $('target-fill'),
@@ -85,6 +85,10 @@ export default class Hud {
       if (this.game.satchel) lines.push('Your last satchel is gone for good.');
     }
     this.el.gameOverLoot.textContent = lines.join('\n');
+  }
+
+  setClock(text) {
+    if (text !== this.clockText) this.el.clock.textContent = this.clockText = text;
   }
 
   setCamMode(mode) {

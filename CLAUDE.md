@@ -31,9 +31,14 @@ It grows feature by feature with the user, who plays and tests with a controller
   trees (oak/pine/birch), houses (incl. smithy), stall, pickups, effects. `src/render/props.js`: scenery drawn into shared builders
   (rocks, bushes, fences, lanterns, fountain, barrels, crates, clouds, glow sprites).
 - `src/art/looks.js`: character color sets. `src/art/icons.js`: HUD pixel icons as SVG.
-- `src/world/generateWorld.js` (seeded tile map + village layout with sections, spots, lanterns, props), `buildWorld.js` (3D meshes),
+- `src/world/regions.js`: named regions (center, radius, ground color, trees, flowers). `generateWorld.js`: seeded tile map with
+  regions, river, lake, bridges, landmarks (`LANDMARKS`) and the village layout. `buildWorld.js` (3D meshes, returns animated parts),
   `collision.js` (tiles + rectangles; `fence: true` rects stop the hero but not monsters).
 - Enemy behaviour is picked by `ai` in `data/enemies.js` ('chase', 'charge', 'shoot'); wisp orbs live in `Game.projectiles`.
+  Where monsters spawn comes from their `regions` (and `night`).
+- `src/systems/dayNight.js`: clock, sky, sun/moon, fog, stars, night glow. `src/world/ambient.js`: decorative life.
+  `src/render/wind.js`: shared wind clock and `addWind(material)` for swaying grass and trees.
+- Villagers (`src/entities/Npc.js`) walk using `wander` / `route` from `data/npcs.js`; their solid rect moves with them (`owner`).
 - `src/entities/`: Player (attack, spin slash, dodge roll), Enemy, Npc. `src/ui/Hud.js` + `hud.css`: HTML overlay (stats, dialogue, shop, controls screen, prompts).
 - Pickups (coins and monster drops) and the death satchel live in `Game.js` (`pickups`, `satchel`, `revive()`).
 - `src/systems/controls.js`: all input (keyboard, mouse drag, gamepad) and the control scheme (`ACTIONS`, PS5 button names).

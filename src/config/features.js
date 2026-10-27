@@ -18,4 +18,7 @@ export const FEATURES = {
   gamepad: true,        // controller support (PS5 layout; any standard pad works)
   retroPixels: false,   // chunky low-res pixel look instead of HD rendering
   grassBlades: true,    // thousands of small grass blades (turn off on slow machines)
+  dayNight: true,       // day/night cycle (8 minutes a day): sunsets, stars, lit windows, fireflies
+  ambientLife: true,    // butterflies, birds, fish, fireflies, chimney smoke, windmill, wind in grass and trees
+  wanderingVillagers: true, // villagers stroll and patrol instead of standing still
 };

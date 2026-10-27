@@ -16,19 +16,20 @@ export default class Collision {
     return SOLID_TILES.includes(this.map[tz][tx]);
   }
 
-  blocked(x, z, r, overFences = false) {
+  // `self` skips the entity's own solid rectangle (moving villagers have one).
+  blocked(x, z, r, overFences = false, self = null) {
     for (let tz = Math.floor(z - r); tz <= Math.floor(z + r); tz++)
       for (let tx = Math.floor(x - r); tx <= Math.floor(x + r); tx++)
         if (this.solidTile(tx, tz)) return true;
     for (const b of this.rects)
-      if (!(overFences && b.fence) && x + r > b.x0 && x - r < b.x1 && z + r > b.z0 && z - r < b.z1) return true;
+      if (b.owner !== self && !(overFences && b.fence) && x + r > b.x0 && x - r < b.x1 && z + r > b.z0 && z - r < b.z1) return true;
     return false;
   }
 
   // Moves an entity one axis at a time so it slides along walls.
   move(entity, dx, dz) {
     const p = entity.group.position, r = entity.radius, over = !!entity.overFences;
-    if (dx && !this.blocked(p.x + dx, p.z, r, over)) p.x += dx;
-    if (dz && !this.blocked(p.x, p.z + dz, r, over)) p.z += dz;
+    if (dx && !this.blocked(p.x + dx, p.z, r, over, entity)) p.x += dx;
+    if (dz && !this.blocked(p.x, p.z + dz, r, over, entity)) p.z += dz;
   }
 }

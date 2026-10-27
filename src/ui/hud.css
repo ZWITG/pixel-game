@@ -48,6 +48,8 @@ html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
   display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 10px;
   background: var(--chip); border: 2px solid rgba(255, 205, 117, 0.25); border-radius: 6px;
 }
+#clock { font-size: 8px; color: var(--steel); padding: 4px 8px; background: var(--chip); border-radius: 6px; }
+#clock:empty { display: none; }
 #bag-info { font-size: 8px; color: #a7f070; }
 #satchel-info { font-size: 8px; color: var(--gold); }
 

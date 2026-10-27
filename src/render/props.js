@@ -125,3 +125,80 @@ export function makeGlowSprite(color = '#ffcf7a', size = 1.1) {
   sprite.scale.setScalar(size);
   return sprite;
 }
+
+// ---- Landmark pieces (v0.6.0) ----
+
+// A mossy boulder filling a ROCK tile.
+export function boulder(b, x, z, r) {
+  const s = 0.85 + r() * 0.3;
+  b.box(x, 0.3 * s, z, 0.82 * s, 0.6 * s, 0.74 * s, '#8a8a92', 0.08)
+    .box(x + 0.1, 0.66 * s, z - 0.05, 0.55 * s, 0.24 * s, 0.5 * s, '#9a9aa2', 0.08)
+    .box(x - 0.05, 0.8 * s, z, 0.4 * s, 0.06 * s, 0.36 * s, '#5f8a4a', 0.1);
+}
+
+// A broken pillar filling a RUIN tile. Moss on top, sometimes a carved capital.
+export function ruinPillar(b, x, z, r) {
+  const h = 0.8 + r() * 1.5;
+  b.box(x, 0.1, z, 0.78, 0.2, 0.78, '#9a9aa2')
+    .box(x, 0.1 + h / 2, z, 0.48, h, 0.48, '#b4b4bc', 0.05)
+    .box(x + 0.245, 0.1 + h * 0.4, z, 0.02, h * 0.6, 0.1, '#8a8a92', 0)
+    .box(x, 0.12 + h, z, 0.5, 0.06, 0.5, '#5f8a4a', 0.1);
+  if (h > 1.6) b.box(x, 0.2 + h, z, 0.66, 0.16, 0.66, '#c9ccd4');
+  if (r() < 0.5) b.box(x + 0.3, 0.08, z + 0.32, 0.26, 0.16, 0.22, '#9a9aa2', 0.1);
+}
+
+// Pieces of a fallen column lying in the grass (not solid).
+export function fallenColumn(b, x, z) {
+  b.box(x, 0.2, z, 1.1, 0.4, 0.42, '#b4b4bc', 0.05)
+    .box(x + 0.75, 0.2, z + 0.1, 0.35, 0.4, 0.42, '#a6a6ae', 0.05)
+    .box(x - 0.2, 0.42, z, 0.5, 0.05, 0.3, '#5f8a4a', 0.1);
+}
+
+// The altar at the heart of the ruins; its rune glows in `glow`.
+export function altar(b, glow, x, z) {
+  b.box(x, 0.12, z, 1.3, 0.24, 1.0, '#9a9aa2').box(x, 0.45, z, 0.9, 0.42, 0.6, '#b4b4bc', 0.04);
+  glow.box(x, 0.67, z, 0.5, 0.02, 0.2, '#9fe8ff', 0).box(x, 0.67, z, 0.1, 0.02, 0.44, '#9fe8ff', 0);
+}
+
+// A tall standing stone with a faintly glowing rune.
+export function standingStone(b, glow, x, z, r) {
+  const h = 1.3 + r() * 0.5;
+  b.box(x, h / 2, z, 0.42, h, 0.3, '#8a8a92', 0.06).box(x, h + 0.04, z, 0.34, 0.08, 0.24, '#9a9aa2');
+  glow.box(x, h * 0.6, z + 0.151, 0.08, 0.3, 0.01, '#9fe8ff', 0).box(x, h * 0.6, z + 0.151, 0.22, 0.06, 0.01, '#9fe8ff', 0);
+  glow.box(x, h * 0.6, z - 0.151, 0.08, 0.3, 0.01, '#9fe8ff', 0);
+}
+
+// A mushroom whose cap glows (stem in `b`, cap in `glow`).
+export function glowMushroom(b, glow, x, z, s = 1) {
+  b.box(x, 0.07 * s, z, 0.06 * s, 0.14 * s, 0.06 * s, '#f4e8d0', 0);
+  glow.box(x, 0.16 * s, z, 0.2 * s, 0.07 * s, 0.2 * s, '#b48cff', 0).box(x, 0.21 * s, z, 0.1 * s, 0.04 * s, 0.1 * s, '#e8dcff', 0);
+}
+
+export function reeds(b, x, z, r) {
+  for (let i = 0; i < 4; i++) {
+    const h = 0.35 + r() * 0.35, rx = x + (r() - 0.5) * 0.4, rz = z + (r() - 0.5) * 0.4;
+    b.box(rx, -0.15 + h / 2, rz, 0.03, h, 0.03, '#5f8a3a', 0);
+    if (r() < 0.5) b.box(rx, -0.15 + h, rz, 0.05, 0.12, 0.05, '#7a4a2a', 0);
+  }
+}
+
+export function leafLitter(b, x, z, r) {
+  const colors = ['#8a5a32', '#b8862a', '#5f6a2a'];
+  for (let i = 0; i < 3; i++) b.box(x + (r() - 0.5) * 0.8, 0.005, z + (r() - 0.5) * 0.8, 0.12, 0.01, 0.08, colors[i % 3], 0.1);
+}
+
+// One bridge tile: planks across the crossing and rails on sides that face water.
+// `alongX` means people walk along x. `rails` = { n, s, e, w } sides with water.
+export function bridgeTile(b, x, z, alongX, rails) {
+  for (let i = 0; i < 4; i++) {
+    const o = -0.375 + i * 0.25, c = i % 2 ? '#a86a3a' : '#b87a42';
+    if (alongX) b.box(x + o, -0.04, z, 0.23, 0.08, 1, c, 0.04);
+    else b.box(x, -0.04, z + o, 1, 0.08, 0.23, c, 0.04);
+  }
+  b.box(x, -0.12, z, 0.9, 0.1, 0.12, '#5a3a22', 0);
+  const rail = (rx, rz, w, d) => b.box(rx, 0.32, rz, w, 0.06, d, '#7a4a2a').box(rx, 0.15, rz, Math.min(w, 0.07) || 0.07, 0.3, Math.min(d, 0.07) || 0.07, '#5a3a22');
+  if (rails.n) rail(x, z - 0.47, 1, 0.06);
+  if (rails.s) rail(x, z + 0.47, 1, 0.06);
+  if (rails.w) rail(x - 0.47, z, 0.06, 1);
+  if (rails.e) rail(x + 0.47, z, 0.06, 1);
+}

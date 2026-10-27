@@ -24,10 +24,15 @@ Press Options (or Esc) in game for the controls screen with a controller diagram
 | Shop: Buy / Sell tab | A D / arrows | L1 R1 / D-pad left right |
 | Rise after falling | R | Cross or Options |
 
-## In the game (v0.5.0, 3D)
+## In the game (v0.6.0, 3D)
 | Feature | Switch | Notes |
 |---|---|---|
 | 3D voxel world, HD | — | Three.js at full resolution with anti-aliasing, soft shadows, filmic tone mapping, gradient sky, fog; 60×40 seeded map (`src/world/`) |
+| World regions | — | Each has its own ground color, trees, details, monsters and a name banner (`src/world/regions.js`):<br>**Sunpetal Meadow** (oaks, flowers, windmill, slimes and boars), **The Dimwood** (dense pines, leaf litter, glowing mushrooms, a fairy-ring clearing, Puffcaps and Wisps), **Glimmer Lake** (sandy shore, reeds, lily pads, a long boardwalk, Puffcaps), **Thornback Moors** (boulders, old pillar ruins with an altar, boars and fire slimes), **Spirit Hill** (the great dimmed Spirit Tree, standing stones with runes, glowing flowers, Wisps) |
+| River and bridges | — | A river runs from the northern hills into Glimmer Lake; railed wooden bridges where roads cross water |
+| Day/night cycle | `dayNight` | 8 minutes per day, clock in the top right. Dawn and dusk colors, moonlit nights with stars; lanterns, windows, runes and mushrooms glow brighter at night; Wisps also roam anywhere after dark |
+| Ambient life | `ambientLife` | Grass and treetops sway in the wind, butterflies over flowers, birds that take off when you come close, fireflies, motes rising from the Spirit Tree, fish jumping in the lake and ponds, chimney smoke, the windmill turning (`src/world/ambient.js`) |
+| Wandering villagers | `wanderingVillagers` | Villagers stroll around their spots, Pip runs about, Guard Bram patrols; they stop and face you when you come near |
 | Retro pixel mode | `retroPixels` | Off by default: renders at 1/3 resolution for a chunky pixel look |
 | Grass blades | `grassBlades` | ~8,000 instanced blades; turn off on slow machines |
 | Block shading | — | Darker block bottoms (fake ambient occlusion), smooth ground color blending, glossy water |
@@ -73,13 +78,17 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Save / load (localStorage)
 - [ ] Dungeon with stairs and a boss
 - [ ] Magic / special skill
-- [ ] Day / night cycle with lanterns
+- [x] Day / night cycle with lanterns
+- [x] Distinct world regions, landmarks and ambient life
+- [ ] Climb Spirit Hill quest: rekindle the Spirit Tree
+- [ ] Weather (rain, fog in the Dimwood)
 - [ ] Sound effects and music
 - [ ] Minimap
 - [ ] Controller rumble on hits
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-10-27 v0.6.0: living world: five regions with their own look and monsters, river and lake with bridges and a boardwalk, the Spirit Tree on Spirit Hill, standing stones, moor ruins, Dimwood fairy ring, windmill; day/night cycle; wind, butterflies, birds, fireflies, fish, chimney smoke; villagers walk and patrol
 - 2026-10-27 v0.5.0: new monsters (Puffcap that splits, charging Thornback Boar, orb-shooting Wisp), Market Row village section with fountain, Odo's Forge (Knight Blade, Iron Vest, Swift Greaves; defense stat) and Lyra the bard, village fence and lanterns, three tree kinds, wild props, clouds, hero cape, framed HUD; camera rises over trees
 - 2026-10-27 v0.4.0: lock-on targeting, dodge roll with invincibility, spin slash, monster drops sold to Mina (Sell tab), loot satchel on death, PS5 controller layout (shoulders no longer turn the camera) with button prompts and a controls screen, behind-the-hero camera only (top-down switched off), L1 recenters the camera
 - 2026-10-27 v0.3.1: HD rendering (full resolution, anti-aliasing, soft shadows, tone mapping), grass blades, smooth ground, glossy water, sky gradient; retro mode kept as a switch

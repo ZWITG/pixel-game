@@ -1,11 +1,13 @@
 // Villagers. `spot` is a named position from the village layout in world/generateWorld.js,
 // `look` is a color set from art/looks.js, and `shop` opens that shop after talking.
+// `wander` (tiles) lets them stroll around their spot; `route` walks them between tiles in order.
 export const NPCS = [
   {
     id: 'elder',
     name: 'Elder Mirae',
     look: 'elder',
     spot: 'elder',
+    wander: 1.5,
     lines: [
       'Welcome to Lumen Hollow, traveler.',
       'Since the Spirit Tree dimmed, slimes have crept out of the woods.',
@@ -17,6 +19,7 @@ export const NPCS = [
     name: 'Mina',
     look: 'merchant',
     spot: 'merchant',
+    wander: 0.6,
     shop: 'mina',
     lines: [
       "Hi there! Mina's Goods, best prices in the Hollow.",
@@ -28,6 +31,8 @@ export const NPCS = [
     name: 'Pip',
     look: 'kid',
     spot: 'kid',
+    wander: 4,
+    speed: 2.2, // Pip runs everywhere
     lines: [
       "Did you know slimes drop coins? I'm saving up for a sword!",
       'Fire slimes only show up once you get tough. Mom says stay away from them.',
@@ -38,6 +43,7 @@ export const NPCS = [
     name: 'Guard Bram',
     look: 'guard',
     spot: 'guard',
+    route: [[17, 14], [23, 14], [23, 11], [17, 11]], // patrols the south side
     lines: [
       "Monsters can't get into the village. The old wards keep us safe.",
       "Out past the road, though, you're on your own.",
@@ -49,6 +55,7 @@ export const NPCS = [
     name: 'Odo the Smith',
     look: 'smith',
     spot: 'smith',
+    wander: 0.8,
     shop: 'odo',
     lines: [
       'Welcome to Market Row. Mind the sparks.',
@@ -60,6 +67,8 @@ export const NPCS = [
     name: 'Lyra the Bard',
     look: 'bard',
     spot: 'bard',
+    wander: 1.5,
+    speed: 0.8,
     lines: [
       'Ah, an audience! Have you heard the Ballad of the Dim Tree?',
       'Wisps drift where the Spirit Tree once glowed. They spit little stars. Roll right through them!',

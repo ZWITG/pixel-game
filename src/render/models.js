@@ -422,3 +422,68 @@ export function makeSlash() {
   const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
   return new THREE.Mesh(slashGeo, mat);
 }
+
+// The Spirit Tree: the great dimmed tree on Spirit Hill, visible from across the map.
+// Its crystals pulse faintly (animate `crystals.material`).
+export function makeSpiritTree() {
+  const group = new THREE.Group();
+  const b = new VoxelBuilder();
+  // roots
+  for (const [x, z, w, d] of [[-1, 0, 0.9, 0.5], [1, 0.1, 0.9, 0.5], [0.1, -1, 0.5, 0.9], [-0.1, 1, 0.5, 0.9], [-0.8, 0.8, 0.5, 0.5], [0.8, -0.8, 0.5, 0.5]]) {
+    b.box(x, 0.18, z, w, 0.36, d, '#5a3a22');
+  }
+  b.box(0, 1.6, 0, 1.4, 3.2, 1.4, '#6a4428')
+    .box(0, 1.2, 0, 1.6, 0.9, 1.6, '#5a3a22')
+    .box(0.3, 2.2, 0.71, 0.3, 0.9, 0.04, '#4a2f1c', 0)
+    .box(-0.71, 1.4, -0.2, 0.04, 0.7, 0.3, '#4a2f1c', 0)
+    .box(0, 3.6, 0, 1.0, 1.2, 1.0, '#6a4428');
+  // branches
+  for (const [x, y, z, w, h, d] of [[1.1, 3.9, 0, 1.4, 0.35, 0.35], [-1.1, 4.2, 0.2, 1.4, 0.35, 0.35], [0, 4.4, 1.1, 0.35, 0.35, 1.4], [0.2, 3.8, -1.1, 0.35, 0.35, 1.4]]) {
+    b.box(x, y, z, w, h, d, '#5a3a22');
+  }
+  // canopy: muted blue-green, as if its light has gone out
+  for (const [x, y, z, w, h, d, c] of [
+    [0, 4.9, 0, 5.2, 1.0, 5.0, '#3e7a6e'], [0.2, 5.8, -0.2, 4.2, 0.9, 4.2, '#4a8f7e'], [-0.2, 6.6, 0.1, 3.0, 0.8, 3.0, '#5aa38c'],
+    [0, 7.25, 0, 1.6, 0.5, 1.6, '#6fb89c'], [2.3, 4.6, 1.2, 1.4, 0.9, 1.6, '#3e7a6e'], [-2.4, 5.0, -1.0, 1.4, 0.8, 1.5, '#4a8f7e'],
+    [1.2, 5.3, -2.3, 1.6, 0.8, 1.2, '#3e7a6e'], [-1.0, 4.7, 2.3, 1.8, 0.8, 1.2, '#4a8f7e'],
+  ]) {
+    b.box(x, y, z, w, h, d, c, 0.08);
+  }
+  group.add(voxelMesh(b, vmat()));
+
+  // Hanging crystals that still glow a little.
+  const c = new VoxelBuilder();
+  for (const [x, y, z] of [[1.6, 4.0, 0.9], [-1.8, 4.3, -0.4], [0.6, 4.1, -2.0], [-0.7, 4.0, 2.0], [2.2, 4.1, -0.8], [-2.0, 4.4, 1.3], [0.1, 4.2, 2.4]]) {
+    c.box(x, y + 0.25, z, 0.03, 0.3, 0.03, '#2b2f45', 0).box(x, y, z, 0.16, 0.26, 0.16, '#9fe8ff', 0);
+  }
+  const crystals = new THREE.Mesh(c.build(), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
+  group.add(crystals);
+  return { group, crystals };
+}
+
+// A meadow windmill. `blades` turns around its z axis.
+export function makeWindmill() {
+  const group = new THREE.Group();
+  const b = new VoxelBuilder()
+    .box(0, 0.1, 0, 1.8, 0.2, 1.8, '#8a8a8a')
+    .box(0, 0.9, 0, 1.4, 1.4, 1.4, '#e8d5b0')
+    .box(0, 2.0, 0, 1.15, 0.9, 1.15, '#e8d5b0')
+    .box(0, 0.55, 0.71, 0.4, 0.7, 0.04, '#7a5230')
+    .box(0, 1.25, 0.71, 0.3, 0.3, 0.04, '#73eff7')
+    .box(0, 1.7, 0, 1.5, 0.08, 1.5, '#7a5230');
+  [[1.4, 2.55], [1.0, 2.8], [0.6, 3.05], [0.2, 3.25]].forEach(([w, y], i) => b.box(0, y, 0, w, 0.25, w, i % 2 ? '#8a2e40' : '#b13e53'));
+  b.box(0, 2.6, 0.62, 0.2, 0.2, 0.3, '#5a3a22');
+  group.add(voxelMesh(b, vmat()));
+  const blades = new THREE.Group();
+  blades.position.set(0, 2.6, 0.8);
+  const bb = new VoxelBuilder().box(0, 0, 0, 0.18, 0.18, 0.12, '#5a3a22');
+  for (let i = 0; i < 4; i++) {
+    const a = (i * Math.PI) / 2, cx = Math.cos(a), cy = Math.sin(a);
+    bb.box(cx * 0.75, cy * 0.75, 0, Math.abs(cx) * 1.4 + 0.08, Math.abs(cy) * 1.4 + 0.08, 0.05, '#7a5230');
+    const ox = -cy * 0.16, oy = cx * 0.16;
+    bb.box(cx * 0.85 + ox, cy * 0.85 + oy, 0.02, Math.abs(cx) * 1.1 + Math.abs(cy) * 0.26, Math.abs(cy) * 1.1 + Math.abs(cx) * 0.26, 0.02, '#f4ecd8');
+  }
+  blades.add(voxelMesh(bb, vmat()));
+  group.add(blades);
+  return { group, blades };
+}

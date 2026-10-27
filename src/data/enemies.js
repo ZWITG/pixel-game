@@ -5,6 +5,7 @@
 //         'charge' - winds up, then dashes in a straight line; stunned if it hits a wall
 //         'shoot'  - keeps its distance and fires slow orbs
 //  drops: monster drops (data/items.js LOOT) and their chance. `splitInto` spawns 2 of that type on death.
+//  regions: where it spawns (world/regions.js ids); night: true also spawns anywhere after dark.
 //  spawns: false keeps a type out of random spawning (it only appears from a split).
 export const ENEMIES = {
   slime: {
@@ -20,6 +21,7 @@ export const ENEMIES = {
     radius: 0.33,
     xp: 4,
     minLevel: 1,
+    regions: ['meadow', 'lake', 'moors', 'spirit'],
     drops: [{ item: 'gel', chance: 0.6 }, { item: 'pearl', chance: 0.04 }],
   },
   puffcap: {
@@ -34,6 +36,7 @@ export const ENEMIES = {
     radius: 0.36,
     xp: 6,
     minLevel: 1,
+    regions: ['dimwood', 'lake'],
     splitInto: 'sporeling',
     drops: [{ item: 'spore', chance: 0.7 }],
   },
@@ -67,6 +70,7 @@ export const ENEMIES = {
     radius: 0.4,
     xp: 8,
     minLevel: 2,
+    regions: ['moors', 'meadow'],
     drops: [{ item: 'hide', chance: 0.6 }, { item: 'tusk', chance: 0.15 }],
   },
   fireSlime: {
@@ -82,6 +86,7 @@ export const ENEMIES = {
     radius: 0.33,
     xp: 10,
     minLevel: 3,
+    regions: ['moors', 'meadow'],
     drops: [{ item: 'ember', chance: 0.5 }, { item: 'gel', chance: 0.3 }, { item: 'pearl', chance: 0.08 }],
   },
   wisp: {
@@ -99,6 +104,8 @@ export const ENEMIES = {
     radius: 0.3,
     xp: 9,
     minLevel: 3,
+    regions: ['spirit', 'dimwood'],
+    night: true,
     drops: [{ item: 'dust', chance: 0.6 }, { item: 'pearl', chance: 0.05 }],
   },
 };

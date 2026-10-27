@@ -11,6 +11,9 @@ import Store from './Store.js';
 import CameraRig from './CameraRig.js';
 import Controls from '../systems/controls.js';
 import LockOn from '../systems/lockOn.js';
+import DayNight from '../systems/dayNight.js';
+import Ambient from '../world/ambient.js';
+import { REGION_BY_ID } from '../world/regions.js';
 import Player from '../entities/Player.js';
 import Enemy from '../entities/Enemy.js';
 import Npc from '../entities/Npc.js';
@@ -32,24 +35,8 @@ const ORB_LIFE = 3;        // seconds a wisp's shot flies
 const ORB_HIT = 0.4;       // tiles from the hero's center that count as a hit
 const TREE_HEIGHT = 2;     // tiles: the camera pulls in when a tree this tall is in the way
 const HOUSE_HEIGHT = 2.4;
-const SKY_TOP = '#4a8fe0';
 const SKY_HORIZON = '#cdeaff';
-
-function skyTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 2;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0, SKY_TOP);
-  grad.addColorStop(0.75, SKY_HORIZON);
-  grad.addColorStop(1, SKY_HORIZON);
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 2, 256);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
+const BANNER_SETTLE = 0.5; // seconds in a new area before its name shows (no flicker on borders)
 
 export default class Game {
   constructor(container) {
@@ -64,7 +51,6 @@ export default class Game {
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = skyTexture();
     this.scene.fog = new THREE.Fog(SKY_HORIZON, 24, 46);
     this.camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 120);
     this.addLights();
@@ -75,19 +61,23 @@ export default class Game {
     this.rig = new CameraRig(this.camera);
     this.hud.setCamMode(this.rig.mode);
 
-    const { data, spawn, village } = generateWorld(WORLD_SEED, { village: FEATURES.village });
+    const gen = generateWorld(WORLD_SEED, { village: FEATURES.village });
+    const { data, spawn, village } = gen;
     this.spawn = spawn;
     this.village = village;
-    const world = buildWorld(this.scene, data, village);
+    this.region = gen.region;
+    const world = buildWorld(this.scene, gen);
     this.water = world.water;
     this.clouds = world.clouds;
     this.collision = new Collision(data, world.rects);
-    // Trees (and the forest past the map edge) and buildings block the camera's view.
+    // Trees (and the forest past the map edge), pillars, boulders and buildings block the camera's view.
     this.rig.occluder = (x, y, z) => {
-      const tx = Math.floor(x), tz = Math.floor(z), row = data[tz];
-      if (y < TREE_HEIGHT && (!row || row[tx] === undefined || row[tx] === TILE.TREE)) return true;
-      return y < HOUSE_HEIGHT && world.rects.some((b) => !b.fence && x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1);
+      const tx = Math.floor(x), tz = Math.floor(z), t = data[tz]?.[tx];
+      if (y < TREE_HEIGHT && (t === undefined || t === TILE.TREE)) return true;
+      if ((t === TILE.RUIN && y < 2.3) || (t === TILE.ROCK && y < 0.9)) return true;
+      return y < HOUSE_HEIGHT && world.rects.some((b) => !b.fence && !b.owner && x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1);
     };
+    this.dayNight = new DayNight(this.scene, { sun: this.sun, hemi: this.hemi, ...world.lights });
 
     this.npcs = [];
     if (village) {
@@ -102,6 +92,7 @@ export default class Game {
 
     this.player = new Player(this);
     this.lockOn = new LockOn(this);
+    this.ambient = FEATURES.ambientLife ? new Ambient(this, gen, world) : null;
     this.enemies = [];
     this.pickups = [];   // coins and monster drops on the ground: { mesh, kind, seed }
     this.satchel = null; // what the hero dropped when falling
@@ -115,7 +106,8 @@ export default class Game {
   }
 
   addLights() {
-    this.scene.add(new THREE.HemisphereLight('#d6efff', '#4a6a3a', 1.5));
+    this.hemi = new THREE.HemisphereLight('#d6efff', '#4a6a3a', 1.5);
+    this.scene.add(this.hemi);
     const sun = new THREE.DirectionalLight('#fff1d6', 2.6);
     sun.castShadow = true;
     const size = FEATURES.retroPixels ? 1024 : 2048;
@@ -148,7 +140,7 @@ export default class Game {
     this.removeSatchel();
     if (FEATURES.enemies) for (let i = 0; i < MAX_ENEMIES; i++) this.spawnEnemy();
     this.spawnTimer = SPAWN_EVERY;
-    this.lastArea = null;
+    this.lastArea = this.pendingArea = null;
     this.hud.reset();
     this.rig.snap(this.player);
   }
@@ -189,14 +181,16 @@ export default class Game {
 
     this.animate(dt);
     this.rig.update(dt, this.player, this.lockOn.target);
-    this.sun.position.set(this.player.x - 8, 14, this.player.z + 6);
-    this.sun.target.position.set(this.player.x, 0, this.player.z);
+    this.dayNight.apply(this.player, this.camera);
+    if (FEATURES.dayNight) this.hud.setClock(this.dayNight.label);
     this.hud.update(dt);
     this.renderer.render(this.scene, this.camera);
   }
 
   updateWorld(dt, just) {
     const player = this.player;
+    this.dayNight.advance(dt);
+    for (const villager of this.npcs) villager.update(dt);
     const npc = FEATURES.dialogue ? this.nearestNpc() : null;
     if (FEATURES.lockOn) {
       if (just.lock) this.lockOn.toggle();
@@ -242,12 +236,18 @@ export default class Game {
 
     // Show the name of the village, or of a section of it, when walking in.
     const area = this.areaName(player.x, player.z);
-    if (area && area !== this.lastArea) this.hud.showBanner(area);
-    this.lastArea = area;
+    if (area !== this.pendingArea) {
+      this.pendingArea = area;
+      this.pendingSince = this.time;
+    } else if (area && area !== this.lastArea && this.time - this.pendingSince > BANNER_SETTLE) {
+      this.hud.showBanner(area);
+      this.lastArea = area;
+    }
   }
 
+  // The village (or a section of it), else the world region: Spirit Hill, The Dimwood...
   areaName(x, z) {
-    if (!this.inVillage(x, z)) return null;
+    if (!this.inVillage(x, z)) return REGION_BY_ID[this.region[Math.floor(z)]?.[Math.floor(x)]]?.name ?? null;
     const section = this.village.sections.find((s) => x >= s.x && x < s.x + s.w && z >= s.y && z < s.y + s.h);
     return section ? section.name : this.village.name;
   }
@@ -261,6 +261,7 @@ export default class Game {
       if (cloud.position.x > this.collision.w + 15) cloud.position.x = -15;
     }
     for (const npc of this.npcs) npc.animate(t);
+    this.ambient?.update(dt);
     for (const item of this.pickups) {
       item.mesh.rotation.y += dt * 3;
       item.mesh.position.y = 0.35 + Math.sin(t * 4 + item.seed) * 0.06;
@@ -341,17 +342,19 @@ export default class Game {
 
   spawnEnemy() {
     if (this.enemies.filter((e) => !e.dying).length >= MAX_ENEMIES) return;
-    const level = this.store.get('level');
-    const types = Object.values(ENEMIES).filter((d) => d.spawns !== false && level >= d.minLevel);
-    const def = types[Math.floor(Math.random() * types.length)];
+    // Each region has its own monsters (data/enemies.js `regions`); some also roam anywhere at night.
+    const level = this.store.get('level'), night = this.dayNight.night > 0.5;
     const { w, h } = this.collision;
     for (let tries = 0; tries < 30; tries++) {
       const x = 2 + Math.floor(Math.random() * (w - 4)) + 0.5;
       const z = 2 + Math.floor(Math.random() * (h - 4)) + 0.5;
-      if (this.collision.blocked(x, z, def.radius)) continue;
+      if (this.collision.blocked(x, z, 0.45)) continue;
       if (Math.hypot(x - this.player.x, z - this.player.z) < 9) continue;
       if (this.inVillage(x, z, 2)) continue;
-      this.spawnAt(x, z, def);
+      const region = this.region[Math.floor(z)][Math.floor(x)];
+      const types = Object.values(ENEMIES).filter((d) => d.spawns !== false && level >= d.minLevel && (d.regions?.includes(region) || (night && d.night)));
+      if (!types.length) continue;
+      this.spawnAt(x, z, types[Math.floor(Math.random() * types.length)]);
       return;
     }
   }
@@ -453,7 +456,7 @@ export default class Game {
     const home = this.homeSpot();
     p.respawn(home.x, home.z);
     s.set('dead', false);
-    this.lastArea = null;
+    this.lastArea = this.pendingArea = null;
     this.rig.snap(p);
   }
 
