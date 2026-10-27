@@ -1,0 +1,39 @@
+// Player stats live in the game registry so every scene (World, UI) can read
+// them and react to 'changedata' events.
+export const START_STATS = {
+  hp: 5,
+  maxHp: 5,
+  atk: 1,
+  level: 1,
+  xp: 0,
+  xpNext: 10,
+  coins: 0,
+  dead: false,
+};
+
+export function resetStats(registry) {
+  for (const [key, value] of Object.entries(START_STATS)) registry.set(key, value);
+}
+
+// Adds XP and handles level ups. Returns how many levels were gained.
+export function addXp(registry, amount) {
+  let xp = registry.get('xp') + amount;
+  let xpNext = registry.get('xpNext');
+  let gained = 0;
+  while (xp >= xpNext) {
+    xp -= xpNext;
+    xpNext = Math.floor(xpNext * 1.5);
+    gained++;
+  }
+  if (gained) {
+    const level = registry.get('level') + gained;
+    const maxHp = Math.min(12, registry.get('maxHp') + gained);
+    registry.set('level', level);
+    registry.set('maxHp', maxHp);
+    registry.set('hp', maxHp);
+    registry.set('atk', 1 + Math.floor((level - 1) / 2));
+  }
+  registry.set('xpNext', xpNext);
+  registry.set('xp', xp);
+  return gained;
+}
