@@ -5,6 +5,8 @@
   --steel: #94b0c2;
   --dim: #566c86;
   --sky: #73eff7;
+  --panel: linear-gradient(180deg, rgba(41, 44, 70, 0.96), rgba(22, 24, 38, 0.96));
+  --chip: rgba(16, 18, 30, 0.55);
 }
 
 html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
@@ -21,16 +23,31 @@ html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
   color: var(--paper);
   text-shadow: 2px 0 var(--ink), -2px 0 var(--ink), 0 2px var(--ink), 0 -2px var(--ink);
 }
+/* Soft vignette that frames the scene. */
+#hud::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(8, 10, 24, 0.38) 100%);
+}
 
-#stats { position: absolute; left: 12px; top: 12px; }
-#hearts { display: flex; flex-wrap: wrap; gap: 3px; max-width: 60vw; }
+#stats {
+  position: absolute; left: 12px; top: 12px; padding: 8px 10px 9px;
+  background: var(--chip); border: 2px solid rgba(255, 255, 255, 0.08); border-radius: 6px;
+}
+#hearts { display: flex; flex-wrap: wrap; gap: 3px; max-width: 60vw; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.45)); }
 #hearts svg, #coin-icon svg { width: 21px; height: 21px; display: block; }
 #level { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-#xpbar { width: 120px; height: 8px; background: #333c57; border: 2px solid var(--ink); }
-#xpfill { height: 100%; width: 0; background: var(--sky); }
+#lv { color: var(--gold); }
+#xpbar { width: 130px; height: 10px; background: #262a40; border: 2px solid var(--ink); border-radius: 3px; overflow: hidden; }
+#xpfill {
+  height: 100%; width: 0; transition: width 0.25s;
+  background: linear-gradient(180deg, #bff6ff 0 30%, var(--sky) 30% 70%, #41a6f6 70%);
+}
 
 #purse { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-#coins { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+#coins {
+  display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 6px 10px;
+  background: var(--chip); border: 2px solid rgba(255, 205, 117, 0.25); border-radius: 6px;
+}
 #bag-info { font-size: 8px; color: #a7f070; }
 #satchel-info { font-size: 8px; color: var(--gold); }
 
@@ -42,18 +59,28 @@ html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
   border: 2px solid var(--ink); border-radius: 3px;
 }
 .btn { background: var(--steel); border-radius: 6px; }
-#hints { position: absolute; left: 12px; bottom: 12px; font-size: 8px; line-height: 1.9; color: var(--steel); }
+#hints {
+  position: absolute; left: 12px; bottom: 12px; max-width: calc(100% - 24px); padding: 6px 10px;
+  font-size: 8px; line-height: 2; color: var(--steel);
+  background: var(--chip); border-radius: 6px;
+}
+#hints:has(#action-hint:empty) { display: none; }
 
 #target { position: absolute; display: none; transform: translate(-50%, -100%); font-size: 8px; text-align: center; white-space: nowrap; }
-#target-bar { width: 64px; height: 6px; margin: 4px auto 0; background: #333c57; border: 2px solid var(--ink); }
-#target-fill { height: 100%; width: 100%; background: #ff6b6b; }
+#target-name { color: #ffb4b4; }
+#target-bar { width: 70px; height: 7px; margin: 4px auto 0; background: #262a40; border: 2px solid var(--ink); border-radius: 3px; overflow: hidden; }
+#target-fill { height: 100%; width: 100%; background: linear-gradient(180deg, #ffb4b4 0 35%, #ff6b6b 35%); transition: width 0.15s; }
 
+/* Area name: a ribbon that fades in when you walk into the village or one of its sections. */
 #banner {
-  position: absolute; top: 18%; width: 100%;
-  text-align: center; font-size: 20px; color: var(--gold);
-  opacity: 0; transition: opacity 0.4s;
+  position: absolute; top: 16%; left: 50%; transform: translate(-50%, -6px);
+  padding: 12px 34px; white-space: nowrap;
+  font-size: 18px; color: var(--gold); letter-spacing: 1px;
+  background: linear-gradient(90deg, transparent, rgba(22, 24, 38, 0.85) 18%, rgba(22, 24, 38, 0.85) 82%, transparent);
+  border-top: 2px solid rgba(255, 205, 117, 0.6); border-bottom: 2px solid rgba(255, 205, 117, 0.6);
+  opacity: 0; transition: opacity 0.4s, transform 0.4s;
 }
-#banner.show { opacity: 1; }
+#banner.show { opacity: 1; transform: translate(-50%, 0); }
 
 #flash { position: absolute; inset: 0; background: #fff3c0; opacity: 0; transition: opacity 0.35s; }
 #flash.on { opacity: 0.55; transition: none; }
@@ -68,14 +95,27 @@ html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
 
 .float { position: absolute; transform: translate(-50%, -50%); font-size: 12px; white-space: nowrap; }
 
-.panel { background: rgba(26, 28, 44, 0.94); border: 3px solid var(--paper); box-shadow: 0 0 0 3px var(--ink); }
+/* Menu panels: dark gradient, light frame with a dark outline and gold corner studs. */
+.panel {
+  background: var(--panel); border: 3px solid var(--paper); border-radius: 4px;
+  box-shadow: 0 0 0 3px var(--ink), 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 0 0 2px rgba(255, 255, 255, 0.05);
+}
+.panel::before, .panel::after {
+  content: ''; position: absolute; top: -7px; width: 8px; height: 8px;
+  background: var(--gold); border: 2px solid var(--ink);
+}
+.panel::before { left: -7px; }
+.panel::after { right: -7px; }
 
 #dialogue {
   position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
   width: min(760px, calc(100% - 32px)); min-height: 90px;
   padding: 14px 18px; box-sizing: border-box; line-height: 1.8;
 }
-#dlg-name { color: var(--gold); margin-bottom: 8px; }
+#dlg-name {
+  display: inline-block; margin: -26px 0 8px -4px; padding: 5px 9px;
+  color: var(--gold); background: var(--ink); border: 2px solid var(--gold); border-radius: 3px;
+}
 #dlg-text { font-size: 11px; }
 #dlg-more { position: absolute; right: 14px; bottom: 10px; animation: blink 0.8s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.2; } }
@@ -88,7 +128,8 @@ html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
 .shop-head { display: flex; justify-content: space-between; color: var(--gold); margin-bottom: 12px; }
 #shop-list { list-style: none; margin: 0; padding: 0; line-height: 2.2; }
 #shop-list li { display: flex; justify-content: space-between; }
-#shop-list li.sel { color: var(--gold); }
+#shop-list li { padding: 0 6px; border-radius: 3px; }
+#shop-list li.sel { color: var(--gold); background: rgba(255, 205, 117, 0.1); }
 #shop-list li.owned { color: var(--dim); }
 #shop-desc { margin-top: 10px; min-height: 14px; color: var(--steel); }
 #shop-msg { margin-top: 8px; min-height: 14px; }

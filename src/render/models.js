@@ -24,8 +24,25 @@ export function makeHumanoid(look, { sword = false } = {}) {
     .box(0, 0.5, 0, 0.42, 0.34, 0.26, look.tunic)
     .box(0, 0.64, 0, 0.44, 0.07, 0.28, look.tunicShade)
     .box(0, 0.37, 0, 0.44, 0.06, 0.28, look.belt);
+  torso.box(0, 0.37, 0.145, 0.08, 0.06, 0.02, '#ffcd75', 0);
   if (look.robe) torso.box(0, 0.22, 0, 0.44, 0.44, 0.3, look.tunic);
+  if (look.apron) torso.box(0, 0.36, 0.145, 0.36, 0.46, 0.02, look.apron);
+  if (look.pauldron) {
+    for (const side of [-1, 1]) torso.box(side * 0.29, 0.69, 0, 0.2, 0.08, 0.26, look.pauldron).box(side * 0.29, 0.645, 0, 0.18, 0.03, 0.24, '#566c86');
+  }
   root.add(voxelMesh(torso, mat));
+
+  // A cape hangs from the shoulders; the hero's swings out while running.
+  let cape = null;
+  if (look.cape) {
+    cape = new THREE.Group();
+    cape.position.set(0, 0.68, -0.15);
+    cape.add(voxelMesh(new VoxelBuilder()
+      .box(0, -0.22, -0.02, 0.42, 0.44, 0.04, look.cape)
+      .box(0, -0.47, -0.02, 0.42, 0.06, 0.04, look.capeShade)
+      .box(0, 0.01, 0.0, 0.46, 0.05, 0.08, look.capeShade), mat));
+    root.add(cape);
+  }
 
   const arms = [-1, 1].map((side) => {
     const pivot = new THREE.Group();
@@ -63,6 +80,20 @@ export function makeHumanoid(look, { sword = false } = {}) {
     .box(0.07, 0.1, 0.21, 0.1, 0.06, 0.05, look.hair)
     .box(-0.08, 0.3, 0.02, 0.14, 0.08, 0.16, look.hairShine)
     .box(0.1, 0.29, -0.08, 0.12, 0.06, 0.14, look.hair);
+  if (look.beard) h.box(0, -0.15, 0.18, 0.34, 0.12, 0.06, look.beard).box(0, -0.06, 0.2, 0.18, 0.04, 0.03, look.beard);
+  if (look.hat) {
+    h.box(0, 0.28, -0.01, 0.52, 0.06, 0.5, look.hat)
+      .box(0, 0.35, -0.03, 0.36, 0.1, 0.34, look.hat)
+      .box(0.2, 0.45, -0.12, 0.04, 0.22, 0.04, '#ffcd75')
+      .box(0.2, 0.58, -0.16, 0.04, 0.08, 0.04, '#ef7d57');
+  }
+  if (look.spiky) {
+    h.box(-0.14, 0.32, 0.1, 0.1, 0.1, 0.12, look.hair)
+      .box(0.02, 0.34, 0.12, 0.1, 0.12, 0.1, look.hair)
+      .box(0.15, 0.31, 0.06, 0.1, 0.09, 0.12, look.hairShine)
+      .box(0.05, 0.36, -0.12, 0.14, 0.1, 0.14, look.hair)
+      .box(-0.12, 0.33, -0.18, 0.1, 0.08, 0.1, look.hair);
+  }
   if (look.helmet) {
     h.box(0, 0.24, -0.01, 0.48, 0.14, 0.46, '#94b0c2')
       .box(0, 0.17, 0.22, 0.5, 0.05, 0.08, '#566c86')
@@ -71,7 +102,7 @@ export function makeHumanoid(look, { sword = false } = {}) {
   head.add(voxelMesh(h, mat));
   root.add(head);
 
-  return { group, root, legs, arms, head, mat };
+  return { group, root, legs, arms, head, cape, mat };
 }
 
 // Swings legs and arms. `phase` advances while walking, `amount` 0..1 fades the swing.
@@ -102,7 +133,134 @@ export function makeSlime(colors) {
   return { group, root, mat };
 }
 
-export function makeTreeGeometry() {
+// Thornback Boar: four trotting legs, tusks and a ridge of thorns.
+export function makeBoar() {
+  const mat = vmat();
+  const group = new THREE.Group();
+  const root = new THREE.Group();
+  group.add(root);
+  const body = new VoxelBuilder()
+    .box(0, 0.5, -0.04, 0.56, 0.42, 0.78, '#7a4a2a')
+    .box(0, 0.73, -0.06, 0.42, 0.08, 0.6, '#5a3a22')
+    .box(0, 0.47, 0.4, 0.46, 0.38, 0.18, '#8a5a32')
+    .box(0, 0.46, 0.58, 0.38, 0.32, 0.22, '#8a5a32')
+    .box(0, 0.4, 0.74, 0.24, 0.16, 0.12, '#e8a0a0')
+    .box(-0.05, 0.42, 0.805, 0.04, 0.05, 0.02, '#5a3a22', 0)
+    .box(0.05, 0.42, 0.805, 0.04, 0.05, 0.02, '#5a3a22', 0)
+    .box(-0.15, 0.4, 0.74, 0.04, 0.18, 0.04, '#f4ecd8', 0)
+    .box(0.15, 0.4, 0.74, 0.04, 0.18, 0.04, '#f4ecd8', 0)
+    .box(-0.12, 0.56, 0.695, 0.07, 0.06, 0.02, '#1a1c2c', 0)
+    .box(0.12, 0.56, 0.695, 0.07, 0.06, 0.02, '#1a1c2c', 0)
+    .box(-0.18, 0.66, 0.52, 0.08, 0.12, 0.06, '#5a3a22')
+    .box(0.18, 0.66, 0.52, 0.08, 0.12, 0.06, '#5a3a22')
+    .box(0, 0.56, -0.46, 0.06, 0.06, 0.12, '#5a3a22');
+  for (let i = 0; i < 4; i++) {
+    const z = -0.3 + i * 0.17;
+    body.box(0, 0.84, z, 0.08, 0.16, 0.08, '#4f8a3a')
+      .box(-0.16, 0.78, z + 0.06, 0.06, 0.12, 0.06, '#3f7a30')
+      .box(0.16, 0.78, z + 0.06, 0.06, 0.12, 0.06, '#3f7a30');
+  }
+  root.add(voxelMesh(body, mat));
+  const legs = [[-0.18, 0.26], [0.18, 0.26], [-0.18, -0.3], [0.18, -0.3]].map(([x, z]) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, 0.3, z);
+    pivot.add(voxelMesh(new VoxelBuilder()
+      .box(0, -0.13, 0, 0.13, 0.26, 0.13, '#5a3a22')
+      .box(0, -0.27, 0.01, 0.14, 0.05, 0.15, '#3a2a1f'), mat));
+    root.add(pivot);
+    return pivot;
+  });
+  return { group, root, mat, legs };
+}
+
+// Wisp: a floating light with a soft glow around it.
+export function makeWisp() {
+  const mat = vmat({ emissive: new THREE.Color('#2a8fa8') });
+  const group = new THREE.Group();
+  const root = new THREE.Group();
+  group.add(root);
+  root.add(voxelMesh(new VoxelBuilder()
+    .box(0, 0, 0, 0.32, 0.32, 0.3, '#bff6ff', 0)
+    .box(0, 0.02, 0, 0.38, 0.18, 0.2, '#73eff7', 0)
+    .box(0, 0.19, -0.02, 0.18, 0.1, 0.18, '#73eff7', 0)
+    .box(-0.07, 0.03, 0.155, 0.05, 0.08, 0.02, '#1a1c2c', 0)
+    .box(0.07, 0.03, 0.155, 0.05, 0.08, 0.02, '#1a1c2c', 0)
+    .box(0, -0.2, -0.06, 0.2, 0.14, 0.18, '#73eff7', 0)
+    .box(0, -0.32, -0.12, 0.12, 0.1, 0.12, '#41a6f6', 0)
+    .box(0, -0.41, -0.17, 0.06, 0.08, 0.06, '#3b5dc9', 0), mat));
+  const halo = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.42, 1),
+    new THREE.MeshBasicMaterial({ color: '#73eff7', transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  root.add(halo);
+  root.position.y = 0.8;
+  return { group, root, mat, halo, extraMats: [halo.material] };
+}
+
+// Puffcap (and its small Sporelings): a walking mushroom with a spotted cap.
+export function makeMushroom() {
+  const mat = vmat();
+  const group = new THREE.Group();
+  const root = new THREE.Group();
+  group.add(root);
+  const b = new VoxelBuilder()
+    .box(-0.1, 0.03, 0.04, 0.12, 0.06, 0.16, '#d8c8a8')
+    .box(0.1, 0.03, 0.04, 0.12, 0.06, 0.16, '#d8c8a8')
+    .box(0, 0.24, 0, 0.36, 0.36, 0.34, '#f4e8d0')
+    .box(-0.08, 0.28, 0.175, 0.06, 0.09, 0.02, '#1a1c2c', 0)
+    .box(0.08, 0.28, 0.175, 0.06, 0.09, 0.02, '#1a1c2c', 0)
+    .box(0, 0.18, 0.176, 0.08, 0.03, 0.02, '#8a3a4a', 0)
+    .box(0, 0.44, 0, 0.6, 0.04, 0.58, '#f4c0c8')
+    .box(0, 0.52, 0, 0.74, 0.14, 0.72, '#e04060')
+    .box(0, 0.64, 0, 0.52, 0.12, 0.5, '#e04060')
+    .box(0, 0.73, 0, 0.26, 0.08, 0.26, '#ef5a7a');
+  for (const [x, y, z, w] of [[0.24, 0.6, 0.2, 0.12], [-0.22, 0.6, 0.12, 0.1], [0.08, 0.6, -0.26, 0.12], [-0.12, 0.71, -0.12, 0.1], [0.14, 0.71, 0.08, 0.08]]) {
+    b.box(x, y, z, w, 0.03, w, '#ffffff', 0);
+  }
+  root.add(voxelMesh(b, mat));
+  return { group, root, mat };
+}
+
+let orbParts = null;
+// A wisp's shot: a small glowing star. Shares geometry and materials, so nothing to dispose.
+export function makeOrb() {
+  orbParts ??= {
+    core: new THREE.IcosahedronGeometry(0.11, 0),
+    glow: new THREE.IcosahedronGeometry(0.22, 1),
+    coreMat: new THREE.MeshBasicMaterial({ color: '#eaffff' }),
+    glowMat: new THREE.MeshBasicMaterial({ color: '#73eff7', transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }),
+  };
+  const group = new THREE.Group();
+  group.add(new THREE.Mesh(orbParts.core, orbParts.coreMat), new THREE.Mesh(orbParts.glow, orbParts.glowMat));
+  return group;
+}
+
+// Three tree kinds: 'oak' (round), 'pine' (layered) and 'birch' (white bark, light leaves).
+export function makeTreeGeometry(kind = 'oak') {
+  if (kind === 'pine') {
+    return new VoxelBuilder()
+      .box(0, 0.05, 0, 0.3, 0.1, 0.3, '#5a3a22')
+      .box(0, 0.35, 0, 0.18, 0.6, 0.18, '#6a4428')
+      .box(0, 0.62, 0, 1.0, 0.32, 1.0, '#1f5c3e')
+      .box(0, 0.95, 0, 0.8, 0.32, 0.8, '#257150')
+      .box(0, 1.26, 0, 0.58, 0.3, 0.58, '#2f8a55')
+      .box(0, 1.54, 0, 0.36, 0.28, 0.36, '#38b764')
+      .box(0, 1.76, 0, 0.14, 0.18, 0.14, '#4fc36a')
+      .build();
+  }
+  if (kind === 'birch') {
+    return new VoxelBuilder()
+      .box(0, 0.05, 0, 0.3, 0.1, 0.3, '#8a8a8a')
+      .box(0, 0.5, 0, 0.2, 0.95, 0.2, '#e8e4da')
+      .box(0.101, 0.35, 0, 0.01, 0.06, 0.1, '#333c57', 0)
+      .box(-0.101, 0.7, 0.03, 0.01, 0.05, 0.08, '#333c57', 0)
+      .box(0, 0.55, 0.101, 0.08, 0.04, 0.01, '#333c57', 0)
+      .box(0.05, 1.1, 0, 0.8, 0.42, 0.75, '#5fae4a')
+      .box(-0.12, 1.42, 0.05, 0.6, 0.34, 0.55, '#7cc95e')
+      .box(0.15, 1.62, -0.05, 0.34, 0.22, 0.34, '#a7f070')
+      .box(-0.3, 0.98, 0.25, 0.26, 0.2, 0.24, '#7cc95e')
+      .build();
+  }
   return new VoxelBuilder()
     .box(0, 0.05, 0, 0.34, 0.1, 0.34, '#5a3a22')
     .box(0, 0.38, 0, 0.24, 0.7, 0.24, '#7a5230')
@@ -113,22 +271,48 @@ export function makeTreeGeometry() {
     .build();
 }
 
-export function makeHouse(roof, roofShade) {
+// A 2x2-tile house. `kind: 'smithy'` gives stone walls, a wide chimney and a glowing forge.
+export function makeHouse(roof, roofShade, kind = 'house') {
+  const smithy = kind === 'smithy';
   const b = new VoxelBuilder()
     .box(0, 0.04, 0, 1.8, 0.08, 1.7, '#8a8a8a')
-    .box(0, 0.62, 0, 1.7, 1.1, 1.6, '#e8d5b0')
+    .box(0, 0.62, 0, 1.7, 1.1, 1.6, smithy ? '#9a9aa2' : '#e8d5b0')
     .box(-0.86, 0.62, 0.81, 0.06, 1.1, 0.06, '#7a5230')
     .box(0.86, 0.62, 0.81, 0.06, 1.1, 0.06, '#7a5230')
+    .box(0, 1.15, 0.81, 1.74, 0.06, 0.06, '#7a5230')
     .box(0, 0.42, 0.81, 0.4, 0.76, 0.04, '#7a5230')
-    .box(0.12, 0.42, 0.835, 0.04, 0.04, 0.02, '#ffcd75', 0);
+    .box(0, 0.42, 0.825, 0.04, 0.72, 0.01, '#5a3a22', 0)
+    .box(0.12, 0.42, 0.835, 0.04, 0.04, 0.02, '#ffcd75', 0)
+    .box(0, 0.86, 0.835, 0.5, 0.06, 0.04, '#5a3a22');
   for (const wx of [-0.5, 0.5]) {
-    b.box(wx, 0.78, 0.81, 0.32, 0.3, 0.04, '#73eff7').box(wx, 0.78, 0.83, 0.34, 0.04, 0.02, '#7a5230', 0);
+    if (smithy && wx > 0) continue;
+    b.box(wx, 0.78, 0.81, 0.32, 0.3, 0.04, '#73eff7')
+      .box(wx, 0.78, 0.83, 0.34, 0.04, 0.02, '#7a5230', 0)
+      .box(wx, 0.78, 0.83, 0.04, 0.3, 0.02, '#7a5230', 0);
+    if (!smithy) {
+      b.box(wx, 0.6, 0.87, 0.38, 0.08, 0.1, '#7a4a2a')
+        .box(wx - 0.11, 0.67, 0.87, 0.07, 0.07, 0.07, '#ff8fb1', 0)
+        .box(wx + 0.01, 0.68, 0.87, 0.07, 0.08, 0.07, '#ffcd75', 0)
+        .box(wx + 0.12, 0.67, 0.87, 0.07, 0.07, 0.07, '#f4f4f4', 0);
+    }
+  }
+  if (smithy) {
+    for (const [x, y] of [[-0.6, 0.3], [-0.2, 0.95], [0.55, 0.5], [0.3, 0.9], [-0.7, 1.0]]) b.box(x, y, 0.805, 0.22, 0.12, 0.02, '#7a7a82', 0);
+    b.box(0.55, 0.32, 0.95, 0.5, 0.64, 0.32, '#566c86').box(0.55, 0.32, 1.1, 0.3, 0.24, 0.02, '#2b2f45', 0);
   }
   [[2.0, 1.25], [1.6, 1.5], [1.15, 1.75], [0.7, 2.0], [0.3, 2.2]].forEach(([w, y], i) => {
     b.box(0, y, 0, w, 0.25, 1.95, i % 2 ? roofShade : roof);
   });
-  b.box(0.55, 1.9, -0.4, 0.22, 0.6, 0.22, '#8a8a8a');
-  return voxelMesh(b, vmat());
+  if (smithy) b.box(0.55, 2.0, -0.35, 0.42, 0.9, 0.42, '#7a7a82').box(0.55, 2.47, -0.35, 0.5, 0.06, 0.5, '#566c86');
+  else b.box(0.55, 1.9, -0.4, 0.22, 0.6, 0.22, '#8a8a8a');
+  const mesh = voxelMesh(b, vmat());
+  if (!smithy) return mesh;
+  // The forge mouth glows.
+  const group = new THREE.Group();
+  const forge = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.2, 0.02), new THREE.MeshBasicMaterial({ color: '#ff8a3d' }));
+  forge.position.set(0.55, 0.32, 1.115);
+  group.add(mesh, forge);
+  return group;
 }
 
 export function makeStall() {

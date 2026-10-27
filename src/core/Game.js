@@ -4,7 +4,7 @@ import { resetStats, addXp } from '../config/stats.js';
 import { ENEMIES } from '../data/enemies.js';
 import { NPCS } from '../data/npcs.js';
 import { LOOT } from '../data/items.js';
-import { generateWorld } from '../world/generateWorld.js';
+import { generateWorld, TILE } from '../world/generateWorld.js';
 import { buildWorld } from '../world/buildWorld.js';
 import Collision from '../world/collision.js';
 import Store from './Store.js';
@@ -16,18 +16,22 @@ import Enemy from '../entities/Enemy.js';
 import Npc from '../entities/Npc.js';
 import { bagCount } from '../systems/shop.js';
 import Hud from '../ui/Hud.js';
-import { makeCoin, makeLoot, makeSatchel } from '../render/models.js';
+import { makeCoin, makeLoot, makeSatchel, makeOrb } from '../render/models.js';
 import { disposeModel } from '../render/voxel.js';
 
 const RETRO_SCALE = 3;   // retro mode renders at 1/3 resolution for chunky pixels
 const MAX_PIXEL_RATIO = 2;
 const WORLD_SEED = 1337;
-const MAX_ENEMIES = 14;
+const MAX_ENEMIES = 18;
 const SPAWN_EVERY = 4;   // seconds
 const TALK_RANGE = 1.6;  // tiles
 const PICKUP_RANGE = 0.55;  // walk this close to pick up a coin or drop
 const MAGNET_RANGE = 1.8;   // drops closer than this slide toward the hero
 const SATCHEL_RANGE = 0.8;
+const ORB_LIFE = 3;        // seconds a wisp's shot flies
+const ORB_HIT = 0.4;       // tiles from the hero's center that count as a hit
+const TREE_HEIGHT = 2;     // tiles: the camera pulls in when a tree this tall is in the way
+const HOUSE_HEIGHT = 2.4;
 const SKY_TOP = '#4a8fe0';
 const SKY_HORIZON = '#cdeaff';
 
@@ -76,7 +80,14 @@ export default class Game {
     this.village = village;
     const world = buildWorld(this.scene, data, village);
     this.water = world.water;
+    this.clouds = world.clouds;
     this.collision = new Collision(data, world.rects);
+    // Trees (and the forest past the map edge) and buildings block the camera's view.
+    this.rig.occluder = (x, y, z) => {
+      const tx = Math.floor(x), tz = Math.floor(z), row = data[tz];
+      if (y < TREE_HEIGHT && (!row || row[tx] === undefined || row[tx] === TILE.TREE)) return true;
+      return y < HOUSE_HEIGHT && world.rects.some((b) => !b.fence && x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1);
+    };
 
     this.npcs = [];
     if (village) {
@@ -94,6 +105,7 @@ export default class Game {
     this.enemies = [];
     this.pickups = [];   // coins and monster drops on the ground: { mesh, kind, seed }
     this.satchel = null; // what the hero dropped when falling
+    this.projectiles = []; // wisp orbs: { mesh, vx, vz, life, damage }
     this.effects = [];
     this.time = 0;
 
@@ -130,12 +142,13 @@ export default class Game {
     this.lockOn.clear();
     for (const e of this.enemies) e.remove();
     for (const item of this.pickups) this.scene.remove(item.mesh);
+    this.clearProjectiles();
     this.enemies = [];
     this.pickups = [];
     this.removeSatchel();
     if (FEATURES.enemies) for (let i = 0; i < MAX_ENEMIES; i++) this.spawnEnemy();
     this.spawnTimer = SPAWN_EVERY;
-    this.wasInVillage = false;
+    this.lastArea = null;
     this.hud.reset();
     this.rig.snap(this.player);
   }
@@ -202,6 +215,7 @@ export default class Game {
 
     for (const e of this.enemies.slice()) e.update(dt);
     this.separateEnemies();
+    this.updateProjectiles(dt);
     for (const e of this.enemies) {
       if (!e.dying && Math.hypot(e.x - player.x, e.z - player.z) < e.radius + player.radius) player.hurt(e.def.damage, e);
     }
@@ -226,22 +240,32 @@ export default class Game {
     if (just.pause) this.hud.openControls();
     if (just.recenter && !this.lockOn.target) this.rig.recenter(player.facing.x, player.facing.y);
 
-    if (this.village) {
-      const inside = this.inVillage(player.x, player.z);
-      if (inside && !this.wasInVillage) this.hud.showBanner(this.village.name);
-      this.wasInVillage = inside;
-    }
+    // Show the name of the village, or of a section of it, when walking in.
+    const area = this.areaName(player.x, player.z);
+    if (area && area !== this.lastArea) this.hud.showBanner(area);
+    this.lastArea = area;
+  }
+
+  areaName(x, z) {
+    if (!this.inVillage(x, z)) return null;
+    const section = this.village.sections.find((s) => x >= s.x && x < s.x + s.w && z >= s.y && z < s.y + s.h);
+    return section ? section.name : this.village.name;
   }
 
   // Things that keep moving even while a menu is open.
   animate(dt) {
     const t = this.time;
     this.water.position.y = Math.sin(t * 1.5) * 0.02;
+    for (const cloud of this.clouds) {
+      cloud.position.x += cloud.userData.speed * dt;
+      if (cloud.position.x > this.collision.w + 15) cloud.position.x = -15;
+    }
     for (const npc of this.npcs) npc.animate(t);
     for (const item of this.pickups) {
       item.mesh.rotation.y += dt * 3;
       item.mesh.position.y = 0.35 + Math.sin(t * 4 + item.seed) * 0.06;
     }
+    for (const orb of this.projectiles) orb.mesh.rotation.y += dt * 8;
     if (this.satchel) {
       const { bag, beam } = this.satchel.model;
       bag.rotation.y = Math.sin(t) * 0.3;
@@ -318,7 +342,7 @@ export default class Game {
   spawnEnemy() {
     if (this.enemies.filter((e) => !e.dying).length >= MAX_ENEMIES) return;
     const level = this.store.get('level');
-    const types = Object.values(ENEMIES).filter((d) => level >= d.minLevel);
+    const types = Object.values(ENEMIES).filter((d) => d.spawns !== false && level >= d.minLevel);
     const def = types[Math.floor(Math.random() * types.length)];
     const { w, h } = this.collision;
     for (let tries = 0; tries < 30; tries++) {
@@ -327,9 +351,48 @@ export default class Game {
       if (this.collision.blocked(x, z, def.radius)) continue;
       if (Math.hypot(x - this.player.x, z - this.player.z) < 9) continue;
       if (this.inVillage(x, z, 2)) continue;
-      this.enemies.push(new Enemy(this, x, z, def));
+      this.spawnAt(x, z, def);
       return;
     }
+  }
+
+  spawnAt(x, z, def) {
+    const enemy = new Enemy(this, x, z, def);
+    this.enemies.push(enemy);
+    return enemy;
+  }
+
+  // A wisp's shot. Flies straight; stopped by trees, water and the village wards.
+  fireOrb(from, dx, dz) {
+    const mesh = makeOrb();
+    mesh.position.set(from.x, 0.8, from.z);
+    this.scene.add(mesh);
+    const speed = from.def.shotSpeed;
+    this.projectiles.push({ mesh, vx: dx * speed, vz: dz * speed, life: ORB_LIFE, damage: from.def.damage });
+  }
+
+  updateProjectiles(dt) {
+    const player = this.player;
+    for (const orb of this.projectiles.slice()) {
+      const pos = orb.mesh.position;
+      pos.x += orb.vx * dt;
+      pos.z += orb.vz * dt;
+      orb.life -= dt;
+      const gone = orb.life <= 0 || this.collision.solidTile(Math.floor(pos.x), Math.floor(pos.z)) || this.inVillage(pos.x, pos.z);
+      // A roll passes straight through; anything else that touches the hero stops the orb.
+      const hit = !gone && Math.hypot(pos.x - player.x, pos.z - player.z) < ORB_HIT && player.hurt(orb.damage, pos);
+      if (gone || hit) this.removeProjectile(orb);
+    }
+  }
+
+  removeProjectile(orb) {
+    this.scene.remove(orb.mesh);
+    this.projectiles = this.projectiles.filter((o) => o !== orb);
+  }
+
+  clearProjectiles() {
+    for (const orb of this.projectiles) this.scene.remove(orb.mesh);
+    this.projectiles = [];
   }
 
   removeEnemy(enemy) {
@@ -338,6 +401,13 @@ export default class Game {
   }
 
   onEnemyKilled(enemy) {
+    const split = ENEMIES[enemy.def.splitInto];
+    if (split) {
+      for (const side of [-1, 1]) {
+        const x = enemy.x + side * 0.35;
+        this.spawnAt(this.collision.blocked(x, enemy.z, split.radius) ? enemy.x : x, enemy.z, split);
+      }
+    }
     if (FEATURES.coins && Math.random() < 0.7) this.dropPickup(enemy.x, enemy.z, 'coin');
     if (FEATURES.monsterDrops) {
       for (const { item, chance } of enemy.def.drops ?? []) if (Math.random() < chance) this.dropPickup(enemy.x, enemy.z, item);
@@ -379,18 +449,19 @@ export default class Game {
     s.set('coins', 0);
     s.set('bag', {});
     s.set('hp', s.get('maxHp'));
+    this.clearProjectiles();
     const home = this.homeSpot();
     p.respawn(home.x, home.z);
     s.set('dead', false);
-    this.wasInVillage = false;
+    this.lastArea = null;
     this.rig.snap(p);
   }
 
-  // Where the hero wakes up after falling: the middle of the village if there is one.
+  // Where the hero wakes up after falling: the village square if there is one.
   homeSpot() {
     if (!this.village) return this.spawn;
-    const c = this.villageCenter();
-    return this.collision.blocked(c.x, c.z, this.player.radius) ? this.spawn : c;
+    const { tx, ty } = this.village.spots.home;
+    return { x: tx + 0.5, z: ty + 0.5 };
   }
 
   placeSatchel(x, z, coins, bag) {

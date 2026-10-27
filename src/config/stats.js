@@ -1,5 +1,4 @@
-// Player stats live in the game registry so every scene (World, UI) can read
-// them and react to 'changedata' events.
+// Player stats live in the Store (core/Store.js); the HUD listens for changes.
 export const MAX_HEARTS = 15;
 
 export const START_STATS = {
@@ -8,6 +7,7 @@ export const START_STATS = {
   atk: 1,
   atkBonus: 0,    // from gear
   speedBonus: 0,  // from gear, 0.2 = 20% faster
+  def: 0,         // from gear: damage taken is reduced by this (never below 1)
   level: 1,
   xp: 0,
   xpNext: 10,

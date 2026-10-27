@@ -16,7 +16,11 @@ function mulberry32(seed) {
 }
 
 // The starting village, in tile coordinates. Enemies stay out of this rectangle.
-export const VILLAGE = { name: 'Lumen Hollow', x: 7, y: 3, w: 18, h: 13 };
+// Sections are named parts of it; entering one shows its name.
+export const VILLAGE = {
+  name: 'Lumen Hollow', x: 7, y: 3, w: 31, h: 13,
+  sections: [{ name: 'Market Row', x: 25, y: 3, w: 13, h: 13 }],
+};
 
 function carveVillage(data, set) {
   const v = VILLAGE;
@@ -24,18 +28,26 @@ function carveVillage(data, set) {
     for (let x = v.x; x < v.x + v.w; x++)
       if (SOLID_TILES.includes(data[y][x])) set(x, y, TILE.GRASS);
 
-  // Each house is 2x2 tiles; its door sits between tx and tx + 1.
+  // Each house is 2x2 tiles; its door sits between tx and tx + 1. `kind: 'smithy'` is Odo's forge.
   const houses = [
     { tx: 9, ty: 5, roof: 'red' },
     { tx: 14, ty: 4, roof: 'blue' },
     { tx: 20, ty: 5, roof: 'green' },
+    { tx: 26, ty: 4, roof: 'yellow' },
+    { tx: 32, ty: 4, roof: 'slate', kind: 'smithy' },
   ];
-  for (let y = 9; y <= 10; y++) for (let x = 9; x <= 21; x++) set(x, y, TILE.PATH);
+  for (let y = 9; y <= 10; y++) for (let x = 9; x <= 36; x++) set(x, y, TILE.PATH);
   for (const h of houses)
     for (let y = h.ty + 2; y <= 8; y++) {
       set(h.tx, y, TILE.PATH);
       set(h.tx + 1, y, TILE.PATH);
     }
+
+  // Market Row plaza: a fountain (2x2) with a path ring around it.
+  const fountain = { tx: 28, ty: 12 };
+  for (let y = fountain.ty - 1; y <= fountain.ty + 2; y++)
+    for (let x = fountain.tx - 1; x <= fountain.tx + 2; x++) set(x, y, TILE.PATH);
+  set(fountain.tx, 11, TILE.PATH);
 
   // Road south until it meets the main road.
   for (let y = 11; y < WORLD_H - 2; y++) {
@@ -48,12 +60,25 @@ function carveVillage(data, set) {
     name: v.name,
     rect: { x: v.x, y: v.y, w: v.w, h: v.h },
     houses,
+    sections: v.sections,
     stall: { tx: 20, ty: 12 }, // 2 tiles wide
+    fountain,
+    anvil: { x: 35.3, z: 7.4 },
+    // Lantern posts (tile centers are +0.5) and small props, kept off paths and doors.
+    lanterns: [[11.5, 8.2], [17.5, 11.8], [23.5, 8.2], [25.5, 11.8], [30.5, 8.2], [35.5, 11.8], [14.3, 13.8]],
+    props: [
+      { kind: 'barrel', x: 19.4, z: 12.4 }, { kind: 'crate', x: 23.4, z: 12.7 }, { kind: 'barrel', x: 31.6, z: 6.6 },
+      { kind: 'crate', x: 34.6, z: 5.6 }, { kind: 'barrel', x: 34.6, z: 6.4 }, { kind: 'board', x: 13, z: 11.6 },
+      { kind: 'crate', x: 25.4, z: 6.5 },
+    ],
     spots: {
       elder: { tx: 12, ty: 8 },
       kid: { tx: 18, ty: 11 },
       merchant: { tx: 22, ty: 12 },
       guard: { tx: 17, ty: 14 },
+      smith: { tx: 34, ty: 7 },
+      bard: { tx: 31, ty: 12 },
+      home: { tx: 16, ty: 9 }, // where the hero wakes up after falling
     },
   };
 }

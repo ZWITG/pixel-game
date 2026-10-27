@@ -27,9 +27,13 @@ It grows feature by feature with the user, who plays and tests with a controller
 - `src/core/Store.js`: player stats (get/set/on). Stats rules in `src/config/stats.js`.
 - `src/config/features.js`: on/off switch per feature. Every new feature gets one.
 - `src/data/`: enemies, villagers, items/shops. Prefer data over code. Distances and speeds are in tiles.
-- `src/render/voxel.js`: `VoxelBuilder` merges colored boxes into one mesh. `src/render/models.js`: hero, villagers, slime, tree, house, stall, coin, slash.
+- `src/render/voxel.js`: `VoxelBuilder` merges colored boxes into one mesh. `src/render/models.js`: characters, monsters (slime, boar, wisp, mushroom),
+  trees (oak/pine/birch), houses (incl. smithy), stall, pickups, effects. `src/render/props.js`: scenery drawn into shared builders
+  (rocks, bushes, fences, lanterns, fountain, barrels, crates, clouds, glow sprites).
 - `src/art/looks.js`: character color sets. `src/art/icons.js`: HUD pixel icons as SVG.
-- `src/world/generateWorld.js` (seeded tile map + village layout), `buildWorld.js` (3D meshes), `collision.js` (tiles + rectangles).
+- `src/world/generateWorld.js` (seeded tile map + village layout with sections, spots, lanterns, props), `buildWorld.js` (3D meshes),
+  `collision.js` (tiles + rectangles; `fence: true` rects stop the hero but not monsters).
+- Enemy behaviour is picked by `ai` in `data/enemies.js` ('chase', 'charge', 'shoot'); wisp orbs live in `Game.projectiles`.
 - `src/entities/`: Player (attack, spin slash, dodge roll), Enemy, Npc. `src/ui/Hud.js` + `hud.css`: HTML overlay (stats, dialogue, shop, controls screen, prompts).
 - Pickups (coins and monster drops) and the death satchel live in `Game.js` (`pickups`, `satchel`, `revive()`).
 - `src/systems/controls.js`: all input (keyboard, mouse drag, gamepad) and the control scheme (`ACTIONS`, PS5 button names).

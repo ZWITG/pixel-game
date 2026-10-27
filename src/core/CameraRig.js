@@ -14,6 +14,10 @@ const LOCK_TURN = 5;       // how fast the camera swings behind the hero when lo
 const LOCK_LEAD = 0.3;     // locked on, the view shifts this share of the way toward the target...
 const LOCK_LEAD_MAX = 2;   // ...but never more than this many tiles
 const RECENTER_TURN = 10;
+const OCCLUDE_START = 0.6;  // tiles from the hero where blocking checks begin
+const OCCLUDE_STEP = 0.25;
+const OCCLUDE_MIN = 1.6;    // never pull in closer than this
+const OCCLUDE_MAX_PITCH = 1.2; // how high the camera may rise to see over trees
 
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -30,6 +34,7 @@ export default class CameraRig {
     camera.updateProjectionMatrix();
     this.shakeLeft = 0;
     this.recenterYaw = null;
+    this.occluder = null; // (x, y, z) => true if something solid and tall is there; set by Game
   }
 
   toggle() {
@@ -59,6 +64,15 @@ export default class CameraRig {
 
   shake(seconds) {
     this.shakeLeft = seconds;
+  }
+
+  // Distance along the view line (at this pitch) to the first thing blocking it, or Infinity.
+  blockedAt(pitch, maxDist, height) {
+    const dx = Math.sin(this.yaw) * Math.cos(pitch), dy = Math.sin(pitch), dz = Math.cos(this.yaw) * Math.cos(pitch);
+    for (let d = OCCLUDE_START; d < maxDist; d += OCCLUDE_STEP) {
+      if (this.occluder(this.target.x + dx * d, height + dy * d, this.target.z + dz * d)) return d;
+    }
+    return Infinity;
   }
 
   // Swings the camera around to look along (x, z), e.g. the hero's facing.
@@ -97,8 +111,20 @@ export default class CameraRig {
       this.camera.updateProjectionMatrix();
     }
 
-    const { dist, height, pitch: p } = this.cur;
-    const ty = height;
+    // When a tree or building sits between the hero and the camera, first rise over it,
+    // and only pull in closer if rising isn't enough. Moves in fast and eases back out.
+    const ty = this.cur.height;
+    let lift = this.cur.pitch, limit = this.cur.dist;
+    if (this.occluder) {
+      while (lift < OCCLUDE_MAX_PITCH && this.blockedAt(lift, limit, ty) < limit) lift += 0.08;
+      limit = Math.max(OCCLUDE_MIN, Math.min(limit, this.blockedAt(lift, limit, ty) - OCCLUDE_STEP));
+    }
+    this.viewDist ??= limit;
+    this.viewPitch ??= lift;
+    const ease = (from, to, fast) => from + (to - from) * (1 - Math.exp(-dt * (fast ? 18 : 3)));
+    this.viewDist = ease(this.viewDist, limit, limit < this.viewDist);
+    this.viewPitch = ease(this.viewPitch, lift, lift > this.viewPitch);
+    const p = this.viewPitch, dist = this.viewDist;
     this.camera.position.set(
       this.target.x + Math.sin(this.yaw) * Math.cos(p) * dist,
       ty + Math.sin(p) * dist,

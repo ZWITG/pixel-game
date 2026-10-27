@@ -1,9 +1,17 @@
-// Enemy types. Add a new enemy by adding an entry here (colors in art/looks.js).
-// Speeds and ranges are in tiles (per second). `drops`: monster drops (data/items.js LOOT) and their chance.
+// Enemy types. Add a new enemy by adding an entry here.
+// Speeds and ranges are in tiles (per second).
+//  model: 'slime' (with `colors` from art/looks.js), 'boar', 'wisp' or 'mushroom' (render/models.js)
+//  ai:    'chase'  - wanders, chases the hero when close
+//         'charge' - winds up, then dashes in a straight line; stunned if it hits a wall
+//         'shoot'  - keeps its distance and fires slow orbs
+//  drops: monster drops (data/items.js LOOT) and their chance. `splitInto` spawns 2 of that type on death.
+//  spawns: false keeps a type out of random spawning (it only appears from a split).
 export const ENEMIES = {
   slime: {
     name: 'Slime',
+    model: 'slime',
     colors: 'green',
+    ai: 'chase',
     hp: 3,
     damage: 1,
     speed: 1.9,
@@ -14,9 +22,58 @@ export const ENEMIES = {
     minLevel: 1,
     drops: [{ item: 'gel', chance: 0.6 }, { item: 'pearl', chance: 0.04 }],
   },
+  puffcap: {
+    name: 'Puffcap',
+    model: 'mushroom',
+    ai: 'chase',
+    hp: 6,
+    damage: 1,
+    speed: 1.2,
+    chaseSpeed: 2.1,
+    aggro: 5,
+    radius: 0.36,
+    xp: 6,
+    minLevel: 1,
+    splitInto: 'sporeling',
+    drops: [{ item: 'spore', chance: 0.7 }],
+  },
+  sporeling: {
+    name: 'Sporeling',
+    model: 'mushroom',
+    scale: 0.55,
+    ai: 'chase',
+    hp: 1,
+    damage: 1,
+    speed: 2.6,
+    chaseSpeed: 3.8,
+    aggro: 7,
+    radius: 0.22,
+    xp: 2,
+    minLevel: 1,
+    spawns: false,
+    drops: [{ item: 'spore', chance: 0.2 }],
+  },
+  boar: {
+    name: 'Thornback Boar',
+    model: 'boar',
+    ai: 'charge',
+    hp: 5,
+    damage: 2,
+    speed: 1.6,
+    chaseSpeed: 9,     // charge speed
+    aggro: 6.5,
+    windup: 0.6,       // seconds it paws the ground before charging
+    chargeTime: 0.8,
+    radius: 0.4,
+    xp: 8,
+    minLevel: 2,
+    drops: [{ item: 'hide', chance: 0.6 }, { item: 'tusk', chance: 0.15 }],
+  },
   fireSlime: {
     name: 'Fire Slime',
+    model: 'slime',
     colors: 'fire',
+    ai: 'chase',
     hp: 6,
     damage: 2,
     speed: 2.2,
@@ -26,5 +83,22 @@ export const ENEMIES = {
     xp: 10,
     minLevel: 3,
     drops: [{ item: 'ember', chance: 0.5 }, { item: 'gel', chance: 0.3 }, { item: 'pearl', chance: 0.08 }],
+  },
+  wisp: {
+    name: 'Wisp',
+    model: 'wisp',
+    ai: 'shoot',
+    hp: 3,
+    damage: 1,
+    speed: 1.8,
+    chaseSpeed: 2.6,
+    aggro: 8,
+    keepAway: [3.5, 6], // tries to stay between these distances
+    fireEvery: 2.2,
+    shotSpeed: 4.5,
+    radius: 0.3,
+    xp: 9,
+    minLevel: 3,
+    drops: [{ item: 'dust', chance: 0.6 }, { item: 'pearl', chance: 0.05 }],
   },
 };

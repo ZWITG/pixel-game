@@ -13,6 +13,7 @@ export function tryBuy(registry, id, item) {
   if (fx.heal) registry.set('hp', registry.get('maxHp'));
   if (fx.atk) registry.set('atkBonus', registry.get('atkBonus') + fx.atk);
   if (fx.speed) registry.set('speedBonus', registry.get('speedBonus') + fx.speed);
+  if (fx.def) registry.set('def', registry.get('def') + fx.def);
   if (fx.maxHp) {
     const maxHp = registry.get('maxHp') + fx.maxHp;
     registry.set('maxHp', maxHp);

@@ -111,6 +111,7 @@ export default class Player {
       root.scale.setScalar(ROLL_TUCK);
       root.rotation.set(spin, 0, 0);
       root.position.set(0, center - c * Math.cos(spin), -c * Math.sin(spin));
+      if (this.model.cape) this.model.cape.rotation.x = 0.3;
       return;
     }
     const swing = (t - this.attackStart) / ATTACK_TIME;
@@ -123,6 +124,8 @@ export default class Player {
     root.scale.setScalar(1);
     root.rotation.set(0, spinning ? -spin * Math.PI * 2 : 0, 0);
     root.position.set(0, Math.abs(Math.sin(this.walkPhase)) * 0.04 * this.walkAmount, 0);
+    // The cape lifts behind the hero when running and flutters a little.
+    if (this.model.cape) this.model.cape.rotation.x = 0.06 + this.walkAmount * 0.5 + Math.sin(t * 9) * 0.04 * this.walkAmount;
   }
 
   idlePose() {
@@ -216,16 +219,18 @@ export default class Player {
     }
   }
 
+  // Returns true when the hit landed (false while invulnerable or rolling through it).
   hurt(damage, source) {
     const game = this.game, t = game.time;
-    if (this.dead || t < this.invulnUntil) return;
+    if (this.dead || t < this.invulnUntil) return false;
     if (t < this.rollIframesUntil) {
       // Rolled through the hit.
       if (!this.dodged) game.hud.floatText(this.x, 1.3, this.z, 'Dodge!', '#73eff7');
       this.dodged = true;
-      return;
+      return false;
     }
     this.invulnUntil = t + INVULN;
+    damage = Math.max(1, damage - game.store.get('def'));
 
     const hp = Math.max(0, game.store.get('hp') - damage);
     game.store.set('hp', hp);
@@ -235,6 +240,7 @@ export default class Player {
     this.knock.set(this.x - source.x, this.z - source.z).normalize().multiplyScalar(6);
     this.knockUntil = t + KNOCK_TIME;
     if (hp <= 0) this.die();
+    return true;
   }
 
   die() {
