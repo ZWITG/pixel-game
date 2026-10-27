@@ -22,10 +22,19 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   update(time, player) {
     this.setDepth(this.y);
-    if (this.dying || time < this.knockUntil) return;
+    const scene = this.scene;
+    if (this.dying || scene.locked || time < this.knockUntil) return;
+
+    // Village wards push monsters back out.
+    if (scene.inVillage(this.x, this.y)) {
+      const c = scene.villageCenter();
+      const away = new Phaser.Math.Vector2(this.x - c.x, this.y - c.y).normalize().scale(this.def.chaseSpeed);
+      this.setVelocity(away.x, away.y);
+      return;
+    }
 
     const dist = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
-    if (dist < this.def.aggro && !player.dead) {
+    if (dist < this.def.aggro && !player.dead && !scene.inVillage(player.x, player.y)) {
       this.scene.physics.moveToObject(this, player, this.def.chaseSpeed);
       this.setFlipX(player.x < this.x);
     } else if (time > this.nextWander) {

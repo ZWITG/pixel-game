@@ -15,7 +15,50 @@ function mulberry32(seed) {
   };
 }
 
-export function generateWorld(seed) {
+// The starting village, in tile coordinates. Enemies stay out of this rectangle.
+export const VILLAGE = { name: 'Lumen Hollow', x: 7, y: 3, w: 18, h: 13 };
+
+function carveVillage(data, set) {
+  const v = VILLAGE;
+  for (let y = v.y; y < v.y + v.h; y++)
+    for (let x = v.x; x < v.x + v.w; x++)
+      if (SOLID_TILES.includes(data[y][x])) set(x, y, TILE.GRASS);
+
+  // Each house is 2x2 tiles; its door sits between tx and tx + 1.
+  const houses = [
+    { tx: 9, ty: 5, roof: 'red' },
+    { tx: 14, ty: 4, roof: 'blue' },
+    { tx: 20, ty: 5, roof: 'green' },
+  ];
+  for (let y = 9; y <= 10; y++) for (let x = 9; x <= 21; x++) set(x, y, TILE.PATH);
+  for (const h of houses)
+    for (let y = h.ty + 2; y <= 8; y++) {
+      set(h.tx, y, TILE.PATH);
+      set(h.tx + 1, y, TILE.PATH);
+    }
+
+  // Road south until it meets the main road.
+  for (let y = 11; y < WORLD_H - 2; y++) {
+    if (y > v.y + v.h && data[y][15] === TILE.PATH) break;
+    set(15, y, TILE.PATH);
+    set(16, y, TILE.PATH);
+  }
+
+  return {
+    name: v.name,
+    rect: { x: v.x, y: v.y, w: v.w, h: v.h },
+    houses,
+    stall: { x: 21 * 16, y: 12 * 16 + 10 },
+    spots: {
+      elder: { tx: 12, ty: 8 },
+      kid: { tx: 18, ty: 11 },
+      merchant: { tx: 22, ty: 12 },
+      guard: { tx: 17, ty: 14 },
+    },
+  };
+}
+
+export function generateWorld(seed, { village = true } = {}) {
   const rand = mulberry32(seed);
   const ri = (min, max) => min + Math.floor(rand() * (max - min + 1));
   const data = [];
@@ -66,9 +109,11 @@ export function generateWorld(seed) {
     for (let x = -3; x <= 3; x++)
       if (SOLID_TILES.includes(data[midY + y][midX + x])) set(midX + x, midY + y, TILE.GRASS);
 
+  const villageInfo = village ? carveVillage(data, set) : null;
+
   // Forest border
   for (let x = 0; x < WORLD_W; x++) for (const y of [0, 1, WORLD_H - 2, WORLD_H - 1]) set(x, y, TILE.TREE);
   for (let y = 0; y < WORLD_H; y++) for (const x of [0, 1, WORLD_W - 2, WORLD_W - 1]) set(x, y, TILE.TREE);
 
-  return { data, spawn: { x: midX * 16 + 8, y: midY * 16 + 8 } };
+  return { data, spawn: { x: midX * 16 + 8, y: midY * 16 + 8 }, village: villageInfo };
 }

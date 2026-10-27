@@ -19,7 +19,31 @@ export const PALETTE = {
   F: '#38b764', // leaf
   t: '#5a3a22', // trunk dark
   T: '#7a5230', // trunk
+  m: '#c2c3c7', // white hair
+  n: '#7a4a2a', // brown hair
+  N: '#a86a3a', // brown hair shine
+  o: '#ef7d57', // orange hair
+  q: '#38b764', // green clothes
+  Q: '#257150', // green clothes shade
+  v: '#5b3a8e', // purple robe
+  V: '#3e2465', // purple robe shade
+  c: '#41a6f6', // blue clothes
+  C: '#3b5dc9', // blue clothes shade
+  a: '#94b0c2', // steel armor
+  A: '#566c86', // steel armor shade
 };
+
+// Villagers reuse the hero's shape with swapped colors.
+export const NPC_LOOKS = {
+  elder: { h: 'm', H: 'w', b: 'v', B: 'V' },
+  merchant: { h: 'n', H: 'N', b: 'q', B: 'Q' },
+  kid: { h: 'o', H: 'y', b: 'c', B: 'C' },
+  guard: { h: 'n', H: 'N', b: 'a', B: 'A', y: 'k' },
+};
+
+export function recolor(rows, map) {
+  return rows.map((row) => [...row].map((ch) => map[ch] ?? ch).join(''));
+}
 
 const heroTop = [
   '.....kkkkkk.....',

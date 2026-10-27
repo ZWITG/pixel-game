@@ -21,30 +21,29 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
     this.invulnUntil = 0;
     this.knockUntil = 0;
     this.dead = false;
-    this.keys = scene.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,J');
   }
 
-  update(time) {
+  // input: { move: {x, y}, attack: bool }, built by WorldScene from Controls.
+  update(time, input) {
     this.setDepth(this.y);
-    if (this.dead || time < this.knockUntil) return;
+    if (this.dead || this.scene.locked || time < this.knockUntil) return;
 
-    const k = this.keys;
-    const vx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
-    const vy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
-    const dir = new Phaser.Math.Vector2(vx, vy).normalize();
-    this.setVelocity(dir.x * SPEED, dir.y * SPEED);
+    const { x: vx, y: vy } = input.move;
+    const dir = new Phaser.Math.Vector2(vx, vy);
+    if (dir.length() > 1) dir.normalize();
+    const speed = SPEED * (1 + this.scene.registry.get('speedBonus'));
+    this.setVelocity(dir.x * speed, dir.y * speed);
 
     if (vx || vy) {
-      this.facing.copy(dir);
-      if (vx) this.setFlipX(vx < 0);
+      this.facing.copy(dir).normalize();
+      if (Math.abs(vx) > 0.1) this.setFlipX(vx < 0);
       this.anims.play('hero-walk', true);
     } else {
       this.anims.stop();
       this.setTexture('hero_0');
     }
 
-    const attackPressed = Phaser.Input.Keyboard.JustDown(k.SPACE) || Phaser.Input.Keyboard.JustDown(k.J);
-    if (FEATURES.combat && attackPressed && time >= this.attackReadyAt) this.attack(time);
+    if (FEATURES.combat && input.attack && time >= this.attackReadyAt) this.attack(time);
   }
 
   attack(time) {
@@ -57,7 +56,7 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
       .setDepth(this.y + 1);
     this.scene.tweens.add({ targets: slash, alpha: 0, duration: 140, onComplete: () => slash.destroy() });
 
-    const atk = this.scene.registry.get('atk');
+    const atk = this.scene.registry.get('atk') + this.scene.registry.get('atkBonus');
     for (const enemy of this.scene.enemies.getChildren().slice()) {
       if (enemy.dying) continue;
       if (Phaser.Math.Distance.Between(hx, hy, enemy.x, enemy.y) <= ATTACK_RADIUS) enemy.takeHit(atk, this.x, this.y);
