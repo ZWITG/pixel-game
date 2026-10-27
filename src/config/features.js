@@ -3,6 +3,7 @@
 export const FEATURES = {
   enemies: true,        // slimes spawn and roam
   combat: true,         // sword attack (Space / J / gamepad X or A)
+  cameraToggle: true,   // switch top-down / behind-the-hero camera (V / Select / R3)
   leveling: true,       // XP, levels, stat growth
   coins: true,          // enemies drop coins
   damageNumbers: true,  // floating numbers on hits

@@ -1,19 +1,9 @@
-import Phaser from 'phaser';
-import BootScene from './scenes/BootScene.js';
-import WorldScene from './scenes/WorldScene.js';
-import UIScene from './scenes/UIScene.js';
+import './ui/hud.css';
+import Game from './core/Game.js';
 
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'game',
-  width: 480,
-  height: 270,
-  pixelArt: true,
-  backgroundColor: '#1a1c2c',
-  physics: { default: 'arcade', arcade: { debug: false } },
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [BootScene, WorldScene, UIScene],
-});
+const game = new Game(document.getElementById('game'));
+game.start();
 
-// Handy for debugging in the browser console and for automated checks.
+// Handy for debugging in the browser console and for automated checks:
+// __game.step(1 / 60) advances one frame by hand.
 window.__game = game;

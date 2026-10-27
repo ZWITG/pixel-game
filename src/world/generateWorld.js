@@ -48,7 +48,7 @@ function carveVillage(data, set) {
     name: v.name,
     rect: { x: v.x, y: v.y, w: v.w, h: v.h },
     houses,
-    stall: { x: 21 * 16, y: 12 * 16 + 10 },
+    stall: { tx: 20, ty: 12 }, // 2 tiles wide
     spots: {
       elder: { tx: 12, ty: 8 },
       kid: { tx: 18, ty: 11 },
@@ -115,5 +115,5 @@ export function generateWorld(seed, { village = true } = {}) {
   for (let x = 0; x < WORLD_W; x++) for (const y of [0, 1, WORLD_H - 2, WORLD_H - 1]) set(x, y, TILE.TREE);
   for (let y = 0; y < WORLD_H; y++) for (const x of [0, 1, WORLD_W - 2, WORLD_W - 1]) set(x, y, TILE.TREE);
 
-  return { data, spawn: { x: midX * 16 + 8, y: midY * 16 + 8 }, village: villageInfo };
+  return { data, spawn: { x: midX + 0.5, z: midY + 0.5 }, village: villageInfo };
 }

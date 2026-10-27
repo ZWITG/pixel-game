@@ -1,17 +1,17 @@
 {
   "name": "pixel-rpg",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port 5180",
     "build": "vite build",
     "preview": "vite preview --port 5180"
   },
-  "dependencies": {
-    "phaser": "3.80.1"
-  },
   "devDependencies": {
     "vite": "5.4.10"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
   }
 }
