@@ -11,8 +11,10 @@ It grows feature by feature with the user, who plays and tests with a controller
 
 ## Testing in the browser pane
 - The pane throttles requestAnimationFrame, so drive frames by hand: `__game.step(1 / 60)`.
-- Fake a controller by overriding `navigator.getGamepads` with an object that has `buttons[i].pressed` and `axes`
-  (standard mapping: A 0, B 1, X 2, Y 3, LB 4, RB 5, Select 8, Start 9, R3 11, D-pad 12-15; axes 0-1 left stick, 2-3 right stick).
+- Fake a controller by overriding `navigator.getGamepads` with an object that has 18 `buttons[i].pressed` and `axes`
+  (PS5 names, standard order: Cross 0, Circle 1, Square 2, Triangle 3, L1 4, R1 5, L2 6, R2 7, Create 8, Options 9,
+  L3 10, R3 11, D-pad 12-15, PS 16, touchpad 17; axes 0-1 left stick, 2-3 right stick).
+- Prompts follow `__game.controls.device` ('pad' after any pad input, 'keyboard' after a key press).
 - Keyboard: `dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }))`, then keyup.
 - Never await requestAnimationFrame in pane scripts: it never fires while the pane is hidden. Step frames, then screenshot
   (if the screenshot shows an old frame, take it again).
@@ -20,15 +22,20 @@ It grows feature by feature with the user, who plays and tests with a controller
 
 ## Layout
 - `src/core/Game.js`: renderer, loop (`step(dt)`), world setup, spawning, combat glue, talking.
-- `src/core/CameraRig.js`: 'top' and 'third' camera modes, camera-relative movement.
+- `src/core/CameraRig.js`: camera-relative movement and the 'third' (behind-the-hero) camera. The 'top' mode is still there but off
+  (`FEATURES.topDownCamera`, the user asked to remove the top-down view on 2026-10-27).
 - `src/core/Store.js`: player stats (get/set/on). Stats rules in `src/config/stats.js`.
 - `src/config/features.js`: on/off switch per feature. Every new feature gets one.
 - `src/data/`: enemies, villagers, items/shops. Prefer data over code. Distances and speeds are in tiles.
 - `src/render/voxel.js`: `VoxelBuilder` merges colored boxes into one mesh. `src/render/models.js`: hero, villagers, slime, tree, house, stall, coin, slash.
 - `src/art/looks.js`: character color sets. `src/art/icons.js`: HUD pixel icons as SVG.
 - `src/world/generateWorld.js` (seeded tile map + village layout), `buildWorld.js` (3D meshes), `collision.js` (tiles + rectangles).
-- `src/entities/`: Player, Enemy, Npc. `src/ui/Hud.js` + `hud.css`: HTML overlay (stats, dialogue, shop, prompts).
-- `src/systems/controls.js`: all input (keyboard, mouse drag, gamepad). Read actions from it; never add raw key handlers elsewhere.
+- `src/entities/`: Player (attack, spin slash, dodge roll), Enemy, Npc. `src/ui/Hud.js` + `hud.css`: HTML overlay (stats, dialogue, shop, controls screen, prompts).
+- Pickups (coins and monster drops) and the death satchel live in `Game.js` (`pickups`, `satchel`, `revive()`).
+- `src/systems/controls.js`: all input (keyboard, mouse drag, gamepad) and the control scheme (`ACTIONS`, PS5 button names).
+  Read actions from it; never add raw key handlers elsewhere. `src/ui/glyphs.js` draws prompts and `src/ui/controllerMap.js`
+  builds the controls-screen diagram from `ACTIONS`, so rebinding there updates both.
+- `src/systems/lockOn.js`: lock-on targeting. `src/systems/shop.js`: buy, sell and bag helpers.
 - One loop: while a menu is open, only the HUD gets input; the world is paused.
 
 ## Rules

@@ -6,6 +6,13 @@ export const ITEMS = {
   charm: { name: 'Heart Charm', price: 30, desc: '+1 max heart.', once: true, effect: { maxHp: 1 } },
 };
 
+// Monster drops. Picked up by walking over them; sell them to a shop that `buysLoot`.
+export const LOOT = {
+  gel: { name: 'Slime Gel', value: 2, color: '#7be36a', desc: 'Wobbly goo. Mina turns it into glue.' },
+  ember: { name: 'Ember Core', value: 6, color: '#ff8a3d', desc: 'Still warm. Heats a stove for a week.' },
+  pearl: { name: 'Slime Pearl', value: 15, color: '#e8dcff', desc: 'A rare gem that grows inside slimes.' },
+};
+
 export const SHOPS = {
-  mina: { title: "Mina's Goods", items: ['tonic', 'sword', 'boots', 'charm'] },
+  mina: { title: "Mina's Goods", items: ['tonic', 'sword', 'boots', 'charm'], buysLoot: true },
 };

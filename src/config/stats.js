@@ -13,12 +13,13 @@ export const START_STATS = {
   xpNext: 10,
   coins: 0,
   owned: [],      // ids of one-time items bought
+  bag: {},        // monster drops carried: item id -> count
   dead: false,
 };
 
 export function resetStats(registry) {
   for (const [key, value] of Object.entries(START_STATS)) {
-    registry.set(key, Array.isArray(value) ? [...value] : value);
+    registry.set(key, Array.isArray(value) ? [...value] : typeof value === 'object' ? { ...value } : value);
   }
 }
 

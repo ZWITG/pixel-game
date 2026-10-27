@@ -159,6 +159,78 @@ export function makeCoin() {
   return mesh;
 }
 
+const lootParts = {};
+// A small glowing gem for monster drops (one shared geometry and material per color).
+export function makeLoot(color) {
+  lootParts[color] ??= {
+    geo: new VoxelBuilder()
+      .box(0, 0, 0, 0.2, 0.2, 0.2, color, 0)
+      .box(0.05, 0.05, 0.05, 0.08, 0.08, 0.12, '#ffffff', 0)
+      .build(),
+    mat: vmat({ emissive: new THREE.Color(color).multiplyScalar(0.35) }),
+  };
+  const mesh = new THREE.Mesh(lootParts[color].geo, lootParts[color].mat);
+  mesh.rotation.set(Math.PI / 4, 0, Math.PI / 4);
+  mesh.castShadow = true;
+  return mesh;
+}
+
+// The bag left where the hero fell, with a light beam so it can be found from afar.
+export function makeSatchel() {
+  const group = new THREE.Group();
+  const bag = voxelMesh(new VoxelBuilder()
+    .box(0, 0.16, 0, 0.42, 0.32, 0.36, '#8a5a32')
+    .box(0, 0.36, 0, 0.3, 0.1, 0.26, '#7a4a2a')
+    .box(0, 0.44, 0, 0.16, 0.08, 0.16, '#a86a3a')
+    .box(0, 0.4, 0.14, 0.32, 0.04, 0.03, '#ffcd75')
+    .box(0.1, 0.2, 0.185, 0.12, 0.12, 0.02, '#ffcd75', 0), vmat());
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.25, 6, 8, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: '#ffcd75', transparent: true, opacity: 0.35, depthWrite: false,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    }),
+  );
+  beam.position.y = 3;
+  group.add(bag, beam);
+  return { group, bag, beam };
+}
+
+let dustGeo = null;
+// A small puff of dust kicked up by a roll. Fades out through game.addEffect.
+export function makeDust() {
+  dustGeo ??= new THREE.BoxGeometry(0.12, 0.12, 0.12);
+  const mat = new THREE.MeshBasicMaterial({ color: '#efe2c4', transparent: true, opacity: 0.9, depthWrite: false });
+  return new THREE.Mesh(dustGeo, mat);
+}
+
+// Lock-on marker: a gold diamond above the target (drawn over everything, so trees
+// never hide it) and a square reticle on the ground.
+export function makeLockMarker() {
+  const group = new THREE.Group();
+  const diamond = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.13),
+    new THREE.MeshBasicMaterial({ color: '#ffcd75', transparent: true, depthTest: false, depthWrite: false }),
+  );
+  diamond.scale.y = 1.6;
+  diamond.renderOrder = 10;
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.5, 0.6, 4, 1).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: '#ff6b6b', transparent: true, opacity: 0.85, depthWrite: false }),
+  );
+  ring.position.y = 0.03;
+  group.add(diamond, ring);
+  return { group, diamond, ring };
+}
+
+let spinGeo = null;
+// A full flat ring for the spin slash.
+export function makeSpinSlash() {
+  spinGeo ??= new THREE.RingGeometry(0.6, 1.35, 32).rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false });
+  return new THREE.Mesh(spinGeo, mat);
+}
+
 let slashGeo = null;
 // A flat crescent that shows the sword's arc. Point it with rotation.y.
 export function makeSlash() {

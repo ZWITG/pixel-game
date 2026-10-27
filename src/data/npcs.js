@@ -18,7 +18,10 @@ export const NPCS = [
     look: 'merchant',
     spot: 'merchant',
     shop: 'mina',
-    lines: ["Hi there! Mina's Goods, best prices in the Hollow.", 'Have a look!'],
+    lines: [
+      "Hi there! Mina's Goods, best prices in the Hollow.",
+      "Got slime gel or other monster drops? I'll buy them. Just pick Sell!",
+    ],
   },
   {
     id: 'pip',

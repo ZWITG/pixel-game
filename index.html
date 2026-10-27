@@ -16,10 +16,15 @@
         <div id="hearts"></div>
         <div id="level"><span id="lv">Lv 1</span><div id="xpbar"><div id="xpfill"></div></div></div>
       </div>
-      <div id="coins"><span id="coin-icon"></span><span id="coin-count">0</span></div>
-      <div id="cam-hint"></div>
+      <div id="purse">
+        <div id="coins"><span id="coin-icon"></span><span id="coin-count">0</span></div>
+        <div id="bag-info"></div>
+        <div id="satchel-info"></div>
+      </div>
+      <div id="hints"><div id="cam-hint"></div><div id="action-hint"></div></div>
       <div id="banner"></div>
-      <div id="prompt">E / A&nbsp; Talk</div>
+      <div id="prompt"></div>
+      <div id="target"><div id="target-name"></div><div id="target-bar"><div id="target-fill"></div></div></div>
       <div id="floats"></div>
       <div id="dialogue" class="panel" hidden>
         <div id="dlg-name"></div>
@@ -28,14 +33,22 @@
       </div>
       <div id="shop" class="panel" hidden>
         <div class="shop-head"><span id="shop-title"></span><span id="shop-coins"></span></div>
+        <div id="shop-tabs"></div>
         <ul id="shop-list"></ul>
         <div id="shop-desc"></div>
         <div id="shop-msg"></div>
-        <div class="shop-hint">Up/Down choose &middot; E/A buy &middot; Q/B leave</div>
+        <div id="shop-hint" class="hint"></div>
+      </div>
+      <div id="controls" class="panel" hidden>
+        <div class="controls-head">Controls</div>
+        <div id="pad-map"></div>
+        <div id="key-map"></div>
+        <div id="controls-hint" class="hint"></div>
       </div>
       <div id="gameover" hidden>
         <div class="big">You fell...</div>
-        <div>Press R / Start to rise again</div>
+        <div id="gameover-loot"></div>
+        <div id="gameover-hint"></div>
       </div>
     </div>
     <script type="module" src="/src/main.js"></script>

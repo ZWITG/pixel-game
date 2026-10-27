@@ -1,24 +1,43 @@
 import { FEATURES } from '../config/features.js';
 
-// One place for all input: keyboard, mouse and gamepad (standard layout, e.g. Xbox/PlayStation).
+// One place for all input: keyboard, mouse and gamepad.
+// Buttons use PS5 names. Browsers report every standard gamepad in this order,
+// so other pads work too (Xbox A = Cross, B = Circle, X = Square, Y = Triangle, LB = L1...).
 // Call update(dt) once per frame, then read `just` (pressed this frame), move() and look().
-const PAD = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, BACK: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+export const PAD = {
+  CROSS: 0, CIRCLE: 1, SQUARE: 2, TRIANGLE: 3, L1: 4, R1: 5, L2: 6, R2: 7,
+  CREATE: 8, OPTIONS: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15, PS: 16, TOUCHPAD: 17,
+};
+// Stick pushes that count as button presses. FLICK_* are right-stick flicks.
+const STICK_EDGES = ['STICK_UP', 'STICK_DOWN', 'STICK_LEFT', 'STICK_RIGHT', 'FLICK_LEFT', 'FLICK_RIGHT'];
 const DEADZONE = 0.25;
-const LOOK_SPEED = 2.6;     // radians per second from stick or keys
+const FLICK = 0.6;
+const LOOK_SPEED = 2.6;     // radians per second from the right stick or Z / X
 const MOUSE_SPEED = 0.006;  // radians per pixel of mouse drag
 
-const ACTIONS = {
-  attack: { keys: ['Space', 'KeyJ'], pad: ['X'] },
-  interact: { keys: ['KeyE'], pad: ['Y'] },
-  padA: { keys: [], pad: ['A'] },       // A talks when next to someone, otherwise attacks
-  confirm: { keys: ['KeyE', 'Space', 'Enter'], pad: ['A'] },
-  back: { keys: ['Escape', 'KeyQ'], pad: ['B'] },
+// The control scheme. The first key and first button of each action are shown in prompts.
+export const ACTIONS = {
+  // World
+  attack: { keys: ['Space', 'KeyJ'], pad: ['SQUARE', 'R1'] },
+  spin: { keys: ['KeyF', 'KeyL'], pad: ['R2', 'TRIANGLE'] },
+  dodge: { keys: ['ShiftLeft', 'ShiftRight', 'KeyK'], pad: ['CIRCLE'] },
+  interact: { keys: ['KeyE'], pad: ['CROSS'] },
+  lock: { keys: ['KeyQ', 'Tab'], pad: ['L2', 'R3'] },
+  targetLeft: { keys: ['KeyZ'], pad: ['FLICK_LEFT'] },   // while locked on; otherwise Z / X turn the camera
+  targetRight: { keys: ['KeyX'], pad: ['FLICK_RIGHT'] },
+  recenter: { keys: ['KeyV'], pad: ['L1'] },                      // swing the camera behind the hero
+  camera: { keys: ['KeyC'], pad: ['CREATE', 'TOUCHPAD'] },         // switch view (only with FEATURES.topDownCamera)
+  pause: { keys: ['Escape', 'KeyP'], pad: ['OPTIONS'] },
+  restart: { keys: ['KeyR'], pad: ['CROSS', 'OPTIONS'] },
+  // Menus
+  confirm: { keys: ['KeyE', 'Space', 'Enter'], pad: ['CROSS'] },
+  back: { keys: ['Escape', 'KeyQ'], pad: ['CIRCLE'] },
   up: { keys: ['KeyW', 'ArrowUp'], pad: ['UP', 'STICK_UP'] },
   down: { keys: ['KeyS', 'ArrowDown'], pad: ['DOWN', 'STICK_DOWN'] },
-  restart: { keys: ['KeyR'], pad: ['START', 'A'] },
-  camera: { keys: ['KeyV'], pad: ['BACK', 'R3'] },
+  left: { keys: ['KeyA', 'ArrowLeft'], pad: ['LEFT', 'STICK_LEFT', 'L1'] },
+  right: { keys: ['KeyD', 'ArrowRight'], pad: ['RIGHT', 'STICK_RIGHT', 'R1'] },
 };
-const NO_SCROLL = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const NO_DEFAULT = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab']; // keys the browser shouldn't act on
 
 export function getPad() {
   if (!FEATURES.gamepad || !navigator.getGamepads) return null;
@@ -35,15 +54,20 @@ export default class Controls {
     this.just = {};
     this.lookDelta = { x: 0, y: 0 };
     this.mouse = { dx: 0, dy: 0, dragging: false };
+    this.device = 'keyboard'; // last used: 'keyboard' or 'pad' (prompts follow it)
 
     window.addEventListener('keydown', (e) => {
       if (!e.repeat) this.queued.add(e.code);
       this.held.add(e.code);
-      if (NO_SCROLL.includes(e.code)) e.preventDefault();
+      this.device = 'keyboard';
+      if (NO_DEFAULT.includes(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => this.held.delete(e.code));
     window.addEventListener('blur', () => this.held.clear());
-    dragTarget.addEventListener('mousedown', () => { this.mouse.dragging = true; });
+    dragTarget.addEventListener('mousedown', () => {
+      this.mouse.dragging = true;
+      this.device = 'keyboard';
+    });
     window.addEventListener('mouseup', () => { this.mouse.dragging = false; });
     window.addEventListener('mousemove', (e) => {
       if (!this.mouse.dragging) return;
@@ -63,6 +87,10 @@ export default class Controls {
     state.lookY = axis(pad.axes[3]);
     state.STICK_UP = state.stickY < -0.5;
     state.STICK_DOWN = state.stickY > 0.5;
+    state.STICK_LEFT = state.stickX < -0.5;
+    state.STICK_RIGHT = state.stickX > 0.5;
+    state.FLICK_LEFT = state.lookX < -FLICK;
+    state.FLICK_RIGHT = state.lookX > FLICK;
     return state;
   }
 
@@ -72,18 +100,20 @@ export default class Controls {
 
     const pad = this.readPad();
     const padJust = {};
-    for (const name of [...Object.keys(PAD), 'STICK_UP', 'STICK_DOWN']) padJust[name] = !!pad[name] && !this.padHeld[name];
+    for (const name of [...Object.keys(PAD), ...STICK_EDGES]) padJust[name] = !!pad[name] && !this.padHeld[name];
     this.padHeld = pad;
+    if (Object.keys(PAD).some((b) => pad[b]) || pad.stickX || pad.stickY || pad.lookX || pad.lookY) this.device = 'pad';
 
     for (const [action, map] of Object.entries(ACTIONS)) {
       this.just[action] = map.keys.some((k) => keyJust.has(k)) || map.pad.some((b) => padJust[b]);
     }
 
+    // Camera turning: right stick, mouse drag, or Z / X on the keyboard.
     const h = this.held;
     let lx = (pad.lookX || 0) * LOOK_SPEED * dt + this.mouse.dx * MOUSE_SPEED;
     const ly = (pad.lookY || 0) * LOOK_SPEED * dt + this.mouse.dy * MOUSE_SPEED;
-    if (h.has('KeyZ') || pad.LB) lx -= LOOK_SPEED * dt;
-    if (h.has('KeyX') || pad.RB) lx += LOOK_SPEED * dt;
+    if (h.has('KeyZ')) lx -= LOOK_SPEED * dt;
+    if (h.has('KeyX')) lx += LOOK_SPEED * dt;
     this.lookDelta = { x: lx, y: ly };
     this.mouse.dx = this.mouse.dy = 0;
   }

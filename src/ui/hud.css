@@ -29,8 +29,24 @@ html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
 #xpbar { width: 120px; height: 8px; background: #333c57; border: 2px solid var(--ink); }
 #xpfill { height: 100%; width: 0; background: var(--sky); }
 
-#coins { position: absolute; right: 12px; top: 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; }
-#cam-hint { position: absolute; left: 12px; bottom: 12px; font-size: 8px; color: var(--steel); }
+#purse { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+#coins { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+#bag-info { font-size: 8px; color: #a7f070; }
+#satchel-info { font-size: 8px; color: var(--gold); }
+
+/* Button prompts: PS5 face-button glyphs, or keycaps for keyboard and other buttons. */
+.glyph { display: inline-block; vertical-align: middle; margin: -4px 2px 0 0; }
+.key, .btn {
+  display: inline-block; vertical-align: middle; margin: -3px 3px 0 0; padding: 2px 4px;
+  font-size: 7px; line-height: 1; text-shadow: none; color: var(--ink); background: var(--paper);
+  border: 2px solid var(--ink); border-radius: 3px;
+}
+.btn { background: var(--steel); border-radius: 6px; }
+#hints { position: absolute; left: 12px; bottom: 12px; font-size: 8px; line-height: 1.9; color: var(--steel); }
+
+#target { position: absolute; display: none; transform: translate(-50%, -100%); font-size: 8px; text-align: center; white-space: nowrap; }
+#target-bar { width: 64px; height: 6px; margin: 4px auto 0; background: #333c57; border: 2px solid var(--ink); }
+#target-fill { height: 100%; width: 100%; background: #ff6b6b; }
 
 #banner {
   position: absolute; top: 18%; width: 100%;
@@ -45,7 +61,7 @@ html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
 #prompt {
   position: absolute; display: none;
   transform: translate(-50%, -100%);
-  padding: 4px 6px; font-size: 8px; white-space: nowrap;
+  padding: 3px 6px 4px; font-size: 8px; white-space: nowrap;
   background: var(--paper); color: var(--ink); text-shadow: none;
   border: 2px solid var(--ink);
 }
@@ -76,12 +92,26 @@ html, body { margin: 0; height: 100%; background: #0d0e17; overflow: hidden; }
 #shop-list li.owned { color: var(--dim); }
 #shop-desc { margin-top: 10px; min-height: 14px; color: var(--steel); }
 #shop-msg { margin-top: 8px; min-height: 14px; }
-.shop-hint { margin-top: 10px; font-size: 8px; color: var(--dim); }
+.hint { margin-top: 12px; font-size: 8px; color: var(--steel); }
+#shop-tabs { display: flex; gap: 18px; margin-bottom: 10px; font-size: 9px; color: var(--dim); }
+#shop-tabs .sel { color: var(--gold); text-decoration: underline; text-underline-offset: 4px; }
+
+#controls {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(860px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow: auto;
+  padding: 14px; box-sizing: border-box; border-color: var(--sky);
+}
+.controls-head { color: var(--sky); margin-bottom: 6px; }
+.pad-map { width: 100%; height: auto; display: block; }
+#key-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 18px; margin-top: 8px; font-size: 8px; }
+#key-map div { display: flex; justify-content: space-between; align-items: center; }
+#key-map div > span:first-child { color: var(--steel); }
 
 #gameover {
   position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
 }
 #gameover .big { font-size: 24px; }
+#gameover-loot { color: var(--gold); text-align: center; white-space: pre-line; line-height: 2; }
 
 [hidden] { display: none !important; }

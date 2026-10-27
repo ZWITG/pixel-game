@@ -3,17 +3,21 @@ import { FEATURES } from '../config/features.js';
 import { resetStats, addXp } from '../config/stats.js';
 import { ENEMIES } from '../data/enemies.js';
 import { NPCS } from '../data/npcs.js';
+import { LOOT } from '../data/items.js';
 import { generateWorld } from '../world/generateWorld.js';
 import { buildWorld } from '../world/buildWorld.js';
 import Collision from '../world/collision.js';
 import Store from './Store.js';
 import CameraRig from './CameraRig.js';
 import Controls from '../systems/controls.js';
+import LockOn from '../systems/lockOn.js';
 import Player from '../entities/Player.js';
 import Enemy from '../entities/Enemy.js';
 import Npc from '../entities/Npc.js';
+import { bagCount } from '../systems/shop.js';
 import Hud from '../ui/Hud.js';
-import { makeCoin } from '../render/models.js';
+import { makeCoin, makeLoot, makeSatchel } from '../render/models.js';
+import { disposeModel } from '../render/voxel.js';
 
 const RETRO_SCALE = 3;   // retro mode renders at 1/3 resolution for chunky pixels
 const MAX_PIXEL_RATIO = 2;
@@ -21,6 +25,9 @@ const WORLD_SEED = 1337;
 const MAX_ENEMIES = 14;
 const SPAWN_EVERY = 4;   // seconds
 const TALK_RANGE = 1.6;  // tiles
+const PICKUP_RANGE = 0.55;  // walk this close to pick up a coin or drop
+const MAGNET_RANGE = 1.8;   // drops closer than this slide toward the hero
+const SATCHEL_RANGE = 0.8;
 const SKY_TOP = '#4a8fe0';
 const SKY_HORIZON = '#cdeaff';
 
@@ -83,8 +90,10 @@ export default class Game {
     }
 
     this.player = new Player(this);
+    this.lockOn = new LockOn(this);
     this.enemies = [];
-    this.coins = [];
+    this.pickups = [];   // coins and monster drops on the ground: { mesh, kind, seed }
+    this.satchel = null; // what the hero dropped when falling
     this.effects = [];
     this.time = 0;
 
@@ -118,10 +127,12 @@ export default class Game {
   reset() {
     resetStats(this.store);
     this.player.respawn(this.spawn.x, this.spawn.z);
+    this.lockOn.clear();
     for (const e of this.enemies) e.remove();
-    for (const c of this.coins) this.scene.remove(c);
+    for (const item of this.pickups) this.scene.remove(item.mesh);
     this.enemies = [];
-    this.coins = [];
+    this.pickups = [];
+    this.removeSatchel();
     if (FEATURES.enemies) for (let i = 0; i < MAX_ENEMIES; i++) this.spawnEnemy();
     this.spawnTimer = SPAWN_EVERY;
     this.wasInVillage = false;
@@ -146,15 +157,17 @@ export default class Game {
     this.controls.update(dt);
     const just = this.controls.just;
 
-    if (just.camera && FEATURES.cameraToggle) {
+    if (just.camera && FEATURES.topDownCamera) {
       this.rig.toggle();
       this.hud.setCamMode(this.rig.mode);
     }
+    // Locked on, the camera turns by itself and left/right input switches targets instead.
     const look = this.controls.look();
-    this.rig.look(look.x, look.y);
+    this.rig.look(this.lockOn.target ? 0 : look.x, look.y);
 
     if (this.store.get('dead')) {
-      if (just.restart) this.reset();
+      this.lockOn.clear();
+      if (just.restart) FEATURES.lootDrop ? this.revive() : this.reset();
     } else if (this.hud.mode) {
       this.hud.handle(just);
     } else {
@@ -162,7 +175,7 @@ export default class Game {
     }
 
     this.animate(dt);
-    this.rig.update(dt, this.player);
+    this.rig.update(dt, this.player, this.lockOn.target);
     this.sun.position.set(this.player.x - 8, 14, this.player.z + 6);
     this.sun.target.position.set(this.player.x, 0, this.player.z);
     this.hud.update(dt);
@@ -172,9 +185,18 @@ export default class Game {
   updateWorld(dt, just) {
     const player = this.player;
     const npc = FEATURES.dialogue ? this.nearestNpc() : null;
+    if (FEATURES.lockOn) {
+      if (just.lock) this.lockOn.toggle();
+      if (just.targetLeft) this.lockOn.cycle(-1);
+      if (just.targetRight) this.lockOn.cycle(1);
+      this.lockOn.update();
+    }
     player.update(dt, {
       move: this.rig.moveVector(this.controls.move()),
-      attack: just.attack || (just.padA && !npc),
+      attack: just.attack,
+      spin: just.spin,
+      dodge: just.dodge,
+      target: this.lockOn.target,
       idleFacing: this.rig.mode === 'third' ? this.rig.forward() : null,
     });
 
@@ -183,9 +205,16 @@ export default class Game {
     for (const e of this.enemies) {
       if (!e.dying && Math.hypot(e.x - player.x, e.z - player.z) < e.radius + player.radius) player.hurt(e.def.damage, e);
     }
-    for (const coin of this.coins.slice()) {
-      if (Math.hypot(coin.position.x - player.x, coin.position.z - player.z) < 0.6) this.collectCoin(coin);
+    for (const item of this.pickups.slice()) {
+      const pos = item.mesh.position, dx = player.x - pos.x, dz = player.z - pos.z, d = Math.hypot(dx, dz);
+      if (d < PICKUP_RANGE) this.collect(item);
+      else if (d < MAGNET_RANGE) {
+        const pull = Math.min(d, (MAGNET_RANGE - d + 1) * 4 * dt);
+        pos.x += (dx / d) * pull;
+        pos.z += (dz / d) * pull;
+      }
     }
+    if (this.satchel && Math.hypot(this.satchel.x - player.x, this.satchel.z - player.z) < SATCHEL_RANGE) this.recoverSatchel();
 
     if (FEATURES.enemies && (this.spawnTimer -= dt) <= 0) {
       this.spawnTimer = SPAWN_EVERY;
@@ -193,7 +222,9 @@ export default class Game {
     }
 
     this.hud.setPrompt(npc);
-    if (npc && (just.interact || just.padA)) this.talkTo(npc);
+    if (npc && just.interact) this.talkTo(npc);
+    if (just.pause) this.hud.openControls();
+    if (just.recenter && !this.lockOn.target) this.rig.recenter(player.facing.x, player.facing.y);
 
     if (this.village) {
       const inside = this.inVillage(player.x, player.z);
@@ -207,14 +238,22 @@ export default class Game {
     const t = this.time;
     this.water.position.y = Math.sin(t * 1.5) * 0.02;
     for (const npc of this.npcs) npc.animate(t);
-    for (const coin of this.coins) {
-      coin.rotation.y += dt * 3;
-      coin.position.y = 0.35 + Math.sin(t * 4 + coin.id) * 0.06;
+    for (const item of this.pickups) {
+      item.mesh.rotation.y += dt * 3;
+      item.mesh.position.y = 0.35 + Math.sin(t * 4 + item.seed) * 0.06;
+    }
+    if (this.satchel) {
+      const { bag, beam } = this.satchel.model;
+      bag.rotation.y = Math.sin(t) * 0.3;
+      beam.material.opacity = 0.25 + Math.sin(t * 3) * 0.1;
     }
     for (const fx of this.effects) {
       fx.age += dt;
       fx.mesh.material.opacity = 0.9 * (1 - fx.age / fx.life);
+      if (fx.rise) fx.mesh.position.y += fx.rise * dt;
+      if (fx.grow) fx.mesh.scale.setScalar(1 + fx.grow * fx.age);
     }
+    this.lockOn.animate(t);
     for (const fx of this.effects.filter((f) => f.age >= f.life)) {
       this.scene.remove(fx.mesh);
       fx.mesh.material.dispose();
@@ -222,9 +261,10 @@ export default class Game {
     this.effects = this.effects.filter((f) => f.age < f.life);
   }
 
-  addEffect(mesh, life) {
+  // A short-lived mesh that fades out. `rise` lifts it (tiles/s), `grow` swells it.
+  addEffect(mesh, life, { rise = 0, grow = 0 } = {}) {
     this.scene.add(mesh);
-    this.effects.push({ mesh, life, age: 0 });
+    this.effects.push({ mesh, life, age: 0, rise, grow });
   }
 
   separateEnemies() {
@@ -298,24 +338,83 @@ export default class Game {
   }
 
   onEnemyKilled(enemy) {
-    if (FEATURES.coins && Math.random() < 0.7) this.dropCoin(enemy.x, enemy.z);
+    if (FEATURES.coins && Math.random() < 0.7) this.dropPickup(enemy.x, enemy.z, 'coin');
+    if (FEATURES.monsterDrops) {
+      for (const { item, chance } of enemy.def.drops ?? []) if (Math.random() < chance) this.dropPickup(enemy.x, enemy.z, item);
+    }
     if (FEATURES.leveling && addXp(this.store, enemy.def.xp)) {
       this.hud.floatText(this.player.x, 1.6, this.player.z, `LEVEL ${this.store.get('level')}!`, '#ffcd75');
       this.hud.flash();
     }
   }
 
-  dropCoin(x, z) {
-    const coin = makeCoin();
-    coin.position.set(x, 0.35, z);
-    this.scene.add(coin);
-    this.coins.push(coin);
+  // `kind` is 'coin' or a monster drop id from data/items.js LOOT.
+  dropPickup(x, z, kind) {
+    const mesh = kind === 'coin' ? makeCoin() : makeLoot(LOOT[kind].color);
+    mesh.position.set(x + (Math.random() - 0.5) * 0.5, 0.35, z + (Math.random() - 0.5) * 0.5);
+    this.scene.add(mesh);
+    this.pickups.push({ mesh, kind, seed: Math.random() * 10 });
   }
 
-  collectCoin(coin) {
-    this.store.set('coins', this.store.get('coins') + 1);
-    this.hud.floatText(coin.position.x, 0.8, coin.position.z, '+1', '#ffcd75');
-    this.scene.remove(coin);
-    this.coins = this.coins.filter((c) => c !== coin);
+  collect(item) {
+    const s = this.store, { mesh, kind } = item, { x, z } = mesh.position;
+    if (kind === 'coin') {
+      s.set('coins', s.get('coins') + 1);
+      this.hud.floatText(x, 0.8, z, '+1', '#ffcd75');
+    } else {
+      s.set('bag', { ...s.get('bag'), [kind]: (s.get('bag')[kind] ?? 0) + 1 });
+      this.hud.floatText(x, 0.8, z, `+${LOOT[kind].name}`, LOOT[kind].color);
+    }
+    this.scene.remove(mesh);
+    this.pickups = this.pickups.filter((p) => p !== item);
+  }
+
+  // After falling: carried coins and drops stay in a satchel where the hero fell (an older,
+  // unclaimed satchel is lost) and the hero wakes up in the village, keeping level and gear.
+  revive() {
+    const s = this.store, p = this.player;
+    this.removeSatchel();
+    const coins = s.get('coins'), bag = s.get('bag');
+    if (coins || bagCount(bag)) this.placeSatchel(p.x, p.z, coins, bag);
+    s.set('coins', 0);
+    s.set('bag', {});
+    s.set('hp', s.get('maxHp'));
+    const home = this.homeSpot();
+    p.respawn(home.x, home.z);
+    s.set('dead', false);
+    this.wasInVillage = false;
+    this.rig.snap(p);
+  }
+
+  // Where the hero wakes up after falling: the middle of the village if there is one.
+  homeSpot() {
+    if (!this.village) return this.spawn;
+    const c = this.villageCenter();
+    return this.collision.blocked(c.x, c.z, this.player.radius) ? this.spawn : c;
+  }
+
+  placeSatchel(x, z, coins, bag) {
+    const model = makeSatchel();
+    model.group.position.set(x, 0, z);
+    this.scene.add(model.group);
+    this.satchel = { model, x, z, coins, bag };
+  }
+
+  recoverSatchel() {
+    const s = this.store, { coins, bag, x, z } = this.satchel;
+    const mine = { ...s.get('bag') };
+    for (const [id, n] of Object.entries(bag)) mine[id] = (mine[id] ?? 0) + n;
+    s.set('bag', mine);
+    s.set('coins', s.get('coins') + coins);
+    this.hud.floatText(x, 1.2, z, 'Satchel recovered!', '#ffcd75');
+    this.removeSatchel();
+    this.hud.refresh();
+  }
+
+  removeSatchel() {
+    if (!this.satchel) return;
+    this.scene.remove(this.satchel.model.group);
+    disposeModel(this.satchel.model.group);
+    this.satchel = null;
   }
 }

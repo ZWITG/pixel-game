@@ -21,3 +21,31 @@ export function tryBuy(registry, id, item) {
   if (item.once) registry.set('owned', [...owned, id]);
   return { ok: true, msg: `Bought ${item.name}!` };
 }
+
+// Sells one monster drop from the bag. Returns { ok, msg }.
+export function trySell(registry, id, item) {
+  const bag = { ...registry.get('bag') };
+  if (!bag[id]) return { ok: false, msg: 'You have none left.' };
+  if (--bag[id] === 0) delete bag[id];
+  registry.set('bag', bag);
+  registry.set('coins', registry.get('coins') + item.value);
+  return { ok: true, msg: `Sold ${item.name} for ${item.value}c.` };
+}
+
+export function bagCount(bag) {
+  return Object.values(bag).reduce((sum, n) => sum + n, 0);
+}
+
+export function bagValue(bag, loot) {
+  return Object.entries(bag).reduce((sum, [id, n]) => sum + n * loot[id].value, 0);
+}
+
+// Sells every monster drop in the bag.
+export function sellAll(registry, loot) {
+  const bag = registry.get('bag');
+  const count = bagCount(bag), total = bagValue(bag, loot);
+  if (!count) return { ok: false, msg: 'Nothing to sell.' };
+  registry.set('bag', {});
+  registry.set('coins', registry.get('coins') + total);
+  return { ok: true, msg: `Sold ${count} drops for ${total}c.` };
+}
