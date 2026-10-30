@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import Controls from '../systems/controls.js';
+import { prompt, buttonHtml, keyHtml } from '../ui/glyphs.js';
 import { height, PLACES, SPAWN, WORLD } from './terrain.js';
 import Chunks from './chunks.js';
 import { addLandmarks } from './landmarks.js';
@@ -54,6 +55,7 @@ scene.add(water);
 const chunks = new Chunks(scene);
 const marks = addLandmarks(scene);
 const controls = new Controls(renderer.domElement);
+controls.device = 'pad'; // PS5 prompts by default; pressing a key switches them to keyboard
 
 const post = new Post(renderer, scene, camera);
 const hero = new HeroSprite(scene);
@@ -64,7 +66,7 @@ const skills = new Skills((skill, level) => {
 });
 const swim = new Swim(skills, hud);
 
-const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '' };
+const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '', recenter: null, stop: 0, promptDevice: null };
 const tmp = new THREE.Vector3();
 
 function setTime(name) {
@@ -121,12 +123,38 @@ function splash(dt) {
   r.ring.position.z = state.z;
 }
 
+// Button prompts follow the device used last.
+function renderPrompts() {
+  const d = controls.device;
+  if (d === state.promptDevice) return;
+  state.promptDevice = d;
+  const pad = d === 'pad', btn = buttonHtml, key = keyHtml;
+  const p = (action) => prompt(action, d);
+  document.getElementById('help').innerHTML = [
+    [pad ? btn('L-stick') : `${key('KeyW')}${key('KeyA')}${key('KeyS')}${key('KeyD')}`, 'Move'],
+    [pad ? btn('R-stick') : key('Drag'), 'Look'],
+    [pad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
+    [p('recenter'), 'Recenter'],
+    [p('camera'), 'Travel'],
+    [p('pause'), 'Spirit Tree'],
+  ].map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');
+  document.getElementById('map-hints').innerHTML = `${pad ? btn('D-pad') : `${key('KeyA')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
+}
+
 function step(dt) {
   dt = Math.min(dt, 0.05);
   shared.uTime.value += dt;
   windTime.value = shared.uTime.value;
   controls.update(dt);
   const just = controls.just;
+  renderPrompts();
+  if (!hud.open && just.recenter) state.recenter = Math.atan2(-state.dir[0], -state.dir[1]);
+  if (!hud.open && just.camera) {
+    state.stop = state.stop % 6 + 1;
+    state.drone = null;
+    goto(...SHOTS[state.stop]);
+    hud.message(nearestPlace().split(' ·')[0], true);
+  }
   if (hud.open ? just.back || just.pause : just.pause) hud.toggle(skills.map('swimming'));
   if (hud.open) {
     hud.map.handle(just);
@@ -134,6 +162,12 @@ function step(dt) {
   }
   const look = hud.open ? { x: 0, y: 0 } : controls.look();
   state.yaw -= look.x;
+  if (look.x) state.recenter = null;
+  if (state.recenter !== null) {
+    const diff = Math.atan2(Math.sin(state.recenter - state.yaw), Math.cos(state.recenter - state.yaw));
+    state.yaw += diff * Math.min(1, dt * 10);
+    if (Math.abs(diff) < 0.01) state.recenter = null;
+  }
   state.pitch = THREE.MathUtils.clamp(state.pitch + look.y, -0.25, 1.2);
 
   const m = hud.open ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
@@ -230,7 +264,7 @@ addEventListener('keydown', (e) => {
 });
 
 setTime('dusk');
-window.__world = { skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
+window.__world = { controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
   step((now - last) / 1000);

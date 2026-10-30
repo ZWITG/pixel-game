@@ -26,7 +26,7 @@ export const ACTIONS = {
   targetLeft: { keys: ['KeyZ'], pad: ['FLICK_LEFT'] },   // while locked on; otherwise Z / X turn the camera
   targetRight: { keys: ['KeyX'], pad: ['FLICK_RIGHT'] },
   recenter: { keys: ['KeyV'], pad: ['L1'] },                      // swing the camera behind the hero
-  camera: { keys: ['KeyC'], pad: ['CREATE', 'TOUCHPAD'] },         // switch view (only with FEATURES.topDownCamera)
+  camera: { keys: ['KeyC'], pad: ['TOUCHPAD', 'CREATE'] },         // switch view (only with FEATURES.topDownCamera)
   pause: { keys: ['Escape', 'KeyP'], pad: ['OPTIONS'] },
   restart: { keys: ['KeyR'], pad: ['CROSS', 'OPTIONS'] },
   // Menus

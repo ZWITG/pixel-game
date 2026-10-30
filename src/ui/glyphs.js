@@ -10,6 +10,7 @@ export const FACE = {
 const PAD_LABELS = {
   CREATE: 'Create', OPTIONS: 'Options', TOUCHPAD: 'Touchpad', UP: 'D-pad', DOWN: 'D-pad',
   LEFT: 'D-pad', RIGHT: 'D-pad', FLICK_LEFT: 'R-stick', FLICK_RIGHT: 'R-stick',
+  L1: 'L1', R1: 'R1',
 };
 const KEY_LABELS = {
   Space: 'Space', ShiftLeft: 'Shift', ShiftRight: 'Shift', Escape: 'Esc', Enter: 'Enter',

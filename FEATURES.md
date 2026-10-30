@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-10-30 prototype: PS5 prompts by default, L1 recenters the camera, touchpad travels between landmarks
 - 2026-10-30 prototype: Skills page replaced by a visual skill map: the Spirit Tree at night, with glowing pixel-icon nodes on each skill's bough
 - 2026-10-30 prototype: Swimming learned by trial and error (breath bar, wash ashore, practice saved), new Skills page (Options / Esc)
 - 2026-10-30 prototype look pass: leaf-card trees with bark, thick swaying ground cover, 2D pixel sprite hero with walk frames and lantern, finer ground pixels, bloom, sun shafts, color grading, dithered finish, softer clouds, clearings around landmarks
