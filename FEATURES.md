@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-10-30 open-world prototype (`/world.html`, `src/open/`, not yet the main game): 8 km streamed terrain, pixel-art ground shader, mountains, lake, roads, Lantern Spire, colossal Spirit Tree, Drifting Isles, Titan Ribs
 - 2026-10-27 v0.6.0: living world: five regions with their own look and monsters, river and lake with bridges and a boardwalk, the Spirit Tree on Spirit Hill, standing stones, moor ruins, Dimwood fairy ring, windmill; day/night cycle; wind, butterflies, birds, fireflies, fish, chimney smoke; villagers walk and patrol
 - 2026-10-27 v0.5.0: new monsters (Puffcap that splits, charging Thornback Boar, orb-shooting Wisp), Market Row village section with fountain, Odo's Forge (Knight Blade, Iron Vest, Swift Greaves; defense stat) and Lyra the bard, village fence and lanterns, three tree kinds, wild props, clouds, hero cape, framed HUD; camera rises over trees
 - 2026-10-27 v0.4.0: lock-on targeting, dodge roll with invincibility, spin slash, monster drops sold to Mina (Sell tab), loot satchel on death, PS5 controller layout (shoulders no longer turn the camera) with button prompts and a controls screen, behind-the-hero camera only (top-down switched off), L1 recenters the camera

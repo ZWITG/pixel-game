@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lumen World Prototype</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0e17; }
+      #game { position: fixed; inset: 0; }
+      #where { position: fixed; left: 12px; top: 10px; color: #f3ead8; font: 13px monospace; text-shadow: 1px 1px 0 #141a28; pointer-events: none; }
+      #help { position: fixed; left: 12px; bottom: 10px; color: #f3ead8; font: 12px monospace; text-shadow: 1px 1px 0 #141a28; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="where"></div>
+    <div id="help">Left stick / WASD move · Right stick / drag look · R2 / Shift sprint · 1-6 jump to landmarks</div>
+    <script type="module" src="/src/open/main.js"></script>
+  </body>
+</html>
