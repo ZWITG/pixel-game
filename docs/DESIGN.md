@@ -96,6 +96,8 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Progress:** save/load (localStorage), a quest log driven by the Elder.
 
+**Body attributes (built 2026-10-30):** Strength, Speed and Endurance start at 10 and grow from skill practice, never from menus (`src/open/skills.js`, `trains`). All their effects live in `src/open/body.js`. Strength is the long-term pillar: today it sets steepest climbable slope and hero size; `damageScale` and `carry` are ready for combat and inventory, and later it should also gate heavy weapons and armor, pushing and breaking objects, and hauling yourself up cliffs.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

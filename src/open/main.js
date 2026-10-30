@@ -12,10 +12,12 @@ import { FEATURES } from '../config/features.js';
 import Skills from './skills.js';
 import Swim, { DEEP } from './swim.js';
 import WorldHud from './skillPage.js';
+import Body, { ATTRIBUTES } from './body.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const PIXEL = Number(new URLSearchParams(location.search).get('px') ?? 1.5); // screen pixels per game pixel
 const RUN = 6, SPRINT = 16;
+const CLIMB_START = 0.45; // slopes steeper than this count as climbing practice
 
 const TIMES = {
   morning: { top: '#6f9bd8', mid: '#bcd2ea', low: '#efe0cc', fog: '#c6d3e0', sun: [0.5, 0.42, 0.6], sunCol: '#fff0d0', cloud: '#f6f2ea', light: 2.8, amb: 1.8, density: 0.0007, shaft: 0.35, shadow: '#2a3a6a', sat: 1.2, bloom: 0.22 },
@@ -63,10 +65,11 @@ const hud = new WorldHud();
 const skills = new Skills((skill, level) => {
   if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
   else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
-});
-const swim = new Swim(skills, hud);
+}, (name, value) => hud.gain(ATTRIBUTES[name], value));
+const body = new Body(skills);
+const swim = new Swim(skills, body, hud);
 
-const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '', recenter: null, stop: 0, promptDevice: null };
+const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '', recenter: null, stop: 0, promptDevice: null, steepAt: 0 };
 const tmp = new THREE.Vector3();
 
 function setTime(name) {
@@ -126,7 +129,7 @@ function splash(dt) {
 // Button prompts follow the device used last.
 function renderPrompts() {
   const pad = getPad();
-  const status = pad ? `${pad.id.split(' (')[0]} connected` : 'No controller yet: press any button on it';
+  const status = pad ? `${(pad.id || 'Controller').split(' (')[0]} connected` : 'No controller yet: press any button on it';
   if (status !== state.padStatus) document.getElementById('pad-status').textContent = state.padStatus = status;
   const d = controls.device;
   if (d === state.promptDevice) return;
@@ -158,7 +161,7 @@ function step(dt) {
     goto(...SHOTS[state.stop]);
     hud.message(nearestPlace().split(' ·')[0], true);
   }
-  if (hud.open ? just.back || just.pause : just.pause) hud.toggle(skills.map('swimming'));
+  if (hud.open ? just.back || just.pause : just.pause) hud.toggle(skills.all(), body);
   if (hud.open) {
     hud.map.handle(just);
     hud.map.update(dt);
@@ -176,14 +179,22 @@ function step(dt) {
   const m = hud.open ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
   if (amount > 0.05) {
     const sprint = controls.held.has('ShiftLeft') || controls.padHeld.R2;
-    const s = Math.sin(state.yaw), c = Math.cos(state.yaw), speed = (swim.inWater ? swim.speed : sprint ? SPRINT : RUN) * amount;
+    const s = Math.sin(state.yaw), c = Math.cos(state.yaw), speed = (swim.inWater ? swim.speed : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
     const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
     const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
     const rise = height(nx, nz) - height(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
     const wet = height(nx, nz) < DEEP;
-    if (rise / Math.max(dist, 1e-3) < 1.4 && (FEATURES.swimming || !wet)) {
+    const steep = rise / Math.max(dist, 1e-3);
+    if (steep < body.climbLimit && (FEATURES.swimming || !wet)) {
       state.x = nx;
       state.z = nz;
+      if (steep > CLIMB_START) skills.add('climbing', dt);
+      if (sprint && !swim.inWater && !wet) skills.add('running', dt);
+    } else if (!wet) {
+      // Too steep for now, but straining against it still builds the arms.
+      skills.add('climbing', dt * 0.5);
+      if (performance.now() - state.steepAt > 5000) hud.message('Too steep. Your arms aren\'t there yet.');
+      state.steepAt = performance.now();
     }
     state.dir = [wx, wz];
     state.phase += dt * (sprint ? 16 : 10);
@@ -214,6 +225,7 @@ function step(dt) {
     camera.lookAt(lx, ly, lz);
   }
 
+  hero.mesh.scale.setScalar(body.heroScale);
   // Pick the sprite's view from where the hero faces relative to the camera.
   const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw), [dx, dz] = state.dir;
   const ahead = -sy * dx - cy * dz, right = cy * dx - sy * dz;
@@ -267,7 +279,7 @@ addEventListener('keydown', (e) => {
 });
 
 setTime('dusk');
-window.__world = { controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
+window.__world = { body, controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
   step((now - last) / 1000);

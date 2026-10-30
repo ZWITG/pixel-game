@@ -1,28 +1,45 @@
 // The skill map: the Spirit Tree at night, drawn in pixels. Each skill is a bough of nodes that
 // light up as levels are reached. Undiscovered boughs stay dark, with only their buds showing.
+import { ATTRIBUTES } from './body.js';
+
 const W = 320, H = 180;
 const INK = '#0a0f22';
 const REVEAL = 1.1; // seconds for the light to run out along a bough when the map opens
 
-// 9 x 9 pixel icons, one per swimming level.
+// 9 x 9 pixel icons for skill levels and attributes.
 const ICONS = {
   drop: ['....#....', '....#....', '...###...', '..#####..', '.#######.', '.###.###.', '.##.####.', '..#####..', '...###...'],
   ripple: ['.........', '..#####..', '.#.....#.', '#..###..#', '#.#...#.#', '#..###..#', '.#.....#.', '..#####..', '.........'],
   wave: ['.........', '.........', '.##...##.', '#..#.#..#', '....#....', '.##...##.', '#..#.#..#', '....#....', '.........'],
   crest: ['.....###.', '...##...#', '..#..##..', '.#..#..#.', '.#..##...', '#......##', '#..######', '.#......#', '..######.'],
   fish: ['.........', '..####..#', '.######.#', '#.#######', '#########', '.######.#', '..####..#', '.........', '.........'],
+  hold: ['...##....', '..####...', '..#####..', '.######..', '.#######.', '.#######.', '..######.', '...####..', '.........'],
+  hill: ['.........', '.........', '....##...', '...####..', '..######.', '.########', '#########', '#########', '.........'],
+  peak: ['....#....', '...###...', '...###...', '..#####..', '..#####..', '.#######.', '.#######.', '#########', '.........'],
+  peaks: ['.....#...', '....###..', '..#.###..', '.###.####', '.########', '#########', '#########', '#########', '.........'],
+  flag: ['..####...', '..#####..', '..####...', '..#......', '..#......', '..#......', '.###.....', '#####....', '.........'],
+  boot: ['..####...', '..####...', '..####...', '..####...', '..#####..', '..######.', '..#######', '..#######', '.........'],
+  dash: ['.........', '####.....', '.....###.', '..######.', '.........', '.#######.', '.....##..', '####.....', '.........'],
+  wind: ['.....##..', '.......#.', '#######..', '.........', '########.', '........#', '.......#.', '.........', '.........'],
+  bolt: ['.....##..', '....##...', '...##....', '..#####..', '....##...', '...##....', '..##.....', '.##......', '.........'],
+  star: ['....#....', '....#....', '...###...', '#########', '.#######.', '..#####..', '..##.##..', '.##...##.', '.........'],
+  fist: ['.........', '.#.#.#.#.', '.#######.', '########.', '#.######.', '########.', '.######..', '..####...', '.........'],
+  heart: ['.........', '.##...##.', '####.####', '#########', '#########', '.#######.', '..#####..', '...###...', '....#....'],
 };
+const DIGITS = ['###,#.#,#.#,#.#,###', '.#.,##.,.#.,.#.,###', '###,..#,###,#..,###', '###,..#,.##,..#,###', '#.#,#.#,###,..#,..#', '###,#..,###,..#,###', '###,#..,###,#.#,###', '###,..#,.#.,.#.,.#.', '###,#.#,###,#.#,###', '###,#.#,###,..#,###'].map((d) => d.split(','));
+const ATTR_ORDER = ['strength', 'speed', 'endurance'];
+const ATTR_FULL = 70; // gauges fill at this value, for now
 
-// Bough paths on the 320 x 180 map. Node positions sit on them.
+// Bough paths on the 320 x 180 map. `out`: which way left/right moves toward the tip.
 const TRUNK = [[160, 182], [158, 150], [162, 122], [160, 100]];
 const BOUGHS = {
-  swimming: [[160, 108], [132, 100], [104, 84], [78, 80], [56, 58], [36, 54], [24, 30]],
+  swimming: { path: [[160, 108], [132, 100], [104, 84], [78, 80], [56, 58], [36, 54], [24, 30]], out: -1 },
+  climbing: { path: [[161, 106], [190, 96], [216, 78], [244, 74], [268, 52], [292, 46], [302, 26]], out: 1 },
+  running: { path: [[159, 118], [124, 128], [92, 114], [60, 122], [28, 104], [14, 84]], out: -1 },
 };
 const SEALED = [
-  [[161, 106], [190, 96], [216, 78], [244, 74], [268, 52], [292, 46]],
   [[160, 102], [156, 78], [166, 56], [158, 34], [162, 16]],
   [[160, 118], [196, 124], [226, 112], [258, 118], [288, 100]],
-  [[159, 118], [124, 128], [92, 114], [60, 122], [28, 104]],
 ];
 
 function rng(seed) {
@@ -85,7 +102,7 @@ function paintBackdrop() {
   g.fillStyle = '#3a2f55';
   TRUNK.slice(1).forEach((p, i) => line(g, [TRUNK[i][0] - 3, TRUNK[i][1]], [p[0] - 3, p[1]], 3));
   // Boughs: every one starts dark, sealed or not.
-  for (const path of [...Object.values(BOUGHS), ...SEALED]) {
+  for (const path of [...Object.values(BOUGHS).map((b) => b.path), ...SEALED]) {
     path.slice(1).forEach((p, i) => {
       g.fillStyle = '#2a2240';
       line(g, path[i], p, i < 2 ? 4 : 3);
@@ -102,6 +119,14 @@ function paintBackdrop() {
   return c;
 }
 
+function icon(g, name, x, y) {
+  ICONS[name].forEach((row, ry) => [...row].forEach((ch, rx) => { if (ch === '#') g.fillRect(x - 4 + rx, y - 4 + ry, 1, 1); }));
+}
+
+function number(g, value, x, y) {
+  [...String(value)].forEach((d, i) => DIGITS[d].forEach((row, ry) => [...row].forEach((ch, rx) => { if (ch === '#') g.fillRect(x + i * 4 + rx, y + ry, 1, 1); })));
+}
+
 export default class SkillMap {
   constructor(canvas, tag) {
     this.canvas = canvas;
@@ -110,58 +135,61 @@ export default class SkillMap {
     this.g = canvas.getContext('2d');
     this.tag = tag;
     this.backdrop = paintBackdrop();
+    this.bough = 0;
     this.focus = 0;
     this.age = 0;
     this.motes = Array.from({ length: 26 }, (_, i) => ({ x: (i * 37) % W, y: (i * 61) % H, s: 4 + (i % 5) * 2 }));
   }
 
-  open(skill) {
-    this.skill = skill;
+  open(skills, body) {
+    this.skills = skills.map((s) => ({ ...s, nodes: along(BOUGHS[s.id].path, s.levels.length) }));
+    this.body = body;
     this.age = 0;
-    this.focus = Math.max(0, skill.level - 1);
-    this.nodes = along(BOUGHS[skill.id], skill.levels.length);
+    this.pick(this.bough);
+  }
+
+  // Jump to a bough, landing on its newest lit node.
+  pick(i) {
+    this.bough = (i + this.skills.length) % this.skills.length;
+    this.focus = Math.max(0, this.skills[this.bough].level - 1);
     this.showTag();
   }
 
   showTag() {
-    const s = this.skill, node = s.levels[this.focus];
+    const s = this.skills[this.bough], node = s.levels[this.focus];
     this.tag.textContent = this.focus < s.level ? `${s.name} · ${node.title}` : '?';
     this.tag.style.color = this.focus < s.level ? s.color : '#7a84b0';
   }
 
   handle(just) {
-    const last = this.skill.levels.length - 1, before = this.focus;
-    if (just.left || just.up) this.focus = Math.min(last, this.focus + 1);
-    if (just.right || just.down) this.focus = Math.max(0, this.focus - 1);
+    if (just.up) return this.pick(this.bough - 1);
+    if (just.down) return this.pick(this.bough + 1);
+    const s = this.skills[this.bough], out = BOUGHS[s.id].out, before = this.focus;
+    if (out < 0 ? just.left : just.right) this.focus = Math.min(s.levels.length - 1, this.focus + 1);
+    if (out < 0 ? just.right : just.left) this.focus = Math.max(0, this.focus - 1);
     if (this.focus !== before) this.showTag();
   }
 
-  update(dt) {
-    this.age += dt;
-    const g = this.g, s = this.skill, t = this.age;
-    const reveal = Math.min(1, t / REVEAL);
-    const lit = Math.min(s.level, s.levels.length);
-    g.imageSmoothingEnabled = false;
-    g.drawImage(this.backdrop, 0, 0);
-    g.fillStyle = s.color;
+  drawBough(s, index, t) {
+    const g = this.g, reveal = Math.min(1, t / REVEAL), lit = s.level, path = BOUGHS[s.id].path;
+    const segs = path.length - 1, upto = (lit / s.levels.length) * reveal * segs;
 
-    // Light climbs the trunk, then runs out along the bough as far as you have learned.
-    const path = BOUGHS[s.id], reach = lit ? (lit / s.levels.length) * reveal : 0;
-    const segs = path.length - 1, upto = reach * segs;
+    // Light runs out along the bough as far as you have learned.
+    g.fillStyle = s.color;
     for (let i = 0; i < segs && i < upto; i++) {
       const k = Math.min(1, upto - i), a = path[i], b = path[i + 1];
       line(g, a, [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k], 2);
     }
     // Sparks travel along the lit stretch, so the tree feels alive.
     if (lit) {
-      const p = ((t * 0.35) % 1) * Math.min(upto, segs), i = Math.floor(p), f = p - i;
+      const p = ((t * 0.35 + index * 0.3) % 1) * Math.min(upto, segs), i = Math.floor(p), f = p - i;
       if (path[i + 1]) {
         g.fillStyle = '#ffffff';
         g.fillRect(Math.round(path[i][0] + (path[i + 1][0] - path[i][0]) * f) - 1, Math.round(path[i][1] + (path[i + 1][1] - path[i][1]) * f) - 1, 3, 3);
       }
     }
 
-    this.nodes.forEach(([x, y], i) => {
+    s.nodes.forEach(([x, y], i) => {
       const on = i < lit && reveal >= (i + 0.6) / s.levels.length;
       const pulse = Math.sin(t * 3 + i) * 0.5 + 0.5;
       if (on) {
@@ -176,12 +204,11 @@ export default class SkillMap {
       disc(g, x, y, 10);
       g.fillStyle = on ? s.color : '#2c3460';
       disc(g, x, y, 9);
-      g.fillStyle = on ? '#eafcff' : '#1c2346';
+      g.fillStyle = on ? '#fff8ea' : '#1c2346';
       disc(g, x, y, 7);
       if (on) {
-        const icon = ICONS[s.levels[i].icon];
         g.fillStyle = INK;
-        icon.forEach((row, ry) => [...row].forEach((ch, rx) => { if (ch === '#') g.fillRect(x - 4 + rx, y - 4 + ry, 1, 1); }));
+        icon(g, s.levels[i].icon, x, y);
       }
       // The next node fills like a ring as you practise.
       if (i === lit && s.progress > 0) {
@@ -189,22 +216,48 @@ export default class SkillMap {
         const steps = Math.floor(s.progress * reveal * 28);
         for (let a = 0; a < steps; a++) {
           const ang = (a / 28) * Math.PI * 2 - Math.PI / 2;
-          g.fillRect(Math.round(x + Math.cos(ang) * 8), Math.round(y + Math.sin(ang) * 8), 1 + Math.round(pulse * 0.4), 1 + Math.round(pulse * 0.4));
+          g.fillRect(Math.round(x + Math.cos(ang) * 8), Math.round(y + Math.sin(ang) * 8), 1, 1);
         }
       }
-      if (i === this.focus) {
+      if (index === this.bough && i === this.focus) {
         // Gold corners mark the focused node.
         g.fillStyle = '#ffb547';
         const o = 13 + Math.round(pulse);
         for (const [cx, cy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-          g.fillRect(x + cx * o - (cx > 0 ? 3 : 0), y + cy * o - (cy > 0 ? 0 : 0), 4, 1);
-          g.fillRect(x + cx * o - (cx > 0 ? 0 : 0), y + cy * o - (cy > 0 ? 3 : 0), 1, 4);
+          g.fillRect(x + cx * o - (cx > 0 ? 3 : 0), y + cy * o, 4, 1);
+          g.fillRect(x + cx * o, y + cy * o - (cy > 0 ? 3 : 0), 1, 4);
         }
       }
     });
+  }
+
+  // Body gauges in the roots: an icon, a bar that grows, and the value.
+  drawBody() {
+    const g = this.g, reveal = Math.min(1, this.age / REVEAL);
+    ATTR_ORDER.forEach((name, i) => {
+      const a = ATTRIBUTES[name], value = this.body[name], x = 94 + i * 48, y = 170;
+      g.fillStyle = INK;
+      g.fillRect(x - 7, y - 7, 46, 14);
+      g.fillStyle = a.color;
+      icon(g, a.icon, x, y);
+      g.fillStyle = '#242a4c';
+      g.fillRect(x + 7, y - 4, 30, 3);
+      g.fillStyle = a.color;
+      g.fillRect(x + 7, y - 4, Math.max(1, Math.round((Math.min(ATTR_FULL, value) / ATTR_FULL) * 30 * reveal)), 3);
+      number(g, Math.floor(value), x + 7, y + 1);
+    });
+  }
+
+  update(dt) {
+    this.age += dt;
+    const g = this.g, t = this.age;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(this.backdrop, 0, 0);
+    this.skills.forEach((s, i) => this.drawBough(s, i, t));
+    this.drawBody();
 
     // Motes drift up the tree.
-    g.fillStyle = s.color;
+    g.fillStyle = '#c9f4ff';
     for (const m of this.motes) {
       m.y -= m.s * dt;
       if (m.y < 0) m.y = H;

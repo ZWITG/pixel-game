@@ -31,9 +31,18 @@ export default class WorldHud {
     setTimeout(() => { el.className = ''; }, 90);
   }
 
-  toggle(skill) {
+  // A small note that rises and fades when an attribute grows; several can stack.
+  gain(attribute, value) {
+    const el = document.createElement('div');
+    el.textContent = `${attribute.name} ${value}`;
+    el.style.color = attribute.color;
+    $('gains').appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+
+  toggle(skills, body) {
     this.open = !this.open;
     $('skills').hidden = !this.open;
-    if (this.open) this.map.open(skill);
+    if (this.open) this.map.open(skills, body);
   }
 }

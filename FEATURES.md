@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-10-30 prototype: body attributes (Strength, Speed, Endurance) grow from skill practice and change movement, breath, climbing and hero size; new Climbing and Running skills; skill map gains boughs and body gauges
 - 2026-10-30 prototype: PS5 prompts by default, L1 recenters the camera, touchpad travels between landmarks
 - 2026-10-30 prototype: Skills page replaced by a visual skill map: the Spirit Tree at night, with glowing pixel-icon nodes on each skill's bough
 - 2026-10-30 prototype: Swimming learned by trial and error (breath bar, wash ashore, practice saved), new Skills page (Options / Esc)
