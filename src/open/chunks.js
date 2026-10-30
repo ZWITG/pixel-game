@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { VoxelBuilder, vmat } from '../render/voxel.js';
-import { height, biome, roadDistance, forest, WORLD } from './terrain.js';
+import { height, biome, roadDistance, forest, WORLD, PLACES } from './terrain.js';
 import { terrainMaterial, shared } from './materials.js';
+import { makeTreeMeshes, makeGrass } from './foliage.js';
 
 // Terrain streams in around the hero: fine chunks close by, coarse ones further out,
 // and one low-detail mesh of the whole world behind them for the far mountains.
@@ -10,6 +10,8 @@ const RING = 4;            // chunks each way from the center (9 x 9 streamed)
 const GRASS_RING = 1;
 const BUILDS_PER_FRAME = 2;
 const MAX_TREES = 9000, MAX_BLADES = 45000;
+// Trees stay out of these, so landmarks stand in the open.
+const CLEARINGS = [PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }];
 const stepFor = (ring) => (ring <= 1 ? 1 : ring <= 2 ? 2 : 4);
 const rnd = (x, z, k) => {
   const v = Math.sin(x * 127.1 + z * 311.7 + k * 74.7) * 43758.5453;
@@ -69,20 +71,6 @@ function gridGeometry(x0, z0, size, step, skirt) {
   return g;
 }
 
-function treeGeometry(kind) {
-  const b = new VoxelBuilder();
-  if (kind === 'pine') {
-    b.box(0, 3.5, 0, 0.5, 7, 0.5, '#5a3320');
-    [[3.4, 3], [2.9, 4.4], [2.3, 5.8], [1.7, 7.1], [1.1, 8.3], [0.6, 9.3]].forEach(([w, y], i) => b.box(0, y, 0, w, 1.3, w, i % 2 ? '#2f7a55' : '#22604a', 0.1));
-  } else {
-    b.box(0, 3, 0, 0.5, 6, 0.5, kind === 'crimson' ? '#7a3a28' : '#d8d2c4');
-    b.box(0.5, 4.4, 0, 1.4, 0.3, 0.3, '#5a3320').box(-0.5, 5, 0.2, 1.4, 0.3, 0.3, '#5a3320');
-    const c = kind === 'crimson' ? ['#d22a2e', '#ee4a3a', '#a01c2a'] : ['#e8b52e', '#f4cf52', '#c88a22'];
-    [[0, 6.6, 0, 4.4, 1.5], [1.1, 7.7, 0.4, 2.8, 1.3], [-1.1, 7.5, -0.5, 2.6, 1.3], [0, 8.7, 0, 2, 1], [1.7, 5.9, -1, 1.7, 0.9], [-1.6, 6, 1.1, 1.8, 0.9]].forEach(([x, y, z, w, h], i) => b.box(x, y, z, w, h, w, c[i % 3], 0.12));
-  }
-  return b.build();
-}
-
 export default class Chunks {
   constructor(scene) {
     this.scene = scene;
@@ -98,20 +86,8 @@ export default class Chunks {
     far.receiveShadow = false;
     scene.add(far);
 
-    this.trees = ['pine', 'crimson', 'gold'].map((kind) => {
-      const mesh = new THREE.InstancedMesh(treeGeometry(kind), vmat(), MAX_TREES);
-      mesh.frustumCulled = false;
-      mesh.castShadow = true;
-      mesh.count = 0;
-      scene.add(mesh);
-      return mesh;
-    });
-    const blade = new VoxelBuilder().box(0, 0.09, 0, 0.1, 0.18, 0.1, '#ffffff', 0, { ao: 0.6 }).build();
-    this.grass = new THREE.InstancedMesh(blade, new THREE.MeshLambertMaterial({ vertexColors: true }), MAX_BLADES);
-    this.grass.frustumCulled = false;
-    this.grass.count = 0;
-    this.grass.setColorAt(0, new THREE.Color());
-    scene.add(this.grass);
+    this.trees = makeTreeMeshes(scene, MAX_TREES);
+    this.grass = makeGrass(scene, MAX_BLADES);
   }
 
   // What grows in one chunk. Same every visit, because it comes from the position.
@@ -120,14 +96,14 @@ export default class Chunks {
     if (this.data.has(key)) return this.data.get(key);
     const trees = [[], [], []], blades = [];
     const x0 = cx * CHUNK, z0 = cz * CHUNK;
-    for (let i = 0; i < 110; i++) {
+    for (let i = 0; i < 150; i++) {
       const x = x0 + rnd(cx, cz, i) * CHUNK, z = z0 + rnd(cx, cz, i + 500) * CHUNK;
-      if (rnd(cx, cz, i + 900) > forest(x, z)) continue;
+      if (rnd(cx, cz, i + 900) > forest(x, z) || CLEARINGS.some((p) => Math.hypot(x - p.x, z - p.z) < p.r)) continue;
       const y = height(x, z);
       if (y < 3 || y > 300 || height(x + 2, z) - y > 2.2 || roadDistance(x, z) < 9) continue;
       const [m, a] = biome(x, z);
       const roll = rnd(cx, cz, i + 1300);
-      trees[roll < a ? 1 : roll < a + m * 0.6 ? 2 : 0].push([x, y, z, 0.8 + rnd(cx, cz, i + 1700) * 0.9, rnd(cx, cz, i + 2100) * 6.28]);
+      trees[roll < a ? 1 : roll < a + m * 0.6 ? 2 : 0].push([x, y, z, 0.8 + rnd(cx, cz, i + 1700) * 0.8, rnd(cx, cz, i + 2100) * 6.28]);
     }
     const col = [[0.5, 0.62, 0.15], [0.8, 0.68, 0.14], [0.7, 0.3, 0.1], [0.13, 0.36, 0.2], [0.95, 0.75, 0.18], [0.9, 0.18, 0.12]];
     for (let i = 0; i < 5000; i++) {
@@ -138,7 +114,7 @@ export default class Chunks {
       const y = height(x, z);
       if (y < 2.5 || y > 280 || Math.abs(height(x + 1, z) - y) > 0.8 || roadDistance(x, z) < 4.5) continue;
       const pick = r > 0.97 ? 5 : r > 0.92 ? 4 : p > m && p > a ? 3 : a > m ? 2 : r > 0.6 ? 1 : 0;
-      blades.push([x, y, z, 0.7 + r * 0.9, col[pick]]);
+      blades.push([x, y, z, 0.8 + r * 0.7, col[pick]]);
     }
     const out = { trees, blades };
     this.data.set(key, out);
@@ -203,22 +179,25 @@ export default class Chunks {
           d.rotation.set(0, rot, 0);
           d.scale.set(sc, sc * 1.25, sc);
           d.updateMatrix();
-          this.trees[kind].setMatrixAt(counts[kind]++, d.matrix);
+          this.trees[kind].crown.setMatrixAt(counts[kind], d.matrix);
+          this.trees[kind].trunk.setMatrixAt(counts[kind]++, d.matrix);
         }
       });
       if (Math.max(Math.abs(i), Math.abs(j)) > GRASS_RING) continue;
       for (const [x, y, z, sc, c] of s.blades) {
         d.position.set(x, y, z);
         d.rotation.set(0, x, 0);
-        d.scale.set(1, sc, 1);
+        d.scale.setScalar(sc);
         d.updateMatrix();
         this.grass.setMatrixAt(b, d.matrix);
         this.grass.setColorAt(b++, color.setRGB(c[0], c[1], c[2]));
       }
     }
-    this.trees.forEach((m, k) => {
-      m.count = counts[k];
-      m.instanceMatrix.needsUpdate = true;
+    this.trees.forEach(({ crown, trunk }, k) => {
+      for (const m of [crown, trunk]) {
+        m.count = counts[k];
+        m.instanceMatrix.needsUpdate = true;
+      }
     });
     this.grass.count = b;
     this.grass.instanceMatrix.needsUpdate = true;

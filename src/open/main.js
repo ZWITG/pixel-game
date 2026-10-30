@@ -1,21 +1,22 @@
 import * as THREE from 'three';
 import Controls from '../systems/controls.js';
-import { HERO_LOOK } from '../art/looks.js';
-import { makeHumanoid, walkPose } from '../render/models.js';
 import { height, PLACES, SPAWN, WORLD } from './terrain.js';
 import Chunks from './chunks.js';
 import { addLandmarks } from './landmarks.js';
 import { skyMaterial, waterMaterial, shared } from './materials.js';
+import { windTime } from '../render/wind.js';
+import Post from './post.js';
+import HeroSprite from './sprite.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
-const PIXEL = Number(new URLSearchParams(location.search).get('px') ?? 2); // screen pixels per game pixel
+const PIXEL = Number(new URLSearchParams(location.search).get('px') ?? 1.5); // screen pixels per game pixel
 const RUN = 6, SPRINT = 16;
 
 const TIMES = {
-  morning: { top: '#6f9bd8', mid: '#bcd2ea', low: '#efe0cc', fog: '#c6d3e0', sun: [0.5, 0.42, 0.6], sunCol: '#fff0d0', light: 2.8, amb: 1.8, density: 0.00055 },
-  dusk: { top: '#7f7fb8', mid: '#b79ac4', low: '#f0b4b8', fog: '#c0a4c6', sun: [-0.55, 0.13, 0.82], sunCol: '#ffc4b0', light: 2.4, amb: 1.9, density: 0.0007 },
-  mist: { top: '#7f94a4', mid: '#a4b4bc', low: '#c0ccce', fog: '#b0bec4', sun: [0.3, 0.6, 0.4], sunCol: '#f4f0e4', light: 1.5, amb: 1.7, density: 0.0016 },
-  night: { top: '#0c1436', mid: '#1c2a58', low: '#384a78', fog: '#26345c', sun: [0.4, 0.6, -0.5], sunCol: '#b8c8ff', light: 1.3, amb: 1.5, density: 0.0009 },
+  morning: { top: '#6f9bd8', mid: '#bcd2ea', low: '#efe0cc', fog: '#c6d3e0', sun: [0.5, 0.42, 0.6], sunCol: '#fff0d0', cloud: '#f6f2ea', light: 2.8, amb: 1.8, density: 0.0007, shaft: 0.35, shadow: '#2a3a6a', sat: 1.2, bloom: 0.22 },
+  dusk: { top: '#7f7fb8', mid: '#b79ac4', low: '#f0b4b8', fog: '#c0a4c6', sun: [-0.55, 0.13, 0.82], sunCol: '#ffc4b0', cloud: '#f4cdd2', light: 2.4, amb: 1.9, density: 0.0011, shaft: 0.8, shadow: '#5a2a6a', sat: 1.25, bloom: 0.4 },
+  mist: { top: '#7f94a4', mid: '#a4b4bc', low: '#c0ccce', fog: '#b0bec4', sun: [0.3, 0.6, 0.4], sunCol: '#f4f0e4', cloud: '#d6dedd', light: 1.5, amb: 1.7, density: 0.003, shaft: 0.5, shadow: '#2a4a5a', sat: 1.1, bloom: 0.25 },
+  night: { top: '#0c1436', mid: '#1c2a58', low: '#384a78', fog: '#26345c', sun: [0.4, 0.6, -0.5], sunCol: '#b8c8ff', cloud: '#34457a', light: 1.3, amb: 1.5, density: 0.0012, shaft: 0, shadow: '#1a2a6a', sat: 1.1, bloom: 0.5 },
 };
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
@@ -50,11 +51,10 @@ const chunks = new Chunks(scene);
 const marks = addLandmarks(scene);
 const controls = new Controls(renderer.domElement);
 
-const hero = makeHumanoid(HERO_LOOK, { sword: true });
-hero.group.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-scene.add(hero.group);
+const post = new Post(renderer, scene, camera);
+const hero = new HeroSprite(scene);
 
-const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, walk: 0, time: 0, lit: '' };
+const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '' };
 const tmp = new THREE.Vector3();
 
 function setTime(name) {
@@ -64,6 +64,7 @@ function setTime(name) {
   u.uMid.value.set(t.mid);
   u.uLow.value.set(t.low);
   u.uSunCol.value.set(t.sunCol);
+  u.uCloud.value.set(t.cloud);
   u.uSun.value.set(...t.sun).normalize();
   scene.fog.color.set(t.fog);
   scene.fog.density = t.density;
@@ -71,6 +72,7 @@ function setTime(name) {
   sun.intensity = t.light;
   hemi.intensity = t.amb;
   hemi.color.set(t.mid);
+  post.setTime({ ...t, sunCol: t.sunCol });
   state.time = name;
 }
 
@@ -78,6 +80,7 @@ function resize() {
   renderer.setSize(Math.ceil(innerWidth / PIXEL), Math.ceil(innerHeight / PIXEL), false);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
+  post.resize(Math.ceil(innerWidth / PIXEL), Math.ceil(innerHeight / PIXEL));
 }
 addEventListener('resize', resize);
 resize();
@@ -94,6 +97,7 @@ function nearestPlace() {
 function step(dt) {
   dt = Math.min(dt, 0.05);
   shared.uTime.value += dt;
+  windTime.value = shared.uTime.value;
   controls.update(dt);
   const look = controls.look();
   state.yaw -= look.x;
@@ -110,14 +114,11 @@ function step(dt) {
       state.x = nx;
       state.z = nz;
     }
-    hero.group.rotation.y = Math.atan2(wx, wz);
-    state.phase += dt * (sprint ? 16 : 11);
+    state.dir = [wx, wz];
+    state.phase += dt * (sprint ? 16 : 10);
   }
-  state.walk += ((amount > 0.05 ? 1 : 0) - state.walk) * Math.min(1, dt * 12);
-  walkPose(hero, state.phase, state.walk);
-  if (hero.cape) hero.cape.rotation.x = 0.06 + state.walk * 0.5;
+  state.moving = amount > 0.05;
   const y = height(state.x, state.z);
-  hero.group.position.set(state.x, Math.max(y, -0.9), state.z);
 
   chunks.update(state.x, state.z);
 
@@ -133,6 +134,12 @@ function step(dt) {
     camera.lookAt(lx, ly, lz);
   }
 
+  // Pick the sprite's view from where the hero faces relative to the camera.
+  const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw), [dx, dz] = state.dir;
+  const ahead = -sy * dx - cy * dz, right = cy * dx - sy * dz;
+  const view = Math.abs(right) > Math.abs(ahead) ? 2 : ahead > 0 ? 0 : 1;
+  hero.update(state.x, Math.max(y, -0.9), state.z, camera, view, right < 0, state.moving ? Math.floor(state.phase / 1.6) % 4 : 0);
+
   const dir = sky.material.uniforms.uSun.value;
   sun.target.position.set(state.x, y, state.z);
   sun.position.copy(sun.target.position).addScaledVector(dir, 180);
@@ -142,7 +149,7 @@ function step(dt) {
   marks.crystals.material.opacity = 0.7 + Math.sin(shared.uTime.value * 1.4) * 0.3;
   for (const isle of marks.isles) isle.position.y += Math.sin(shared.uTime.value * 0.3 + isle.userData.bob) * 0.02;
 
-  renderer.render(scene, camera);
+  post.render(dir);
   const text = `${nearestPlace()}   |   ${(state.x / 1000).toFixed(2)} km, ${(state.z / 1000).toFixed(2)} km   |   height ${Math.round(y)}`;
   if (text !== state.lit) document.getElementById('where').textContent = state.lit = text;
 }
@@ -152,6 +159,7 @@ function goto(x, z, lookX, lookZ, time) {
   state.x = x;
   state.z = z;
   state.yaw = Math.atan2(x - lookX, z - lookZ);
+  state.dir = [lookX - x, lookZ - z];
   if (time) setTime(time);
   chunks.update(x, z);
   while (chunks.pending) chunks.update(x, z);
@@ -171,7 +179,7 @@ addEventListener('keydown', (e) => {
 });
 
 setTime('dusk');
-window.__world = { step, goto, SHOTS, setTime, state, renderer, chunks };
+window.__world = { camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
   step((now - last) / 1000);

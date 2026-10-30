@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // Pixel-art surfaces with no texture files: the color of each "texel" is worked out in the
 // shader from its world position, so the 8 km world never repeats.
-const TEXELS = 6; // texels per tile
+const TEXELS = 12; // texels per tile
 const HASH = /* glsl */`
 float h21(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
 float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
@@ -33,7 +33,7 @@ export function terrainMaterial({ far = false } = {}) {
       vec2 c=floor(uv*${TEXELS.toFixed(1)})/${TEXELS.toFixed(1)};
       float detail=1.-smoothstep(120.,520.,dist);
       float n=h21(c), n2=h21(c+7.3);
-      float patchy=vn(c*.11), big=vn(c*.013);
+      float patchy=vn(floor(c*3.)/3.*.11), big=vn(c*.013);
       vec3 col;
       // pick one ground type per texel (dithered) so borders break up like pixel art
       vec3 w=vB+vec3(n,n2,h21(c+3.1))*.45*detail+(vec3(patchy,big,1.-patchy)-.5)*.5;
@@ -101,10 +101,10 @@ export function skyMaterial() {
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: {
       uTop: { value: new THREE.Color() }, uMid: { value: new THREE.Color() }, uLow: { value: new THREE.Color() },
-      uSun: { value: new THREE.Vector3() }, uSunCol: { value: new THREE.Color() }, uTime: shared.uTime,
+      uSun: { value: new THREE.Vector3() }, uSunCol: { value: new THREE.Color() }, uCloud: { value: new THREE.Color() }, uTime: shared.uTime,
     },
     vertexShader: 'varying vec3 vD; void main(){ vD=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-    fragmentShader: /* glsl */`varying vec3 vD; uniform vec3 uTop,uMid,uLow,uSun,uSunCol; uniform float uTime; ${HASH}
+    fragmentShader: /* glsl */`varying vec3 vD; uniform vec3 uTop,uMid,uLow,uSun,uSunCol,uCloud; uniform float uTime; ${HASH}
       void main(){
         vec3 d=normalize(vD);
         float y=max(d.y,0.);
@@ -113,13 +113,17 @@ export function skyMaterial() {
         float t=floor((y+dither)*48.)/48.;
         vec3 col=mix(uLow,uMid,smoothstep(0.,.14,t)); col=mix(col,uTop,smoothstep(.1,.6,t));
         float s=dot(d,uSun);
-        col=mix(col,uSunCol,smoothstep(.93,.995,s)*.55);
+        col=mix(col,uSunCol,smoothstep(.8,.995,s)*.6);
+        col=mix(col,vec3(1.,.9,.86),smoothstep(.985,.9975,s)*.7);
         col=mix(col,vec3(1.,.96,.92),step(.9992,s));
         // cloud bars
         vec2 p=d.xz/(y+.12);
-        vec2 cc=floor(p*14.)/14.;
-        float cl=vn(cc*vec2(.5,1.6)+vec2(uTime*.01,0.))*vn(cc*1.4);
-        col=mix(col,mix(uSunCol,vec3(1.),.6),step(.3,cl)*smoothstep(.02,.16,y)*.6);
+        vec2 cc=floor(p*36.)/36.;
+        float cl=vn(cc*vec2(.5,1.6)+vec2(uTime*.01,0.))*.65+vn(cc*vec2(1.2,3.)+3.)*.35;
+        cl*=vn(cc*.35+9.)*1.5;
+        float edge=h21(cc)*.05, fade=smoothstep(.02,.2,y);
+        col=mix(col,uCloud*.8,step(.5+edge,cl)*fade*.5);
+        col=mix(col,uCloud,step(.58+edge,cl)*fade*.8);
         gl_FragColor=vec4(col,1.);
         #include <colorspace_fragment>
       }`,
