@@ -7,6 +7,10 @@ import { skyMaterial, waterMaterial, shared } from './materials.js';
 import { windTime } from '../render/wind.js';
 import Post from './post.js';
 import HeroSprite from './sprite.js';
+import { FEATURES } from '../config/features.js';
+import Skills from './skills.js';
+import Swim, { DEEP } from './swim.js';
+import WorldHud from './skillPage.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const PIXEL = Number(new URLSearchParams(location.search).get('px') ?? 1.5); // screen pixels per game pixel
@@ -53,6 +57,12 @@ const controls = new Controls(renderer.domElement);
 
 const post = new Post(renderer, scene, camera);
 const hero = new HeroSprite(scene);
+const hud = new WorldHud();
+const skills = new Skills((skill, level) => {
+  if (level === 1) hud.message(`You learned ${skill.name}! See your Skills page.`, true);
+  else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
+});
+const swim = new Swim(skills, hud);
 
 const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '' };
 const tmp = new THREE.Vector3();
@@ -94,23 +104,43 @@ function nearestPlace() {
   return `${best.name} ${d > 0 ? `· ${Math.round(d)} m away` : ''}`;
 }
 
+// Rings on the water around a swimmer, more of them for a flailing beginner.
+const rings = Array.from({ length: 6 }, () => {
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#e8f6ff', transparent: true, opacity: 0, depthWrite: false }));
+  ring.position.y = 0.03;
+  scene.add(ring);
+  return { ring, age: 9 };
+});
+let ringTimer = 0;
+function splash(dt) {
+  if ((ringTimer -= dt) > 0) return;
+  ringTimer = swim.flailing ? 0.16 : 0.5;
+  const r = rings.reduce((a, b) => (a.age > b.age ? a : b));
+  r.age = 0;
+  r.ring.position.x = state.x;
+  r.ring.position.z = state.z;
+}
+
 function step(dt) {
   dt = Math.min(dt, 0.05);
   shared.uTime.value += dt;
   windTime.value = shared.uTime.value;
   controls.update(dt);
-  const look = controls.look();
+  const just = controls.just;
+  if (hud.open ? just.back || just.pause : just.pause) hud.toggle(skills.learned());
+  const look = hud.open ? { x: 0, y: 0 } : controls.look();
   state.yaw -= look.x;
   state.pitch = THREE.MathUtils.clamp(state.pitch + look.y, -0.25, 1.2);
 
-  const m = controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
+  const m = hud.open ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
   if (amount > 0.05) {
     const sprint = controls.held.has('ShiftLeft') || controls.padHeld.R2;
-    const s = Math.sin(state.yaw), c = Math.cos(state.yaw), speed = (sprint ? SPRINT : RUN) * amount;
+    const s = Math.sin(state.yaw), c = Math.cos(state.yaw), speed = (swim.inWater ? swim.speed : sprint ? SPRINT : RUN) * amount;
     const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
     const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
     const rise = height(nx, nz) - height(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
-    if (rise / Math.max(dist, 1e-3) < 1.4 && height(nx, nz) > -1.2) {
+    const wet = height(nx, nz) < DEEP;
+    if (rise / Math.max(dist, 1e-3) < 1.4 && (FEATURES.swimming || !wet)) {
       state.x = nx;
       state.z = nz;
     }
@@ -118,15 +148,24 @@ function step(dt) {
     state.phase += dt * (sprint ? 16 : 10);
   }
   state.moving = amount > 0.05;
-  const y = height(state.x, state.z);
+  let y = height(state.x, state.z);
+  if (FEATURES.swimming && !hud.open) {
+    const shore = swim.update(dt, state.x, state.z, y, state.moving);
+    if (shore) {
+      state.x = shore.x;
+      state.z = shore.z;
+      y = height(state.x, state.z);
+    }
+    if (swim.inWater) splash(dt);
+  }
 
   chunks.update(state.x, state.z);
 
-  const dist = 7, cp = Math.cos(state.pitch);
-  tmp.set(state.x + Math.sin(state.yaw) * cp * dist, y + 1.7 + Math.sin(state.pitch) * dist, state.z + Math.cos(state.yaw) * cp * dist);
-  tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8);
+  const dist = 7, cp = Math.cos(state.pitch), eye = Math.max(y, -0.3);
+  tmp.set(state.x + Math.sin(state.yaw) * cp * dist, eye + 1.7 + Math.sin(state.pitch) * dist, state.z + Math.cos(state.yaw) * cp * dist);
+  tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
   camera.position.copy(tmp);
-  camera.lookAt(state.x, y + 1.7, state.z);
+  camera.lookAt(state.x, eye + 1.7, state.z);
   if (state.drone) {
     // Preview only: a raised camera aimed at a landmark.
     const [up, lx, ly, lz] = state.drone;
@@ -138,7 +177,10 @@ function step(dt) {
   const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw), [dx, dz] = state.dir;
   const ahead = -sy * dx - cy * dz, right = cy * dx - sy * dz;
   const view = Math.abs(right) > Math.abs(ahead) ? 2 : ahead > 0 ? 0 : 1;
-  hero.update(state.x, Math.max(y, -0.9), state.z, camera, view, right < 0, state.moving ? Math.floor(state.phase / 1.6) % 4 : 0);
+  // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
+  const time = shared.uTime.value;
+  const heroY = swim.inWater ? -1.25 + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.22 : 0.07) : Math.max(y, -0.9);
+  hero.update(state.x, heroY, state.z, camera, view, right < 0, state.moving || swim.flailing ? Math.floor(time * (swim.flailing ? 12 : 6)) % 4 : 0);
 
   const dir = sky.material.uniforms.uSun.value;
   sun.target.position.set(state.x, y, state.z);
@@ -149,6 +191,11 @@ function step(dt) {
   marks.crystals.material.opacity = 0.7 + Math.sin(shared.uTime.value * 1.4) * 0.3;
   for (const isle of marks.isles) isle.position.y += Math.sin(shared.uTime.value * 0.3 + isle.userData.bob) * 0.02;
 
+  for (const r of rings) {
+    r.age += dt;
+    r.ring.material.opacity = Math.max(0, 0.8 - r.age * 1.2);
+    r.ring.scale.setScalar(1 + r.age * 2.5);
+  }
   post.render(dir);
   const text = `${nearestPlace()}   |   ${(state.x / 1000).toFixed(2)} km, ${(state.z / 1000).toFixed(2)} km   |   height ${Math.round(y)}`;
   if (text !== state.lit) document.getElementById('where').textContent = state.lit = text;
@@ -179,7 +226,7 @@ addEventListener('keydown', (e) => {
 });
 
 setTime('dusk');
-window.__world = { camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
+window.__world = { skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
   step((now - last) / 1000);

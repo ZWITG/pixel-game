@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-10-30 prototype: Swimming learned by trial and error (breath bar, wash ashore, practice saved), new Skills page (Options / Esc)
 - 2026-10-30 prototype look pass: leaf-card trees with bark, thick swaying ground cover, 2D pixel sprite hero with walk frames and lantern, finer ground pixels, bloom, sun shafts, color grading, dithered finish, softer clouds, clearings around landmarks
 - 2026-10-30 open-world prototype (`/world.html`, `src/open/`, not yet the main game): 8 km streamed terrain, pixel-art ground shader, mountains, lake, roads, Lantern Spire, colossal Spirit Tree, Drifting Isles, Titan Ribs
 - 2026-10-27 v0.6.0: living world: five regions with their own look and monsters, river and lake with bridges and a boardwalk, the Spirit Tree on Spirit Hill, standing stones, moor ruins, Dimwood fairy ring, windmill; day/night cycle; wind, butterflies, birds, fireflies, fish, chimney smoke; villagers walk and patrol

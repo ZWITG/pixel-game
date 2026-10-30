@@ -4,17 +4,50 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lumen World Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet" />
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0e17; }
       #game { position: fixed; inset: 0; }
       #where { position: fixed; left: 12px; top: 10px; color: #f3ead8; font: 13px monospace; text-shadow: 1px 1px 0 #141a28; pointer-events: none; }
       #help { position: fixed; left: 12px; bottom: 10px; color: #f3ead8; font: 12px monospace; text-shadow: 1px 1px 0 #141a28; pointer-events: none; }
+      #toast { position: fixed; left: 50%; top: 16%; transform: translateX(-50%); max-width: calc(100% - 32px); color: #f3ead8; font: 700 20px 'Zen Maru Gothic', sans-serif; text-align: center; text-shadow: 0 2px 0 #141a28; opacity: 0; transition: opacity 0.35s; pointer-events: none; }
+      #toast.show { opacity: 1; }
+      #toast.big { color: #ffb547; font-size: 30px; }
+      #breath { position: fixed; left: 50%; bottom: 44px; width: 220px; height: 10px; transform: translateX(-50%); background: #141a28; }
+      #breath-fill { height: 100%; width: 100%; background: #9fe8ff; }
+      #blink { position: fixed; inset: 0; background: #141a28; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+      #blink.on { opacity: 1; transition: none; }
+      #skills { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; background: rgba(20, 26, 40, 0.72); color: #f3ead8; font: 500 16px 'Zen Maru Gothic', sans-serif; }
+      #skills-card { width: min(620px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box; padding: 28px 32px; background: #141a28; }
+      #skills h1 { margin: 0 0 18px; font-size: 40px; font-weight: 700; color: #ffb547; }
+      #skill-list { list-style: none; margin: 0; padding: 0; }
+      #skill-list p { margin: 4px 0; line-height: 1.5; }
+      .skill-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+      .skill-name { font-size: 24px; font-weight: 700; }
+      .skill-rank { color: #ffb547; }
+      .skill-bar { height: 8px; margin-top: 10px; background: #2b3346; }
+      .skill-bar div { height: 100%; background: #ffb547; }
+      .skill-next, .skill-hint { font-size: 14px; color: #c9c0b0; }
+      .skill-hint { margin: 22px 0 0; }
+      [hidden] { display: none !important; }
     </style>
   </head>
   <body>
     <div id="game"></div>
     <div id="where"></div>
-    <div id="help">Left stick / WASD move · Right stick / drag look · R2 / Shift sprint · 1-6 jump to landmarks</div>
+    <div id="help">Left stick / WASD move · Right stick / drag look · R2 / Shift sprint · Options / Esc skills · 1-6 jump to landmarks</div>
+    <div id="blink"></div>
+    <div id="toast"></div>
+    <div id="breath" hidden><div id="breath-fill"></div></div>
+    <div id="skills" hidden>
+      <div id="skills-card">
+        <h1>Skills</h1>
+        <ul id="skill-list"></ul>
+        <p class="skill-hint">Circle / Esc to close</p>
+      </div>
+    </div>
     <script type="module" src="/src/open/main.js"></script>
   </body>
 </html>
