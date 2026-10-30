@@ -41,7 +41,9 @@ const NO_DEFAULT = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 
 
 export function getPad() {
   if (!FEATURES.gamepad || !navigator.getGamepads) return null;
-  return [...navigator.getGamepads()].find((p) => p && p.connected) ?? null;
+  // Steam and virtual-pad drivers can add a second pad that never moves, so use the one touched last.
+  const pads = [...navigator.getGamepads()].filter((p) => p && p.connected);
+  return pads.reduce((a, b) => (!a || b.timestamp > a.timestamp ? b : a), null);
 }
 
 const axis = (v) => (Math.abs(v ?? 0) > DEADZONE ? v : 0);

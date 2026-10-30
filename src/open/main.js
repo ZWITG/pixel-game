@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import Controls from '../systems/controls.js';
+import Controls, { getPad } from '../systems/controls.js';
 import { prompt, buttonHtml, keyHtml } from '../ui/glyphs.js';
 import { height, PLACES, SPAWN, WORLD } from './terrain.js';
 import Chunks from './chunks.js';
@@ -125,20 +125,23 @@ function splash(dt) {
 
 // Button prompts follow the device used last.
 function renderPrompts() {
+  const pad = getPad();
+  const status = pad ? `${pad.id.split(' (')[0]} connected` : 'No controller yet: press any button on it';
+  if (status !== state.padStatus) document.getElementById('pad-status').textContent = state.padStatus = status;
   const d = controls.device;
   if (d === state.promptDevice) return;
   state.promptDevice = d;
-  const pad = d === 'pad', btn = buttonHtml, key = keyHtml;
+  const usePad = d === 'pad', btn = buttonHtml, key = keyHtml;
   const p = (action) => prompt(action, d);
   document.getElementById('help').innerHTML = [
-    [pad ? btn('L-stick') : `${key('KeyW')}${key('KeyA')}${key('KeyS')}${key('KeyD')}`, 'Move'],
-    [pad ? btn('R-stick') : key('Drag'), 'Look'],
-    [pad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
+    [usePad ? btn('L-stick') : `${key('KeyW')}${key('KeyA')}${key('KeyS')}${key('KeyD')}`, 'Move'],
+    [usePad ? btn('R-stick') : key('Drag'), 'Look'],
+    [usePad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
     [p('recenter'), 'Recenter'],
     [p('camera'), 'Travel'],
     [p('pause'), 'Spirit Tree'],
   ].map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');
-  document.getElementById('map-hints').innerHTML = `${pad ? btn('D-pad') : `${key('KeyA')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
+  document.getElementById('map-hints').innerHTML = `${usePad ? btn('D-pad') : `${key('KeyA')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
 }
 
 function step(dt) {
