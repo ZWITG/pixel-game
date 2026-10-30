@@ -1,16 +1,16 @@
 // Skills are learned by doing, not bought. A skill gathers hidden practice from the first
-// try; it joins the Skills page when practice reaches its first level.
+// try; its first node lights on the skill map when practice reaches level 1.
 // `levels`: { at: practice needed, title } in order. Add a skill by adding an entry here.
 export const SKILLS = {
   swimming: {
     name: 'Swimming',
-    desc: 'Learned the hard way, one mouthful of lake at a time.',
+    color: '#5fd8f0',
     levels: [
-      { at: 20, title: 'Paddler', perk: '8 seconds of breath' },
-      { at: 60, title: 'Swimmer', perk: '16 seconds of breath, faster strokes' },
-      { at: 140, title: 'Strong Swimmer', perk: '32 seconds of breath' },
-      { at: 300, title: 'Lake Runner', perk: 'A full minute of breath' },
-      { at: 600, title: 'Born of the Water', perk: 'Never run out of breath' },
+      { at: 20, title: 'Paddler', icon: 'drop' },
+      { at: 60, title: 'Swimmer', icon: 'ripple' },
+      { at: 140, title: 'Strong Swimmer', icon: 'wave' },
+      { at: 300, title: 'Lake Runner', icon: 'crest' },
+      { at: 600, title: 'Born of the Water', icon: 'fish' },
     ],
   },
 };
@@ -45,15 +45,10 @@ export default class Skills {
     } catch { /* private window: skills last this session only */ }
   }
 
-  // Skills shown on the page: only the ones actually learned.
-  learned() {
-    return Object.keys(SKILLS).filter((id) => this.level(id) > 0).map((id) => {
-      const skill = SKILLS[id], level = this.level(id), p = this.practice[id];
-      const now = skill.levels[level - 1], next = skill.levels[level];
-      return {
-        name: skill.name, desc: skill.desc, level, title: now.title, perk: now.perk,
-        next: next?.title ?? null, progress: next ? (p - now.at) / (next.at - now.at) : 1,
-      };
-    });
+  // What the skill map draws for one skill. Hidden practice shows only as the next node's ring.
+  map(id) {
+    const skill = SKILLS[id], level = this.level(id), p = this.practice[id] ?? 0;
+    const from = level ? skill.levels[level - 1].at : 0, next = skill.levels[level];
+    return { ...skill, id, level, progress: next ? (p - from) / (next.at - from) : 1 };
   }
 }

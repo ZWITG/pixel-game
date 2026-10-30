@@ -19,34 +19,22 @@
       #breath-fill { height: 100%; width: 100%; background: #9fe8ff; }
       #blink { position: fixed; inset: 0; background: #141a28; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
       #blink.on { opacity: 1; transition: none; }
-      #skills { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; background: rgba(20, 26, 40, 0.72); color: #f3ead8; font: 500 16px 'Zen Maru Gothic', sans-serif; }
-      #skills-card { width: min(620px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box; padding: 28px 32px; background: #141a28; }
-      #skills h1 { margin: 0 0 18px; font-size: 40px; font-weight: 700; color: #ffb547; }
-      #skill-list { list-style: none; margin: 0; padding: 0; }
-      #skill-list p { margin: 4px 0; line-height: 1.5; }
-      .skill-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
-      .skill-name { font-size: 24px; font-weight: 700; }
-      .skill-rank { color: #ffb547; }
-      .skill-bar { height: 8px; margin-top: 10px; background: #2b3346; }
-      .skill-bar div { height: 100%; background: #ffb547; }
-      .skill-next, .skill-hint { font-size: 14px; color: #c9c0b0; }
-      .skill-hint { margin: 22px 0 0; }
+      #skills { position: fixed; inset: 0; background: #0a0f22; }
+      #skill-map { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
+      #skill-tag { position: fixed; left: 0; right: 0; bottom: 5%; text-align: center; font: 700 26px 'Zen Maru Gothic', sans-serif; text-shadow: 0 2px 0 #0a0f22; }
       [hidden] { display: none !important; }
     </style>
   </head>
   <body>
     <div id="game"></div>
     <div id="where"></div>
-    <div id="help">Left stick / WASD move · Right stick / drag look · R2 / Shift sprint · Options / Esc skills · 1-6 jump to landmarks</div>
+    <div id="help">Left stick / WASD move · Right stick / drag look · R2 / Shift sprint · Options / Esc Spirit Tree · 1-6 jump to landmarks</div>
     <div id="blink"></div>
     <div id="toast"></div>
     <div id="breath" hidden><div id="breath-fill"></div></div>
     <div id="skills" hidden>
-      <div id="skills-card">
-        <h1>Skills</h1>
-        <ul id="skill-list"></ul>
-        <p class="skill-hint">Circle / Esc to close</p>
-      </div>
+      <canvas id="skill-map"></canvas>
+      <div id="skill-tag"></div>
     </div>
     <script type="module" src="/src/open/main.js"></script>
   </body>

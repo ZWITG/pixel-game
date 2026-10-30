@@ -59,7 +59,7 @@ const post = new Post(renderer, scene, camera);
 const hero = new HeroSprite(scene);
 const hud = new WorldHud();
 const skills = new Skills((skill, level) => {
-  if (level === 1) hud.message(`You learned ${skill.name}! See your Skills page.`, true);
+  if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
   else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
 });
 const swim = new Swim(skills, hud);
@@ -127,7 +127,11 @@ function step(dt) {
   windTime.value = shared.uTime.value;
   controls.update(dt);
   const just = controls.just;
-  if (hud.open ? just.back || just.pause : just.pause) hud.toggle(skills.learned());
+  if (hud.open ? just.back || just.pause : just.pause) hud.toggle(skills.map('swimming'));
+  if (hud.open) {
+    hud.map.handle(just);
+    hud.map.update(dt);
+  }
   const look = hud.open ? { x: 0, y: 0 } : controls.look();
   state.yaw -= look.x;
   state.pitch = THREE.MathUtils.clamp(state.pitch + look.y, -0.25, 1.2);

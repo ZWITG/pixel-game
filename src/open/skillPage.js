@@ -1,9 +1,12 @@
+import SkillMap from './skillMap.js';
+
 const $ = (id) => document.getElementById(id);
 
-// World HUD: short messages, the breath bar, and the Skills page.
+// World HUD: short messages, the breath bar, and the skill map.
 export default class WorldHud {
   constructor() {
     this.open = false;
+    this.map = new SkillMap($('skill-map'), $('skill-tag'));
     this.timer = null;
   }
 
@@ -28,21 +31,9 @@ export default class WorldHud {
     setTimeout(() => { el.className = ''; }, 90);
   }
 
-  renderSkills(list) {
-    $('skill-list').innerHTML = list.length
-      ? list.map((s) => `<li>
-          <div class="skill-top"><span class="skill-name">${s.name}</span><span class="skill-rank">Level ${s.level}: ${s.title}</span></div>
-          <p>${s.desc}</p>
-          <p class="skill-perk">${s.perk}</p>
-          <div class="skill-bar"><div style="width:${Math.round(s.progress * 100)}%"></div></div>
-          <p class="skill-next">${s.next ? `Next: ${s.next}` : 'Mastered'}</p>
-        </li>`).join('')
-      : '<li class="skill-empty">Nothing learned yet. Skills come from trying things, and from getting them wrong.</li>';
-  }
-
-  toggle(list) {
+  toggle(skill) {
     this.open = !this.open;
     $('skills').hidden = !this.open;
-    if (this.open) this.renderSkills(list);
+    if (this.open) this.map.open(skill);
   }
 }
