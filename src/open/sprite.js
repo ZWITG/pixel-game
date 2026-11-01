@@ -2,9 +2,8 @@ import * as THREE from 'three';
 
 // The heroes as pixel sprites standing in the 3D world, drawn here in code from a small
 // skeleton: each frame poses the joints, then paints limbs, coat, scarf and hair around them.
-// Atlas rows: back / front / side (facing right). Columns: six walking, idle, wind-up, punch, jump.
+// Atlas rows: back / front / side (facing right). Columns: six walking frames, then POSES below.
 const W = 56, H = 84, ROWS = 3;
-const WALK = 6, IDLE = 6, WINDUP = 7, PUNCH = 8, JUMP = 9, FRAMES = 10;
 const CX = 28, GROUND = 81; // where the feet sit in a frame
 const SIZE = 2.9;           // height of a frame in the world, in tiles
 const GHOSTS = 12;          // afterimages behind a Superspeed runner
@@ -77,16 +76,41 @@ class Paint {
   }
 }
 
+// Hand spots are relative to the shoulder. Side views use `near` and `far`; front and back views
+// use `arms`: 'up', 'out' or 'in'. `tuck` folds the legs; `bend` lifts both feet.
+const stride = (i, n, size) => Math.sin((i / n) * Math.PI * 2) * size;
+const POSES = [
+  ...[0, 1, 2, 3].map((i) => ({ name: 'idle', s: 0, bob: i > 1 ? 1 : 0, wave: i * 1.5, lean: 0 })),
+  ...[0, 1, 2, 3, 4, 5].map((i) => {
+    const q = stride(i, 6, 1.35);
+    return { name: 'run', s: q, bob: i % 3 === 1 ? 0 : 1, wave: i, lean: 3, near: [-q * 8 + 3, 8 - Math.abs(q) * 2], far: [q * 8 + 3, 8 - Math.abs(q) * 2] };
+  }),
+  { name: 'windup', s: -0.35, bob: 1, wave: 1, lean: -2, windup: true },
+  { name: 'punch', s: 0.55, bob: 1, wave: 2, lean: 4, punch: true },
+  { name: 'uppercut', s: 0.3, bob: -1, wave: 3, lean: 2, near: [8, -19], far: [-7, 9], arms: 'up' },
+  { name: 'rising', s: 0.2, bob: -3, wave: 3, lean: 1, tuck: true, near: [4, -14], far: [-3, -11], arms: 'up' },
+  { name: 'falling', s: 0.35, bob: -2, wave: 4, lean: -1, near: [-7, -11], far: [7, -10], arms: 'up' },
+  { name: 'landing', s: 0.15, bob: 5, wave: 1, lean: 3, near: [5, 9], far: [-5, 9], arms: 'in', bend: 4 },
+  ...[0, 1, 2, 3].map((i) => ({ name: 'swim', s: stride(i, 4, 0.5), bob: 1, wave: i * 2, lean: 2, near: [[11, -9], [16, 1], [4, 11], [-9, 3]][i], far: [[-9, 3], [4, 11], [16, 1], [11, -9]][i], arms: i % 2 ? 'in' : 'out' })),
+  ...[0, 1].map((i) => ({ name: 'fly', s: 0.1 - i * 0.2, bob: 0, wave: i * 3, lean: 2, near: [21, -1], far: [-7, 11], arms: 'up' })),
+  { name: 'glide', s: 0.2, bob: 0, wave: 2, lean: 1, near: [-11, -1], far: [11, -1], arms: 'out' },
+  { name: 'hurt', s: -0.2, bob: 2, wave: 5, lean: -4, near: [-9, -7], far: [-11, 2], arms: 'out' },
+  ...[0, 1].map((i) => ({ name: 'charge', s: 0.2, bob: 2 + i, wave: i * 3, lean: 1, near: [-3, 11], far: [5, 11], arms: 'in', bend: 2 })),
+  ...[0, 1, 2, 3].map((i) => {
+    const q = stride(i, 4, 1.5);
+    return { name: 'dash', s: q, bob: i % 2, wave: i * 2, lean: 5, near: [-13, 8], far: [-15, 10] };
+  }),
+];
+const WALK = 6, FIRST_POSE = WALK;
+const FRAMES = WALK + POSES.length;
+const POSE_AT = Object.fromEntries(POSES.map((q, i) => [q.name, i]).reverse());
+const frameOf = (name, i = 0) => FIRST_POSE + POSE_AT[name] + i;
+
 // Where the body is on one frame. `s` runs -1..1 through a stride.
 function posing(frame) {
-  if (frame < WALK) {
-    const a = (frame / WALK) * Math.PI * 2;
-    return { s: Math.sin(a), bob: Math.abs(Math.cos(a)) < 0.6 ? 0 : 1, wave: frame, lean: 1 };
-  }
-  if (frame === WINDUP) return { s: -0.35, bob: 1, wave: 1, lean: -2, windup: true };
-  if (frame === PUNCH) return { s: 0.55, bob: 1, wave: 2, lean: 4, punch: true };
-  if (frame === JUMP) return { s: 0.2, bob: -3, wave: 3, lean: 1, jump: true };
-  return { s: 0, bob: 0, wave: 0, lean: 0 };
+  if (frame >= WALK) return POSES[frame - WALK];
+  const a = (frame / WALK) * Math.PI * 2;
+  return { s: Math.sin(a), bob: Math.abs(Math.cos(a)) < 0.6 ? 0 : 1, wave: frame, lean: 1 };
 }
 
 // A leg seen from the side. `s` > 0 swings forward; a leg swinging back bends at the knee.
@@ -128,15 +152,15 @@ function drawSide(p, C, q) {
   const bob = q.bob, hip = [CX - 1 + q.lean * 0.3, 50 + bob], neck = [CX + q.lean, 29 + bob];
   const shoulder = [neck[0] - 1, neck[1] + 3];
   // Far arm and leg first.
-  const farHand = q.windup ? [shoulder[0] + 7, shoulder[1] + 8] : q.punch ? [shoulder[0] - 7, shoulder[1] + 10] : [shoulder[0] + q.s * 9 + 1, shoulder[1] + 15];
+  const farHand = q.far ? [shoulder[0] + q.far[0], shoulder[1] + q.far[1]] : q.windup ? [shoulder[0] + 7, shoulder[1] + 8] : q.punch ? [shoulder[0] - 7, shoulder[1] + 10] : [shoulder[0] + q.s * 9 + 1, shoulder[1] + 15];
   p.limb(shoulder, farHand, 3, 2.4, C.coatDark, C.coatDark);
   p.oval(farHand[0], farHand[1], 2.5, 2.5, C.skinDark);
-  drawLeg(p, C, [hip[0] + 1, hip[1]], sideLeg(hip, -q.s, q.jump && false), true);
+  drawLeg(p, C, [hip[0] + 1, hip[1]], sideLeg(hip, -q.s, false), true);
 
   scarfTail(p, C, [neck[0] - 4, neck[1]], -1, q.wave);
   if (C.tail) for (let i = 0; i < 8; i++) p.oval(neck[0] - 8 - i * 1.6, neck[1] - 10 + i * 3.2 + Math.sin(i + q.wave) * 0.7, 3.2 - i * 0.2, 2.4, i % 3 === 1 ? C.hairDark : C.hair);
 
-  drawLeg(p, C, hip, sideLeg(hip, q.s, q.jump), false);
+  drawLeg(p, C, hip, sideLeg(hip, q.s, q.tuck), false);
   // Coat: torso, then a split tail that flares with the stride.
   const flare = 3 + Math.abs(q.s) * 3;
   p.poly([[neck[0] - 7, neck[1] + 1], [neck[0] + 6, neck[1] + 1], [hip[0] + 7, hip[1] - 2], [hip[0] + 6 + q.s * 2, hip[1] + 10], [hip[0] - 8 - flare, hip[1] + 13], [hip[0] - 8, hip[1] - 2]], C.coatDark);
@@ -162,8 +186,8 @@ function drawSide(p, C, q) {
   p.limb([neck[0] - 5, neck[1]], [neck[0] + 5, neck[1] + 1], 3.3, 3.3, C.scarfDark, C.scarf);
 
   // Near arm, in front of everything.
-  const hand = q.punch ? [shoulder[0] + 22, shoulder[1] + 1] : q.windup ? [shoulder[0] - 10, shoulder[1] + 5] : [shoulder[0] - q.s * 9 + 1, shoulder[1] + 15];
-  const elbow = q.punch ? [shoulder[0] + 11, shoulder[1] + 1] : q.windup ? [shoulder[0] - 7, shoulder[1] + 8] : [(shoulder[0] + hand[0]) / 2 - 1, shoulder[1] + 8];
+  const hand = q.near ? [shoulder[0] + q.near[0], shoulder[1] + q.near[1]] : q.punch ? [shoulder[0] + 22, shoulder[1] + 1] : q.windup ? [shoulder[0] - 10, shoulder[1] + 5] : [shoulder[0] - q.s * 9 + 1, shoulder[1] + 15];
+  const elbow = q.near ? [(shoulder[0] + hand[0]) / 2 + 1, (shoulder[1] + hand[1]) / 2 + 2] : q.punch ? [shoulder[0] + 11, shoulder[1] + 1] : q.windup ? [shoulder[0] - 7, shoulder[1] + 8] : [(shoulder[0] + hand[0]) / 2 - 1, shoulder[1] + 8];
   p.limb(shoulder, elbow, 3.4, 3, C.coatDark, C.coat);
   p.limb(elbow, hand, 3, 2.6, C.coatDark, C.coat);
   p.oval(hand[0], hand[1], q.punch ? 3.4 : 2.8, q.punch ? 3.4 : 2.8, C.wrap);
@@ -171,7 +195,7 @@ function drawSide(p, C, q) {
 
 function legsFacing(p, C, q, y) {
   for (const side of [-1, 1]) {
-    const hip = [CX + side * 5, y], lift = Math.max(0, side * q.s) * 6 + (q.jump ? (side > 0 ? 9 : 4) : 0);
+    const hip = [CX + side * 5, y], lift = Math.max(0, side * q.s) * 6 + (q.tuck ? (side > 0 ? 9 : 4) : 0) + (q.bend ?? 0);
     const foot = [hip[0] + side, GROUND - 5 - lift], knee = [hip[0] + side * 1.5, (hip[1] + foot[1]) / 2 - lift * 0.2];
     p.limb(hip, knee, 4.6, 3.6, C.pantsDark, C.pants);
     p.limb(knee, foot, 3.6, 3, C.pantsDark, C.pants);
@@ -183,8 +207,9 @@ function armsFacing(p, C, q, y, back) {
   for (const side of [-1, 1]) {
     const shoulder = [CX + side * 11, y], swing = side * q.s * 3 * (back ? -1 : 1);
     const thrown = q.punch && side > 0, drawn = q.windup && side > 0;
-    const hand = thrown ? [CX + 25, y + 3] : drawn ? [CX + 9, y + 9] : [shoulder[0] + side * 2, y + 21 + swing];
-    const elbow = thrown ? [CX + 18, y + 2] : drawn ? [CX + 15, y + 11] : [shoulder[0] + side * 2.5, y + 11 + swing * 0.5];
+    const set = { up: [[side * 3, -20], [side * 5, -9]], out: [[side * 14, 2], [side * 8, 1]], in: [[-side * 5, 12], [side * 1, 9]] }[q.arms];
+    const hand = set ? [shoulder[0] + set[0][0], y + set[0][1]] : thrown ? [CX + 25, y + 3] : drawn ? [CX + 9, y + 9] : [shoulder[0] + side * 2, y + 21 + swing];
+    const elbow = set ? [shoulder[0] + set[1][0], y + set[1][1]] : thrown ? [CX + 18, y + 2] : drawn ? [CX + 15, y + 11] : [shoulder[0] + side * 2.5, y + 11 + swing * 0.5];
     p.limb(shoulder, elbow, 3.6, 3, C.coatDark, C.coat);
     p.limb(elbow, hand, 3, 2.6, C.coatDark, C.coat);
     p.oval(hand[0], hand[1], thrown ? 3.4 : 2.8, thrown ? 3.4 : 2.8, C.wrap);
@@ -298,9 +323,23 @@ function burstTexture() {
   return map;
 }
 
-export const punchFrame = (t) => (t < 0.35 ? WINDUP : PUNCH);
-export const walkFrame = (time, rate) => Math.floor(time * rate) % WALK;
-export { IDLE, JUMP };
+// The frame for each thing a hero does. `time` is seconds, for those that loop.
+const loop = (name, count, time, rate) => frameOf(name, Math.floor(time * rate) % count);
+export const FRAME = {
+  walk: (time) => Math.floor(time * 10) % WALK,
+  idle: (time) => loop('idle', 4, time, 2.5),
+  run: (time, rate) => loop('run', 6, time, rate),
+  dash: (time) => loop('dash', 4, time, 18),
+  swim: (time, rate) => loop('swim', 4, time, rate),
+  fly: (time) => loop('fly', 2, time, 8),
+  charge: (time) => loop('charge', 2, time, 16),
+  punch: (t, chain) => frameOf(t < 0.35 ? 'windup' : chain === 2 ? 'uppercut' : 'punch'),
+  rising: frameOf('rising'),
+  falling: frameOf('falling'),
+  landing: frameOf('landing'),
+  glide: frameOf('glide'),
+  hurt: frameOf('hurt'),
+};
 
 export default class HeroSprite {
   constructor(scene, look) {
@@ -325,6 +364,7 @@ export default class HeroSprite {
       map, alphaTest: 0.5, side: THREE.DoubleSide, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: 0.55,
     }));
     this.mesh.castShadow = true;
+    this.mesh.rotation.order = 'YXZ'; // so a lean tips the sprite while it still faces the camera
     this.mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5 });
     scene.add(this.mesh);
 
@@ -354,6 +394,8 @@ export default class HeroSprite {
     this.ghostIn = GHOST_EVERY;
     const g = this.ghosts[this.ghostAt = (this.ghostAt + 1) % GHOSTS];
     g.position.copy(this.mesh.position);
+    g.rotation.order = 'YXZ';
+    g.rotation.z = this.mesh.rotation.z;
     g.scale.copy(this.mesh.scale);
     g.material.map.offset.copy(this.map.offset);
     g.material.map.repeat.copy(this.map.repeat);
@@ -376,10 +418,17 @@ export default class HeroSprite {
     this.flash.rotation.z = pose.t * 9;
   }
 
+  // Turns the sprite red for a moment when the hero is hit.
+  flinch(on) {
+    this.mesh.material.emissive.set(on ? '#ff5040' : '#ffffff');
+  }
+
   // view: 0 back, 1 front, 2 side; flip mirrors the frame to face left.
-  update(x, y, z, camera, view, flip, frame) {
+  // lean: radians the body tips forward, in the side view.
+  update(x, y, z, camera, view, flip, frame, lean = 0) {
     this.mesh.position.set(x, y, z);
     this.mesh.rotation.y = Math.atan2(camera.position.x - x, camera.position.z - z);
+    this.mesh.rotation.z = view === 2 ? lean * (flip ? 1 : -1) : 0;
     this.map.repeat.x = (flip ? -1 : 1) / FRAMES;
     this.map.offset.set((frame + (flip ? 1 : 0)) / FRAMES, 1 - (view + 1) / ROWS);
   }

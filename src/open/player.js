@@ -3,7 +3,7 @@ import Controls from '../systems/controls.js';
 import { prompt } from '../ui/glyphs.js';
 import { FEATURES } from '../config/features.js';
 import { height, SPAWN } from './terrain.js';
-import HeroSprite, { punchFrame, walkFrame, IDLE, JUMP, LOOKS } from './sprite.js';
+import HeroSprite, { FRAME, LOOKS } from './sprite.js';
 import Skills from './skills.js';
 import Swim, { DEEP, SURFACE } from './swim.js';
 import WorldHud from './skillPage.js';
@@ -44,6 +44,9 @@ const FULL_SPRINT = 0.5;     // seconds of sprinting before you're at full tilt
 const SPRINT_AGAIN = 0.35;   // seconds to let go of sprint and press it again
 const CHARGE_SLOW = 0.35;    // walking speed while gathering a Destructive Blow
 const RAM_EVERY = 0.15;      // seconds between hits on whatever you barrel into
+const LANDING = 0.16;        // seconds of crouch after a real drop
+const FLINCH = 0.28;         // seconds of recoil from a hit
+const DUST_EVERY = 0.13;     // seconds between puffs under a sprinter
 const TAP = 0.16;            // holding the button this long turns a jump into flight
 const GLIDE = 0.35;          // gravity while falling, once you have wings
 const TIME_ORDER = ['morning', 'dusk', 'mist', 'night'];
@@ -81,6 +84,9 @@ export default class Player {
     this.rush = 0;             // seconds of Superspeed left
     this.clock = 0;
     this.ram = 0;
+    this.flinch = 0;
+    this.landed = 0;
+    this.dust = 0;
     this.looked = 9;
     this.level = this.body.level;
     hud.setLevel(this.level);
@@ -213,7 +219,8 @@ export default class Player {
     if (state.air > 0) return;
     const fell = state.peak;
     state.air = state.rise = state.peak = 0;
-    this.world.work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], 5, 2);
+    this.landed = fell > 2 ? LANDING : 0;
+    this.world.work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], fell > 2 ? 12 : 5, 2 + Math.min(4, fell * 0.2));
     if (!this.rooms.house) this.melee.stomp(state, fell);
   }
 
@@ -244,6 +251,7 @@ export default class Player {
     if (FEATURES.jump && just.jump && !used && free && !state.air && !melee.active) {
       // A kick up out of the water is weaker than a jump off the ground, but it gets you out.
       state.rise = body.jumpSpeed * (swim.inWater ? WATER_JUMP : 1);
+      world.work.burst(state.x, state.y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], 4, 2);
       state.air = 0.01;
       skills.add('jumping', 1);
     }
@@ -315,6 +323,14 @@ export default class Player {
     if (state.flying && FLY_TIME[skills.level('flight')] !== Infinity) hud.setBreath(Math.max(0, this.wind) / FLY_TIME[skills.level('flight')]);
     state.y = y;
     this.hero.mesh.scale.setScalar(body.heroScale);
+    this.landed = Math.max(0, this.landed - dt);
+    this.flinch = Math.max(0, this.flinch - dt);
+    this.hero.flinch(this.flinch > FLINCH * 0.5);
+    // Dust kicks up under a sprinter, thicker the faster they go.
+    if (state.moving && state.sprinting && !state.air && !swim.inWater && !state.onWater && !rooms.house && (this.dust -= dt) <= 0) {
+      this.dust = DUST_EVERY;
+      world.work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#b4a48c'], 2 + Math.floor((state.pace ?? 0) * 4), 1.6);
+    }
     this.hero.leaveTrail(state.pace ?? 0, dt);
 
     if (body.level !== this.level) {
@@ -386,6 +402,24 @@ export default class Player {
     this.guard = 3;
   }
 
+  // What the body is doing now, as [atlas frame, forward lean]; the first thing that applies wins.
+  motion(pose, time) {
+    const { state, swim, melee } = this, pace = state.pace ?? 0;
+    if (this.flinch) return [FRAME.hurt, -0.15];
+    if (pose) return [FRAME.punch(pose.t, pose.chain), 0];
+    if (melee.charging) return [FRAME.charge(time), 0.08];
+    if (state.flying) return [FRAME.fly(time), state.moving ? 1.25 : 0.2];
+    if (state.air > 0.4) {
+      if (state.rise > 1) return [FRAME.rising, 0.1];
+      return [this.wings && state.air > 2 ? FRAME.glide : FRAME.falling, this.wings && state.air > 2 ? 0.5 : 0];
+    }
+    if (this.landed) return [FRAME.landing, 0.12];
+    if (swim.inWater) return [FRAME.swim(time, swim.flailing ? 13 : state.moving ? 7 : 3), state.moving ? 0.75 : 0.2];
+    if (pace > 0.15) return [FRAME.dash(time), 0.15 + pace * 0.3];
+    if (state.moving) return state.sprinting ? [FRAME.run(time, 14), 0.1] : [FRAME.walk(time), 0];
+    return [FRAME.idle(time), 0];
+  }
+
   // Turns the sprite to face one camera. Runs once per view, so each screen sees it correctly.
   pose(camera, time) {
     const { state, swim, melee, hero } = this;
@@ -396,7 +430,8 @@ export default class Player {
     // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
     const heroY = swim.inWater ? SURFACE + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air;
     const pose = melee.pose, flip = pose && view !== 2 ? pose.chain === 1 : right < 0;
-    hero.update(state.x, heroY, state.z, camera, view, flip, pose ? punchFrame(pose.t) : state.air ? JUMP : state.moving || swim.flailing ? walkFrame(time, swim.flailing ? 16 : state.sprinting ? 15 + (state.pace ?? 0) * 13 : 10) : IDLE);
+    const [frame, lean] = this.motion(pose, time);
+    hero.update(state.x, heroY, state.z, camera, view, flip, frame, lean);
     hero.trailFrom(camera);
     hero.punch(pose, flip ? -1 : 1);
   }

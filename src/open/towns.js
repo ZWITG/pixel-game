@@ -13,6 +13,7 @@ const ROOFS = [['#b13e53', '#8a2e40'], ['#3b5dc9', '#2c4498'], ['#e8a33a', '#b87
 const FOLK_NEAR = 160;      // tiles past a town's edge that people start to appear
 const CROWD = { village: 8, city: 16 };
 const TALK = 3.6;
+const GREET = 8;            // tiles at which townsfolk stop and wave
 const WANDER = 2.4;         // townsfolk walking speed
 const TRADE_COST = 5;
 const FOLK = [LOOKS.merchant, LOOKS.kid, LOOKS.smith, LOOKS.bard, LOOKS.elder, LOOKS.guard];
@@ -225,6 +226,15 @@ export class People {
         f.turn = 2 + Math.random() * 5;
         f.moving = Math.random() < 0.7;
         f.dir = Math.random() * 6.28;
+      }
+      // Someone close by gets a look and a wave.
+      const friend = players.find((p) => Math.hypot(p.state.x - f.model.group.position.x, p.state.z - f.model.group.position.z) < GREET);
+      if (friend) {
+        const g = f.model.group;
+        g.rotation.y = Math.atan2(friend.state.x - g.position.x, friend.state.z - g.position.z);
+        walkPose(f.model, f.phase, 0);
+        f.model.arms[0].rotation.set(-2.6 + Math.sin(performance.now() * 0.012) * 0.3, 0, 0);
+        continue;
       }
       const g = f.model.group, nx = g.position.x + Math.sin(f.dir) * WANDER * dt, nz = g.position.z + Math.cos(f.dir) * WANDER * dt;
       const stray = Math.max(Math.abs(nx - f.T.x), Math.abs(nz - f.T.z)) > f.spread;

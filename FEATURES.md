@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: many more animations: idle, run, dash, swim, fly, glide, rising, falling, landing, uppercut finisher, charging, hit recoil, body lean, sprint dust; monsters squash when hit and rear up close to you; townsfolk stop and wave
 - 2026-11-01 prototype: Destructive Blow, evolved from maxed Punching: hold Square to charge, release to explode, stronger with its own skill. Speed now has diminishing returns
 - 2026-11-01 prototype: Superspeed now builds up from a sprint with momentum; a chase camera follows behind the runner and holds steady on hills
 - 2026-11-01 prototype: Superspeed skill, evolved from maxed Running; press sprint again at full sprint; afterimages, camera rush, water running from level 3, ramming

@@ -155,6 +155,7 @@ export default class Monsters {
   hit(e, force, x, z) {
     if (e.dying) return;
     e.takeHit(Math.round(force * 10) / 10, x, z);
+    e.recoil = 1;
     this.work.skills.add('fighting', 1);
     const fling = Math.min(KNOCK_LIMIT, 7 + force * 1.5);
     e.vel.normalize().multiplyScalar(fling);
@@ -170,6 +171,7 @@ export default class Monsters {
     if (p.guard > 0 || (p.rooms.house && !p.rooms.house.hostile)) return;
     const heavy = p.body.massScale, taken = Math.max(0.5, (amount * (1 - p.body.guard)) / Math.sqrt(heavy));
     p.hp -= taken;
+    p.flinch = 0.28;
     p.guard = HURT_GUARD;
     p.calm = 0;
     p.skills.add('fighting', 0.5);
@@ -242,6 +244,16 @@ export default class Monsters {
       e.update(dt);
       if (this.list.indexOf(e) < 0) continue;
       animateParts(e, dt, this.time);
+      // A blow squashes it, and it springs back.
+      if (e.recoil > 0 && !e.dying) {
+        e.recoil = Math.max(0, e.recoil - dt * 5);
+        const k = Math.sin(e.recoil * Math.PI) * 0.3;
+        e.model.root.scale.multiply(new THREE.Vector3(1 + k, 1 - k, 1 + k));
+      }
+      // Lunging: a monster about to bite rears up at its target.
+      if (hero && !e.dying && !e.evolving && far < e.radius + 5) {
+        e.model.root.rotation.x = -0.25 * (1 - far / (e.radius + 5));
+      }
       if (e.air > 0 || e.rise > 0) {
         e.rise -= 40 * dt;
         e.air = Math.max(0, e.air + e.rise * dt);
