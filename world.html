@@ -144,6 +144,25 @@
       @keyframes bar { from { transform: scaleX(0); } to { transform: none; } }
       @keyframes mark { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
       body.no-compass .compass { display: none; }
+      .place small { display: block; margin-top: 2px; font-size: 16px; font-weight: 500; letter-spacing: 0.04em; color: #e8ddc8; }
+      #conquest { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 0 20px; text-align: center; pointer-events: none; opacity: 0; font-family: 'Zen Maru Gothic', sans-serif; background: radial-gradient(ellipse at center, #05081299 0%, #05081200 70%); }
+      #conquest.show { animation: fallen 6.4s ease-out forwards; }
+      #conquest b { font-size: clamp(30px, 6vw, 62px); letter-spacing: 0.04em; text-shadow: 0 0 34px currentColor, 0 4px 18px #050812; }
+      #conquest span { font-size: 19px; font-weight: 500; color: #f7efdf; text-shadow: 0 2px 10px #050812; }
+      @keyframes fallen { 0% { opacity: 0; transform: scale(1.08); } 10% { opacity: 1; transform: none; } 78% { opacity: 1; } 100% { opacity: 0; } }
+      .nations-page { max-width: 880px; margin: 0 auto; }
+      .nations-page h2 { margin: 0; font-size: 24px; color: #ffd98a; }
+      .nations-page p { margin: 4px 0 16px; font-size: 15px; color: #d9d1c4; }
+      .nation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+      .nation { display: flex; gap: 12px; align-items: center; padding: 11px 14px; border-radius: 10px; background: #ffffff0a; box-shadow: inset 3px 0 0 var(--c); }
+      .nation i { display: flex; color: var(--c); filter: drop-shadow(0 0 6px var(--c)); }
+      .nation > div { flex: 1; min-width: 0; }
+      .nation b { display: block; font-size: 17px; }
+      .nation span { display: block; font-size: 13px; color: #b5ad9f; }
+      .nation em { font-style: normal; font-size: 13px; color: var(--c); }
+      .nation.fallen { opacity: 0.72; }
+      .nation-bar { height: 6px; margin: 5px 0 3px; border-radius: 3px; overflow: hidden; background: #ffffff1a; }
+      .nation-bar u { display: block; height: 100%; background: var(--c); }
       .powers { position: fixed; right: 18px; bottom: 44px; width: 132px; height: 132px; pointer-events: none; }
       body.two #powers { bottom: calc(50% + 10px); }
       body.two #p2-powers { bottom: 10px; }
@@ -319,6 +338,7 @@
         <div id="p2-pack-hints" class="pack-hints"></div>
       </div>
     </div>
+    <div id="conquest"></div>
     <div id="powers" class="powers" hidden></div>
     <div id="p2-powers" class="powers p2" hidden></div>
     <div id="pick" hidden></div>

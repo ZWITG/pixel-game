@@ -32,6 +32,14 @@ export default class Compass {
     this.pin = add('pin-mark', '');
   }
 
+  // Big words across the middle: the name of a place, or of a land, with a line under it.
+  announce(name, under = '') {
+    this.title.innerHTML = under ? `${name}<small>${under}</small>` : name;
+    this.title.className = '';
+    void this.title.offsetWidth; // restarts the animation
+    this.title.className = 'show';
+  }
+
   put(el, bearing, yaw) {
     const k = wrap(yaw - bearing) / SPAN, on = Math.abs(k) < 1;
     el.style.display = on ? '' : 'none';
@@ -78,10 +86,7 @@ export default class Compass {
     // Stepping into a named place brings its name up for a moment.
     const [d, place] = near.find(([dist, t]) => dist < t.r * TITLE_AT) ?? [];
     if (d !== undefined && place !== this.here) {
-      this.title.textContent = place.name;
-      this.title.className = '';
-      void this.title.offsetWidth; // restarts the animation
-      this.title.className = 'show';
+      this.announce(place.name);
     }
     this.here = place ?? this.here;
   }

@@ -13,6 +13,8 @@ export const POWERS = {
   mirewyrm: { color: '#a8d84a', adds: 'lurker', powers: ['volley', 'rain', 'line', 'call'] },
   frostwarden: { color: '#9fe8ff', adds: 'wraith', powers: ['volley', 'wave', 'rain', 'call'] },
   emberhorn: { color: '#ffb020', adds: 'scorpion', powers: ['charge', 'wave', 'rain', 'line'] },
+  marshal: { color: '#e8c050', adds: 'soldier', powers: ['charge', 'wave', 'line', 'call'] },
+  thornqueen: { color: '#5fae62', adds: 'bandit', powers: ['volley', 'rain', 'line', 'call'] },
 };
 const TELL = 1.1;            // seconds of warning before a power, shorter when enraged
 const REST = 1.5;            // seconds open afterward

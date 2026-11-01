@@ -126,6 +126,10 @@ export const ENEMIES = {
     spawns: false,
     drops: [{ item: 'tusk', chance: 0.6 }, { item: 'pearl', chance: 0.3 }],
   },
+  // The armies of the nations, and the two rulers who hold cities.
+  soldier: { name: 'Soldier', model: 'human', look: 'guard', plain: true, sword: true, scale: 0.95, ai: 'chase', hp: 8, damage: 2, speed: 2.2, chaseSpeed: 3.8, aggro: 10, radius: 0.36, xp: 10, spawns: false, drops: [{ item: 'iron', chance: 0.4 }, { item: 'hide', chance: 0.2 }] },
+  marshal: { name: 'High Marshal Verane', boss: true, plain: true, model: 'human', look: 'chief', sword: true, scale: 3, ai: 'chase', hp: 44, damage: 4, speed: 1.6, chaseSpeed: 2.6, aggro: 60, radius: 1.3, xp: 200, spawns: false, drops: [] },
+  thornqueen: { name: 'Sable, the Thorn Queen', boss: true, plain: true, model: 'human', look: 'bard', sword: true, scale: 3, ai: 'chase', hp: 40, damage: 4, speed: 1.8, chaseSpeed: 3, aggro: 60, radius: 1.2, xp: 200, spawns: false, drops: [] },
   // Open-world creatures. `spawns: false` keeps them out of the original game's map.
   wolf: { name: 'Dusk Wolf', model: 'beast', shape: 'wolf', ai: 'chase', hp: 3, damage: 1, speed: 3, chaseSpeed: 5.4, aggro: 10, radius: 0.34, xp: 5, spawns: false, drops: [{ item: 'hide', chance: 0.5 }] },
   golem: { name: 'Stone Golem', model: 'beast', shape: 'golem', scale: 1.5, ai: 'chase', hp: 14, damage: 3, speed: 1, chaseSpeed: 1.8, aggro: 7, radius: 0.5, xp: 16, spawns: false, drops: [{ item: 'iron', chance: 0.8 }, { item: 'stone', chance: 0.9 }] },

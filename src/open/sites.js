@@ -22,12 +22,14 @@ export const CATEGORIES = {
   cave: { name: 'Cave', color: '#b08cff', count: 9, goal: 'cave', verb: 'Enter the cave', text: 'Go in and find its treasure', steep: 9, land: (y) => y > 15 && y < 300, reward: { items: { pearl: 1, iron: 5, dust: 2 }, perk: { health: 3 } } },
   bandit: { name: 'Bandit Camp', color: '#ff6f6f', count: 0, goal: 'clear', mobs: ['chief', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit'], size: 7, built: true, text: 'Drive out the bandits', reward: { items: { iron: 4, hide: 4, tusk: 1, tonic: 1 } } },
   keep: { name: 'Ruined Keep', color: '#c9bcc4', count: 0, goal: 'clear', mobs: ['boar', 'fireSlime', 'puffcap', 'fireSlime'], size: 9, built: true, text: 'Clear the ruins of what nests there', reward: { items: { iron: 8, pearl: 2 }, perk: { force: 0.02 } } },
+  city: { name: 'City', color: '#e8c050', count: 0, goal: 'boss', built: true, guards: 5, text: 'Overthrow the ruler of this city', reward: { items: { pearl: 3, iron: 12 }, practice: { fighting: 200 } } },
   lair: { name: 'Lair', color: '#ff3a6a', count: 0, goal: 'boss', built: true, text: 'Bring down what rules here', reward: { items: { pearl: 3, iron: 12, tusk: 4 }, perk: { force: 0.1, health: 15 }, practice: { fighting: 200 } } },
   cache: { name: 'Lost Cache', color: '#ffb547', count: 12, goal: 'open', verb: 'Open', text: 'Open the old chest', land: (y) => y > 3 && y < 260, reward: { items: { salve: 1, iron: 2, wood: 4 } } },
 };
 
 const SAVE_KEY = 'lumen.sites';
 const SEEN_AT = 70, REACH = 6, SHOW_PROP = 450, FIRST_FROM = 160, FIRST_TO = 520, SPACING = 140;
+const CITY_COURT = 70;        // tiles south of a city's center
 const BEAMS = 3, BEAM_EVERY = 1; // beams shown per hero, and seconds between choosing them
 const SAFE = 280;            // no sites in the middle of the Hollow
 const SURVIVE_RING = 40;     // tiles
@@ -103,7 +105,8 @@ export default class Sites {
     for (const T of TOWNS) {
       if (!CATEGORIES[T.kind]) continue;
       const id = `${T.kind}-${T.name}`, cat = { ...CATEGORIES[T.kind], name: T.name, ...(T.boss ? { mobs: [T.boss] } : {}) };
-      this.list.push({ id, key: T.kind, cat, x: T.x, y: T.y, z: T.z, done: done.has(id), seen: false, hits: 0, held: 0, mobs: null, timer: 0, runner: null, wave: 0, mesh: null });
+      // A ruler holds court on the avenue before the city's keep.
+      this.list.push({ id, key: T.kind, cat, x: T.x, y: T.y, z: T.z + (T.kind === 'city' ? CITY_COURT : 0), done: done.has(id), seen: false, hits: 0, held: 0, mobs: null, timer: 0, runner: null, wave: 0, mesh: null });
     }
     // One beam per site, all in one draw.
     const geo = new THREE.CylinderGeometry(0.7, 2.2, 260, 8, 1, true).translate(0, 130, 0);
@@ -202,6 +205,7 @@ export default class Sites {
     const near = this.players.filter((h) => h === p || Math.hypot(h.state.x - s.x, h.state.z - s.z) < 120);
     for (const h of near) this.reward(h, s);
     this.save();
+    this.finished?.(s, p);
   }
 
   hideBeam(s) {
@@ -242,7 +246,11 @@ export default class Sites {
     s.mobs = [];
     for (let i = 0; i < count; i++) {
       const reach = s.cat.built ? 20 : 12, a = (i / count) * 6.28, x = s.x + Math.cos(a) * reach, z = s.z + Math.sin(a) * reach;
-      const e = this.monsters.add(cat.mobs[i % cat.mobs.length], x, z, this.monsters.danger(s.x, s.z), cat.goal === 'boss' && s.key !== 'lair');
+      const e = this.monsters.add(cat.mobs[i % cat.mobs.length], x, z, this.monsters.danger(s.x, s.z), cat.goal === 'boss' && !cat.built);
+      s.mobs.push(e);
+    }
+    for (let i = 0; i < (cat.guards ?? 0); i++) {
+      const a = (i / cat.guards) * 6.28, e = this.monsters.add('soldier', s.x + Math.cos(a) * 14, s.z + Math.sin(a) * 14, this.monsters.danger(s.x, s.z), false);
       s.mobs.push(e);
     }
   }
@@ -330,7 +338,9 @@ export default class Sites {
       if (s.done) continue;
       if (s.timer) this.updateSurvive(s, dt);
       if (s.cat.goal !== 'clear' && s.cat.goal !== 'boss') continue;
-      if (!s.mobs && near < SEEN_AT) this.rally(s);
+      if (!s.mobs && near < SEEN_AT) {
+        if (!this.sealed?.(s, out.reduce((a, b) => (Math.hypot(a.state.x - s.x, a.state.z - s.z) < Math.hypot(b.state.x - s.x, b.state.z - s.z) ? a : b)))) this.rally(s);
+      }
       else if (s.mobs && near > SEEN_AT * 3) this.dismiss(s);
       else if (s.mobs && !this.alive(s).length) {
         const p = out.reduce((a, b) => (Math.hypot(a.state.x - s.x, a.state.z - s.z) < Math.hypot(b.state.x - s.x, b.state.z - s.z) ? a : b));

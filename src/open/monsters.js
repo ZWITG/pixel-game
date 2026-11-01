@@ -4,6 +4,7 @@ import { makeOrb } from '../render/models.js';
 import { height, biome, region, PLACES, SPAWN, TOWNS } from './terrain.js';
 import { CAVE_FLOOR } from './cave.js';
 import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts } from './evolve.js';
+import { nationAt } from './nations.js';
 import { arm, stagger, standDown, TURN_TAKERS, PARRIED } from './foes.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
 
@@ -28,6 +29,7 @@ const GROUPS = [
   ['boar', 'fireSlime', 'wolf', 'puffcap'], // autumn wood
   ['puffcap', 'wolf', 'wolf', 'wisp'],      // pine wood
 ];
+const PATROLS = 0.25, PATROL_SIZE = 3; // the chance a spawn on hostile land is a patrol, and its size
 const BADLANDS = ['scorpion', 'scorpion', 'golem', 'fireSlime'];
 const MARSH = ['lurker', 'lurker', 'puffcap', 'wisp'];
 const HEIGHTS = ['wraith', 'wraith', 'golem', 'wolf'];
@@ -175,6 +177,12 @@ export default class Monsters {
     if (height(x, z) < 2 || this.inVillage(x, z)) return;
     const b = biome(x, z), [bad, marsh] = region(x, z);
     const group = bad > 0.5 ? BADLANDS : marsh > 0.5 ? MARSH : height(x, z) > HIGH_GROUND ? HEIGHTS : GROUPS[b.indexOf(Math.max(...b.slice(0, 3)))], type = this.nightfall ? 'wisp' : group[Math.floor(Math.random() * group.length)];
+    // A nation still standing keeps soldiers on its land; conquered ground has none.
+    const nation = nationAt(x, z);
+    if (nation && !this.world.nations.isFallen(nation) && Math.random() < PATROLS) {
+      for (let i = 0; i < PATROL_SIZE; i++) this.add('soldier', x + i * 3, z + (i % 2) * 3, this.danger(x, z), false);
+      return;
+    }
     this.add(type, x, z, this.danger(x, z), Math.random() < ELDER_CHANCE);
   }
 

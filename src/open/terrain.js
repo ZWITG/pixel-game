@@ -16,8 +16,8 @@ export const SPAWN = { x: 3650, z: 4600 };
 
 // Built places (see towns.js). `r` is the ground levelled for it.
 export const TOWNS = [
-  { kind: 'city', name: 'Aurelgate', x: 5400, z: 5000, r: 300, y: 36 },
-  { kind: 'city', name: 'Thornmere', x: 2250, z: 4000, r: 260, y: 30 },
+  { kind: 'city', name: 'Aurelgate', boss: 'marshal', x: 5400, z: 5000, r: 300, y: 36 },
+  { kind: 'city', name: 'Thornmere', boss: 'thornqueen', x: 2250, z: 4000, r: 260, y: 30 },
   { kind: 'village', name: 'Fernwick', x: 3350, z: 5950, r: 110, y: 24 },
   { kind: 'village', name: 'Mossford', x: 4650, z: 6100, r: 110, y: 22 },
   { kind: 'village', name: 'Emberfield', x: 1700, z: 5050, r: 110, y: 26 },

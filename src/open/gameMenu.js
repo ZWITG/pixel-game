@@ -2,6 +2,7 @@ import { PLACES, TOWNS, WORLD } from './terrain.js';
 import { prompt } from '../ui/glyphs.js';
 import { QUALITY, saveSettings } from './startMenu.js';
 import { svg, MAX_RANK } from './powers.js';
+import { NATIONS, nationAt } from './nations.js';
 
 // The menu in play: one row of icon tabs over the map, the Spirit Tree, the Satchel, the
 // buttons and the settings. Add a tab by adding an entry to TABS and a case in `show`.
@@ -10,6 +11,8 @@ const SHAPES = {
   map: 'M2 6.500 8.500 3l7 3.500L22 3v14.500L15.500 21l-7-3.500L2 21zM8 5.500v10.700l-4 2.200V7.600zm2 0v10.800l4 2V8zm6 2.400v10.400l4-2.100V5.700z',
   powers: 'M13 1.500s1.200 4.300-1.800 7.300S6 13.800 6 16.800a6.200 6.200 0 0 0 12.400.200c0-3.500-2.300-6.300-3.200-8.500-.2 1.700-.8 2.800-1.900 3.300.8-3.600.6-7.700-.3-10.300z',
   skills: 'M12 2l7 9h-4l5 7h-6v4h-4v-4H4l5-7H5z',
+  nations: 'M5 2h2v20H5zm3 1h12l-3 4.500L20 12H8z',
+  crown: 'M2 7l5 5 5-8 5 8 5-5-2 13H4z',
   satchel: 'M8 8V6.500a4 4 0 0 1 8 0V8h3.200L21 21.500H3L4.800 8zm2 0h4V6.500a2 2 0 0 0-4 0zm.5 4v3h3v-3z',
   controls: 'M7 6.500h10a5 5 0 0 1 5 4.800l.8 6.400a3 3 0 0 1-5.300 2.200L16 18H8l-1.500 1.900a3 3 0 0 1-5.300-2.200l.8-6.400a5 5 0 0 1 5-4.800zM6.500 9v2h-2v2h2v2h2v-2h2v-2h-2V9zM16 12.500a1.300 1.300 0 1 0 0 2.600 1.300 1.300 0 0 0 0-2.600zm2.500-3a1.300 1.300 0 1 0 0 2.600 1.300 1.300 0 0 0 0-2.600z',
   settings: 'M10.300 2h3.400l.5 2.600 1.900.8 2.200-1.500 2.400 2.400-1.500 2.200.8 1.900 2.600.5v3.400l-2.600.5-.8 1.900 1.500 2.200-2.400 2.400-2.200-1.500-1.900.8-.5 2.600h-3.400l-.5-2.600-1.900-.8-2.200 1.500-2.400-2.400 1.500-2.200-.8-1.900L1.400 13.700v-3.400L4 9.800l.8-1.900L3.300 5.700l2.400-2.400 2.200 1.500 1.900-.8zM12 8.500a3.500 3.500 0 1 0 0 7 3.500 3.500 0 0 0 0-7z',
@@ -22,8 +25,9 @@ const SHAPES = {
   goal: 'M12 2 22 12 12 22 2 12z',
   pin: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6z',
 };
-const TABS = [['map', 'Map'], ['powers', 'Powers'], ['skills', 'Skills'], ['satchel', 'Satchel'], ['controls', 'Controls'], ['settings', 'Settings']];
-export const SATCHEL_TAB = 3;
+const TABS = [['map', 'Map'], ['nations', 'Nations'], ['powers', 'Powers'], ['skills', 'Skills'], ['satchel', 'Satchel'], ['controls', 'Controls'], ['settings', 'Settings']];
+export const SATCHEL_TAB = 4;
+const TERRITORY = 128;      // cells across the map's overlay of borders
 const POWER_COLS = 4, DIRS = ['up', 'right', 'down', 'left'], DIR_NAMES = ['Up', 'Right', 'Down', 'Left'];
 const KINDS = { city: ['#ffe7b0', 'City'], village: ['#ffd9a0', 'Village'], bandit: ['#ff8f7f', 'Bandit camp'], keep: ['#d8d0c8', 'Ruined keep'], lair: ['#ff4a6a', 'Lair'], landmark: ['#9fe8ff', 'Landmark'], goal: ['#ffffff', 'Place you have found'], pin: ['#ffe15a', 'Your pin'] };
 const HINTS = [['Auto', 'auto'], ['Always', 'always'], ['Off', 'off']];
@@ -55,6 +59,9 @@ export default class GameMenu {
     this.sure = false;
     this.cursor = null;
     this.chart = document.createElement('canvas');
+    this.lands = document.createElement('canvas');
+    this.lands.width = this.lands.height = TERRITORY;
+    this.landsOf = -1;
     this.charted = 0;
     this.tabs.innerHTML = TABS.map(([id, label], i) => `<button data-tab="${i}">${SVG(SHAPES[id])}<span>${label}</span></button>`).join('');
     this.tabs.addEventListener('click', (e) => {
@@ -131,7 +138,7 @@ export default class GameMenu {
     this.device = p.controls.device;
     [...this.tabs.children].forEach((el, i) => el.classList.toggle('at', i === tab));
     this.mapBox.hidden = id !== 'map';
-    this.page.hidden = id !== 'controls' && id !== 'settings' && id !== 'powers';
+    this.page.hidden = id !== 'controls' && id !== 'settings' && id !== 'powers' && id !== 'nations';
     this.assigning = false;
     if (id === 'skills') p.hud.toggle(p.skills.all(), p.body);
     if (id === 'satchel') {
@@ -159,7 +166,7 @@ export default class GameMenu {
     const pin = this.owner.pin;
     const own = { map: `${p('confirm')} ${pin ? 'Remove pin' : 'Drop pin'}&nbsp;&nbsp; ${p('punch')} Zoom&nbsp;&nbsp;`, satchel: '', powers: '', controls: '', settings: `${p('confirm')} Change&nbsp;&nbsp;` }[id];
     if (id === 'powers') this.hints.innerHTML = this.assigning ? `${p('left')} ${p('up')} ${p('right')} ${p('down')} Pick a button&nbsp;&nbsp; ${p('back')} Cancel` : `${p('confirm')} Equip&nbsp;&nbsp; ${p('back')} Close`;
-    else this.hints.innerHTML = id === 'skills' || id === 'satchel' ? '' : `${own}${p('back')} Close`;
+    else this.hints.innerHTML = id === 'skills' || id === 'satchel' ? '' : `${own ?? ''}${p('back')} Close`;
   }
 
   options() {
@@ -202,6 +209,7 @@ export default class GameMenu {
       this.page.innerHTML = `<div class="menu-rows">${this.rows(pad).map(([key, label]) => `<div>${key}<span>${label}</span></div>`).join('')}</div>`;
     }
     if (id === 'powers') this.drawPowers();
+    if (id === 'nations') this.drawNations();
     if (id === 'settings') {
       this.page.innerHTML = this.options().map((o, i) => `<button data-at="${i}" class="${i === this.at ? 'at' : ''}"><b>${o.label}</b><small>${o.note}</small><em>${o.action ? o.value : `‹ ${o.value} ›`}</em></button>`).join('');
     }
@@ -209,6 +217,22 @@ export default class GameMenu {
 
   choose(d) {
     this.options()[this.at].step(d);
+  }
+
+  // Who still stands, how close each is to breaking, and where each ruler sits.
+  drawNations() {
+    const { nations } = this.world, cards = NATIONS.map((n) => {
+      const r = nations.report(n), state = r.fallen ? 'Conquered' : r.open ? 'Ruler exposed' : 'Standing';
+      const fill = r.fallen ? 100 : Math.round((r.done / r.need) * 100);
+      return `<div class="nation ${r.fallen ? 'fallen' : ''}" style="--c:${n.color}">
+        <i>${SVG(r.fallen ? SHAPES.nations : SHAPES.crown, 34)}</i>
+        <div><b>${n.name}</b><span>${n.ruler} · ${n.seat}</span>
+        <div class="nation-bar"><u style="width:${fill}%"></u></div>
+        <em>${state}${r.fallen || r.open ? '' : ` · ${r.done} of ${r.need} strongholds broken`}</em></div>
+      </div>`;
+    }).join('');
+    const count = nations.fallen.size, line = count === NATIONS.length ? 'Every nation has fallen. Something has noticed.' : 'Break a nation\'s strongholds to expose its ruler, then bring the ruler down.';
+    this.page.innerHTML = `<div class="nations-page"><h2>${count} of ${NATIONS.length} nations conquered</h2><p>${line}</p><div class="nation-grid">${cards}</div></div>`;
   }
 
   // The Conqueror's eight powers, and the D-pad cross they're worn on.
@@ -316,7 +340,7 @@ export default class GameMenu {
   }
 
   marks() {
-    const out = [...TOWNS.map((t) => ({ ...t, icon: t.kind })), ...LANDMARKS.map((t) => ({ ...t, icon: 'landmark' }))];
+    const out = [...TOWNS.map((t) => ({ ...t, icon: t.kind, color: t.boss && this.world.nations.isFallen(nationAt(t.x, t.z)) ? '#8a8690' : undefined })), ...LANDMARKS.map((t) => ({ ...t, icon: 'landmark' }))];
     for (const s of this.world.sites.list) {
       if (!s.done && s.seen && !TOWNS.some((t) => t.name === s.cat.name)) out.push({ x: s.x, z: s.z, name: s.cat.name, icon: 'goal', color: s.cat.color });
     }
@@ -350,6 +374,23 @@ export default class GameMenu {
     g.restore();
   }
 
+  // Every nation's land as a wash of its color, redrawn when a nation falls.
+  drawLands() {
+    const { nations } = this.world, g = this.lands.getContext('2d');
+    if (this.landsOf === nations.fallen.size) return;
+    this.landsOf = nations.fallen.size;
+    g.clearRect(0, 0, TERRITORY, TERRITORY);
+    const cell = WORLD / TERRITORY;
+    for (let j = 0; j < TERRITORY; j++) for (let i = 0; i < TERRITORY; i++) {
+      const n = nationAt((i + 0.5) * cell, (j + 0.5) * cell);
+      if (!n) continue;
+      g.globalAlpha = nations.isFallen(n) ? 0.1 : 0.34;
+      g.fillStyle = nations.isFallen(n) ? '#f7efdf' : n.color;
+      g.fillRect(i, j, 1, 1);
+    }
+    g.globalAlpha = 1;
+  }
+
   drawMap() {
     const { g, canvas: { width: w, height: h }, scale, owner } = this, [ox, oy, s] = this.view(), to = (a) => (a / WORLD) * s;
     g.fillStyle = '#143a5c';
@@ -358,6 +399,18 @@ export default class GameMenu {
       g.imageSmoothingEnabled = true;
       g.imageSmoothingQuality = 'high';
       g.drawImage(this.chart, 0, 0, this.chart.width, this.charted, ox, oy, s, (this.charted / this.chart.height) * s);
+    }
+    this.drawLands();
+    g.drawImage(this.lands, ox, oy, s, s);
+    g.textAlign = 'center';
+    g.font = `700 ${15 * scale}px 'Zen Maru Gothic', sans-serif`;
+    g.lineWidth = 4 * scale;
+    g.strokeStyle = '#141a28';
+    for (const n of NATIONS) {
+      const x = ox + to(n.x), y = oy + to(n.z) - 18 * scale, fallen = this.world.nations.isFallen(n);
+      g.fillStyle = fallen ? '#f7efdf' : n.color;
+      g.strokeText(n.name, x, y);
+      g.fillText(n.name, x, y);
     }
     const marks = this.marks(), c = this.cursor, cx = ox + to(c.x), cy = oy + to(c.z);
     let nearest = null, best = NEAR_PX * scale;

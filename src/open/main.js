@@ -22,6 +22,7 @@ import GameMenu from './gameMenu.js';
 import ConquerorPick from './conquerorPick.js';
 import { PowerFx } from './powers.js';
 import { CONQUERORS } from './conquerors.js';
+import Nations from './nations.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -125,6 +126,8 @@ world.fx = new PowerFx(scene);
 world.pick = new ConquerorPick();
 world.sites = new Sites(scene, monsters, work, players);
 world.people = new People(scene, world);
+world.nations = new Nations(scene, world);
+monsters.world = world;
 world.quake = new Quake(scene, chunks);
 monsters.quake = world.quake;
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
@@ -609,6 +612,7 @@ function step(dt) {
   if (!world.paused) {
     if (FEATURES.monsters) monsters.update(dt);
     if (FEATURES.sites) world.sites.update(dt);
+    world.nations.update(dt);
     world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);
     work.update(dt);

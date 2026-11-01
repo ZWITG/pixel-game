@@ -29,6 +29,12 @@ export default class WorldHud {
     this.timer = setTimeout(() => { el.className = ''; }, big ? 4200 : 2800);
   }
 
+  // Clears the way for something bigger.
+  hush() {
+    this.$('toast').className = '';
+    this.keepUntil = 0;
+  }
+
   setBreath(amount) {
     const bar = this.$('breath');
     bar.hidden = amount === null;
