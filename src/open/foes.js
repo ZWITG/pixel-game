@@ -20,6 +20,7 @@ const FIGHTERS = {
   boar: ['charge'],
   bandit: ['swipe', 'flurry'],
   chief: ['charge', 'slam', 'flurry'],
+  soldier: ['swipe', 'charge'],
   wolf: ['swipe', 'hop'],
   golem: ['slam', 'swipe'],
   scorpion: ['swipe', 'charge'],
@@ -36,7 +37,8 @@ const TOUGH_FROM = 4;        // from this form, single blows don't interrupt
 export const PARRIED = 1.6;  // seconds dazed by a parry
 
 export function arm(e, type, monsters) {
-  e.moves = (FIGHTERS[type] ?? []).slice();
+  // Only shooters fight with no moves; anything else unlisted still has to be able to strike.
+  e.moves = (FIGHTERS[type] ?? (e.def.keepAway ? [] : ['swipe'])).slice();
   e.mode = 'roam';
   e.until = 0;
   e.think = (t) => think(monsters, e, t);

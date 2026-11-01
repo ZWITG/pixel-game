@@ -64,6 +64,7 @@ It grows feature by feature with the user, who plays and tests with a controller
   `navigator.getGamepads`, set `__world.world.skipRender = true`, and render only captured frames, or the save changes or the tab crashes.
 
 ## Rules
+- New enemy types need an entry in `FIGHTERS` (foes.js) or `keepAway`. Before shipping, sweep every type in `ENEMIES` at point-blank range for a few seconds of real fighting: spawning and removing them proves nothing.
 - Keep everything original. Genre conventions are fine; don't copy characters, maps, names or assets from existing games.
 - After a feature change, update `FEATURES.md` (table, backlog, changelog), test in the browser, commit and push to GitHub.
 - Bump `version` in package.json for each playable milestone.

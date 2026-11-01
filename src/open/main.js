@@ -728,10 +728,16 @@ addEventListener('pagehide', saveSpot);
 setTime(world.menu ? 'dusk' : 'morning');
 window.__world = { menu, players, world, split, views, join, leave, monsters, height, PUNCHES, work, marks, melee: p1.melee, bag: p1.bag, rooms: p1.rooms, body: p1.body, controls: p1.controls, skills: p1.skills, swim: p1.swim, hud: p1.hud, camera, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
+// The next frame is booked first: an error in one frame is logged, and play carries on.
 const loop = (now) => {
-  step((now - last) / 1000);
-  last = now;
   requestAnimationFrame(loop);
+  const dt = (now - last) / 1000;
+  last = now;
+  try {
+    step(dt);
+  } catch (error) {
+    console.error('A frame failed:', error);
+  }
 };
 goto(SPAWN.x, SPAWN.z, PLACES.spire.x, PLACES.spire.z);
 if (CONQUERORS[QUERY.get('play')] && !p1.powers.def) p1.becomeConqueror(QUERY.get('play'));

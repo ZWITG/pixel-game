@@ -365,7 +365,14 @@ export default class Monsters {
       }
       if (e.evolving !== undefined && !e.dying) updateEvolving(e, dt, this.time, (m, tier) => this.evolved(m, tier));
       this.pushing = e;
-      e.update(dt);
+      // One broken monster is taken out of the world; it must never stop the game.
+      try {
+        e.update(dt);
+      } catch (error) {
+        console.error(`${e.def.name} failed and was removed:`, error);
+        this.removeEnemy(e);
+        continue;
+      }
       if (this.list.indexOf(e) < 0) continue;
       animateParts(e, dt, this.time);
       // A blow squashes it, and it springs back.

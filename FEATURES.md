@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 v0.11.1 fixed the freeze when a soldier came close; soldiers now fight properly, and one broken monster or frame can no longer stop the game
 - 2026-11-01 Nations: six nations hold the world: The Aurel Crown, The Thorn League, The Frostwall, The Cinder Reach, The Drowned Court, The Bone Waste. Break 60% of a nation's strongholds to expose its ruler, bring the ruler down to conquer it for a lasting tribute. Banners change, patrols stop, borders show on the map, new Nations tab. Two new rulers hold the cities with guards
 - 2026-11-01 Conquerors: New Game asks for one of five, for good: Titan, Stormcaller, Voidwalker, Emberlord, Frostwarden. Each is its own menacing creature (stone colossus, hovering storm spirit, legless shadow wraith, winged fire demon, ice knight) with eight powers that train by use, rank up to 6 and open new ones through Mastery. Four are worn on the D-pad (keys 1 to 4), swapped on the new Powers tab; Skills holds the Spirit Tree. Player 2 chooses their own. Punch stages past Solid Punch and Destructive Blow are Titan only, Flight Stormcaller only, Superspeed Voidwalker only. The Frostwarden boss is now The Rime King
 - Backlog: secret boss, the creator's original hero (`docs/legend-hero.json`), arrives only once the player has conquered all nations
