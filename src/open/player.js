@@ -3,7 +3,7 @@ import Controls from '../systems/controls.js';
 import { prompt } from '../ui/glyphs.js';
 import { FEATURES } from '../config/features.js';
 import { height, SPAWN } from './terrain.js';
-import HeroSprite, { punchFrame, LOOKS } from './sprite.js';
+import HeroSprite, { punchFrame, walkFrame, IDLE, JUMP, LOOKS } from './sprite.js';
 import Skills from './skills.js';
 import Swim, { DEEP } from './swim.js';
 import WorldHud from './skillPage.js';
@@ -16,6 +16,8 @@ import Rooms, { ROOM_Y } from './rooms.js';
 const RUN = 6, SPRINT = 16;
 const GRAVITY = 22;
 const CLIMB_START = 0.45; // slopes steeper than this count as climbing practice
+const TURN_WITH_MOVE = 0.75; // radians per second the camera eases round when walking sideways
+const LOOK_RESPECT = 1.2;    // seconds after the player steers the camera before it eases again
 const REGEN_DELAY = 6, REGEN = 2; // seconds out of a fight, then health per second
 const TIME_ORDER = ['morning', 'dusk', 'mist', 'night'];
 
@@ -43,6 +45,7 @@ export default class Player {
     this.guard = 0;
     this.calm = 0;
     this.ringTimer = 0;
+    this.looked = 9;
     this.camPos = new THREE.Vector3();
     this.camLook = new THREE.Vector3();
     hud.setBag(this.bag);
@@ -129,6 +132,7 @@ export default class Player {
     }
     const look = free ? controls.look() : { x: 0, y: 0 };
     aim.yaw -= look.x;
+    this.looked = look.x || look.y ? 0 : this.looked + dt;
     if (look.x) aim.recenter = null;
     if (aim.recenter !== null) {
       const diff = Math.atan2(Math.sin(aim.recenter - aim.yaw), Math.cos(aim.recenter - aim.yaw));
@@ -139,7 +143,9 @@ export default class Player {
 
     const m = !free || melee.active ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
     if (amount > 0.05) {
-      const sprint = controls.held.has('ShiftLeft') || controls.padHeld.R2;
+      const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
+      // Walking sideways slowly brings the camera round behind the hero.
+      if (!world.together && !rooms.house && this.looked > LOOK_RESPECT) aim.yaw -= m.x * TURN_WITH_MOVE * dt;
       const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (swim.inWater ? swim.speed : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
       const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
       const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
@@ -212,7 +218,7 @@ export default class Player {
     // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
     const heroY = swim.inWater ? -1.25 + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.22 : 0.07) : Math.max(state.y, -0.9) + state.air;
     const pose = melee.pose, flip = pose && view !== 2 ? pose.chain === 1 : right < 0;
-    hero.update(state.x, heroY, state.z, camera, view, flip, pose ? punchFrame(pose.t) : state.air ? 1 : state.moving || swim.flailing ? Math.floor(time * (swim.flailing ? 12 : 6)) % 4 : 0);
+    hero.update(state.x, heroY, state.z, camera, view, flip, pose ? punchFrame(pose.t) : state.air ? JUMP : state.moving || swim.flailing ? walkFrame(time, swim.flailing ? 16 : state.sprinting ? 15 : 10) : IDLE);
     hero.punch(pose, flip ? -1 : 1);
   }
 }

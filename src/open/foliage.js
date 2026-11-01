@@ -9,6 +9,43 @@ const LEAVES = {
   gold: { colors: ['#9a5c14', '#cf8f1e', '#efbe34', '#ffe27a'], shape: 'blob' },
 };
 
+// Where the heroes are, set before each view is drawn.
+export const focus = { uFocus: { value: new THREE.Vector3() }, uFocus2: { value: new THREE.Vector3() } };
+
+// Leaves, grass, bark and rock thin out in a dither close to the camera and along the sight
+// line to each hero, so nothing can hide them or blank the screen. Shadows stay whole.
+function fadeNear(material, near, far) {
+  const inner = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    inner?.(shader, renderer);
+    Object.assign(shader.uniforms, focus);
+    shader.vertexShader = `varying vec3 vFadeAt;\n${shader.vertexShader}`.replace(
+      '#include <project_vertex>',
+      `#include <project_vertex>
+      #ifdef USE_INSTANCING
+        vFadeAt = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+      #else
+        vFadeAt = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      #endif`,
+    );
+    shader.fragmentShader = `varying vec3 vFadeAt; uniform vec3 uFocus, uFocus2;
+      float fadeSight(vec3 at) {
+        vec3 dir = at - cameraPosition, v = vFadeAt - cameraPosition;
+        float l = length(dir), a = dot(v, dir / l);
+        if (a < 0.0 || a > l - 1.2) return 1.0;
+        return smoothstep(1.5, 3.0, length(v - dir / l * a));
+      }\n${shader.fragmentShader}`.replace(
+      '#include <clipping_planes_fragment>',
+      `#include <clipping_planes_fragment>
+      float fadeKeep = min(smoothstep(${near.toFixed(1)}, ${far.toFixed(1)}, distance(vFadeAt, cameraPosition)), min(fadeSight(uFocus), fadeSight(uFocus2)));
+      if (fadeKeep < fract(dot(floor(gl_FragCoord.xy), vec2(0.5, 0.25)) + 0.125 * mod(floor(gl_FragCoord.y), 2.0))) discard;`,
+    );
+  };
+  const key = material.customProgramCacheKey?.() ?? '';
+  material.customProgramCacheKey = () => `${key}-fade-${near}-${far}`;
+  return material;
+}
+
 function pixelTexture(size, paint) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
@@ -112,10 +149,10 @@ export function makeTreeMeshes(scene, max) {
     stump.count = 0;
     scene.add(stump);
     const map = leafTexture(LEAVES[kind]);
-    const mat = addWind(new THREE.MeshLambertMaterial({ map, alphaTest: 0.5 }), { from: 5, amount: 0.018 });
+    const mat = fadeNear(addWind(new THREE.MeshLambertMaterial({ map, alphaTest: 0.5 }), { from: 5, amount: 0.018 }), 4, 12);
     const crownMesh = new THREE.InstancedMesh(crown(kind), mat, max);
     crownMesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5 });
-    const trunkMesh = new THREE.InstancedMesh(trunkGeometry(), trunkMaterial(kind), max);
+    const trunkMesh = new THREE.InstancedMesh(trunkGeometry(), fadeNear(trunkMaterial(kind), 2, 5), max);
     for (const m of [crownMesh, trunkMesh]) {
       m.frustumCulled = false;
       m.castShadow = true;
@@ -148,7 +185,7 @@ export function makeRocks(scene, max) {
     p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k);
   }
   geo.computeVertexNormals();
-  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ map, flatShading: true }), max);
+  const mesh = new THREE.InstancedMesh(geo, fadeNear(new THREE.MeshLambertMaterial({ map, flatShading: true }), 1.5, 3), max);
   mesh.frustumCulled = false;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -184,7 +221,7 @@ export function makeGrass(scene, max) {
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
-  const mesh = new THREE.InstancedMesh(g, addWind(new THREE.MeshLambertMaterial({ map, alphaTest: 0.5 }), { from: 0.1, amount: 0.22 }), max);
+  const mesh = new THREE.InstancedMesh(g, fadeNear(addWind(new THREE.MeshLambertMaterial({ map, alphaTest: 0.5 }), { from: 0.1, amount: 0.22 }), 2.5, 6), max);
   mesh.frustumCulled = false;
   mesh.receiveShadow = true;
   mesh.count = 0;

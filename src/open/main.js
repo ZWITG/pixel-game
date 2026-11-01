@@ -6,6 +6,7 @@ import Chunks from './chunks.js';
 import { addLandmarks } from './landmarks.js';
 import { skyMaterial, waterMaterial, shared } from './materials.js';
 import { windTime } from '../render/wind.js';
+import { focus } from './foliage.js';
 import Post from './post.js';
 import { FEATURES } from '../config/features.js';
 import Work from './work.js';
@@ -15,8 +16,16 @@ import Player from './player.js';
 import SplitView from './splitView.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
+const FOV = 52;
 const PIXEL = Number(new URLSearchParams(location.search).get('px') ?? 1.5); // screen pixels per game pixel
-const ROOM_CAMERA = 5.5;  // camera distance indoors
+const CAMERA_DIST = 9.5;   // tiles behind the hero
+const CAMERA_GROWTH = 5;   // extra distance per unit of hero scale, so a huge hero still fits
+const CAMERA_LIFT = 7;     // how fast the camera follows the ground up and down
+const LOOK_HEIGHT = 1.9;   // the point followed, above the feet
+const AIM_ABOVE = 1.3;     // the camera aims this far over that, so the hero stands low in frame
+const HILL_SAMPLES = 8;
+const MAX_HILL_LIFT = 9;   // tiles the camera may climb to see over ground behind the hero
+const ROOM_CAMERA = 5.5;   // camera distance indoors
 const SPLIT_AT = 30, MERGE_AT = 20; // tiles apart; the gap keeps it from flickering at the edge
 const SPLIT_HEIGHT = 14;  // a big difference in height splits too
 const SPLIT_TIME = 0.6;   // seconds to slide between one view and two
@@ -41,7 +50,7 @@ document.getElementById('game').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2('#c0a4c6', 0.0007);
-const camera = new THREE.PerspectiveCamera(58, 16 / 9, 0.3, 9000);
+const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.3, 9000);
 const hemi = new THREE.HemisphereLight('#ffffff', '#7a6a70', 1.4);
 const sun = new THREE.DirectionalLight('#fff', 2.4);
 sun.castShadow = true;
@@ -176,7 +185,7 @@ function travel(who) {
 function join() {
   if (!extra) {
     extra = new Player(1, world);
-    const camera2 = new THREE.PerspectiveCamera(58, 16 / 9, 0.3, 9000);
+    const camera2 = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.3, 9000);
     extra.hud.camera = camera2;
     views.push({ camera: camera2, post: new Post(renderer, scene, camera2) });
     resize();
@@ -244,24 +253,47 @@ function joinOrLeave(dt) {
   }
 }
 
-// One hero's own camera, behind their shoulder.
-function personal(p) {
-  const s = p.state, dist = p.rooms.house ? ROOM_CAMERA : 7, cp = Math.cos(s.pitch), eye = Math.max(s.y, -0.3);
-  tmp.set(s.x + Math.sin(s.yaw) * cp * dist, eye + 1.7 + Math.sin(s.pitch) * dist, s.z + Math.cos(s.yaw) * cp * dist);
-  if (p.rooms.house) p.rooms.clampCamera(tmp, s.x, s.z);
+// How much higher the far end of a sight line must be to clear the ground along it.
+function clearance(ax, ay, az, bx, by, bz) {
+  let lift = 0;
+  for (let i = 1; i <= HILL_SAMPLES; i++) {
+    const t = i / HILL_SAMPLES;
+    const over = height(ax + (bx - ax) * t, az + (bz - az) * t) + 0.7 - (ay + (by - ay) * t);
+    if (over > 0) lift = Math.max(lift, over / t);
+  }
+  return lift;
+}
+
+// One hero's own camera: behind and above, looking past them so they stand low in the frame
+// rather than hiding the way ahead. It eases after the hero, and climbs over hills behind them,
+// only moving in if it can't get high enough.
+function personal(p, dt) {
+  const s = p.state, big = p.body.heroScale, cp = Math.cos(s.pitch), eyeY = Math.max(s.y, -0.3);
+  p.camY = p.camY === undefined || Math.abs(p.camY - eyeY) > 30 ? eyeY : p.camY + (eyeY - p.camY) * Math.min(1, dt * CAMERA_LIFT);
+  const lookY = p.camY + LOOK_HEIGHT * big, inside = !!p.rooms.house;
+  const far = inside ? ROOM_CAMERA : CAMERA_DIST + (big - 1) * CAMERA_GROWTH;
+  const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(s.pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
+  const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz), lift = Math.min(need, MAX_HILL_LIFT);
+  // Quick to rise for a hill, slow to settle back, so it doesn't pump.
+  p.camLift = (p.camLift ?? lift) + (lift - (p.camLift ?? lift)) * Math.min(1, dt * (lift > (p.camLift ?? lift) ? 10 : 2));
+  const want = need > lift ? far * Math.max(0.45, lift / need) : far;
+  p.camDist = (p.camDist ?? want) + (want - (p.camDist ?? want)) * Math.min(1, dt * (want < (p.camDist ?? want) ? 10 : 2.5));
+  const d = p.camDist;
+  tmp.set(s.x + Math.sin(s.yaw) * cp * d, lookY + Math.sin(s.pitch) * d + p.camLift, s.z + Math.cos(s.yaw) * cp * d);
+  if (inside) p.rooms.clampCamera(tmp, s.x, s.z);
   else tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
   p.camPos.copy(tmp);
-  p.camLook.set(s.x, eye + 1.7, s.z);
+  p.camLook.set(s.x, lookY + AIM_ABOVE * Math.min(1, d / CAMERA_DIST), s.z);
 }
 
 // One camera behind both heroes, pulling back as they drift apart.
 const sharedPos = new THREE.Vector3(), sharedLook = new THREE.Vector3();
 function together(a, b, span) {
-  const { yaw, pitch } = shared2, dist = 7 + span * 0.8, cp = Math.cos(pitch);
-  const x = (a.state.x + b.state.x) / 2, z = (a.state.z + b.state.z) / 2, eye = Math.max((a.state.y + b.state.y) / 2, -0.3) + 1.7;
+  const { yaw, pitch } = shared2, dist = CAMERA_DIST + span * 0.8, cp = Math.cos(pitch);
+  const x = (a.state.x + b.state.x) / 2, z = (a.state.z + b.state.z) / 2, eye = (a.camY + b.camY) / 2 + LOOK_HEIGHT;
   sharedPos.set(x + Math.sin(yaw) * cp * dist, eye + Math.sin(pitch) * dist, z + Math.cos(yaw) * cp * dist);
   sharedPos.y = Math.max(sharedPos.y, height(sharedPos.x, sharedPos.z) + 0.8, 0.8);
-  sharedLook.set(x, eye, z);
+  sharedLook.set(x, eye + AIM_ABOVE, z);
 }
 
 // The adaptive split: one shared view when close, sliding to two views as the heroes part.
@@ -288,14 +320,14 @@ function updateSplit(dt) {
 }
 const tmpV = new THREE.Vector2();
 
-function aimCameras() {
+function aimCameras(dt) {
   const [a, b] = players;
-  personal(a);
+  personal(a, dt);
   if (!b) {
     camera.position.copy(a.camPos);
     camera.lookAt(a.camLook);
   } else {
-    personal(b);
+    personal(b, dt);
     together(a, b, Math.hypot(a.state.x - b.state.x, a.state.z - b.state.z));
     const k = split.amount * split.amount * (3 - 2 * split.amount);
     views.forEach((v, i) => {
@@ -322,6 +354,10 @@ function aimCameras() {
 function renderView(v, p, dir) {
   const time = shared.uTime.value;
   for (const hero of players) hero.pose(v.camera, time);
+  for (const [i, u] of [focus.uFocus, focus.uFocus2].entries()) {
+    const s = (players[i] ?? p).state;
+    u.value.set(s.x, s.y + 1.4 + s.air, s.z);
+  }
   sun.target.position.set(p.state.x, p.state.y, p.state.z);
   sun.position.copy(sun.target.position).addScaledVector(dir, 180);
   sky.position.copy(v.camera.position);
@@ -348,7 +384,7 @@ function step(dt) {
   for (const p of players) p.update(dt);
 
   chunks.update(players.map((p) => [p.state.x, p.state.z]));
-  aimCameras();
+  aimCameras(dt);
 
   if (!world.paused) {
     if (FEATURES.monsters) monsters.update(dt);
