@@ -64,9 +64,9 @@ const HUB = [260, 190];
 const TRUNK = [[260, 296], [256, 250], [264, 215], HUB];
 // The boughs fan out evenly from the top of the trunk, left to right; Flight grows beside the
 // Jumping it evolved from, and Superspeed beside Running. Each is its own spoke, so nodes never crowd one another.
-const FAN = ['running', 'superspeed', 'swimming', 'climbing', 'jumping', 'flight', 'punching', 'fighting', 'mining', 'woodcutting'];
+const FAN = ['running', 'superspeed', 'swimming', 'climbing', 'jumping', 'flight', 'punching', 'blow', 'fighting', 'mining', 'woodcutting'];
 const FAN_FROM = 0.955, FAN_SPAN = 0.91;     // share of a half turn, left end and width
-const RINGS = [84, 111, 138, 165, 192];      // distance of each node from the hub
+const RINGS = [92, 117, 142, 167, 192];      // distance of each node from the hub
 const WIDE = 1.25, TALL = 0.88;              // the fan is an oval, to fill a wide map
 const BOUGHS = Object.fromEntries(FAN.map((id, i) => {
   const a = Math.PI * (FAN_FROM - (FAN_SPAN * i) / (FAN.length - 1));

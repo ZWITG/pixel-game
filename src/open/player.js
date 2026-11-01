@@ -32,10 +32,17 @@ const RUN_MAX = 5;           // the Running level that opens Superspeed
 // By Superspeed level: seconds of it, and how many times a sprint.
 const SUPER_TIME = [4, 8, 15, 30, 60, Infinity];
 const SUPER_BOOST = [2, 2.3, 2.6, 3, 3.5, 4];
-const SUPER_TOP = 130;       // tiles per second, the most it can reach
+const SUPER_TOP = 180;       // tiles per second, the most it can reach
+const SUPER_BUILD = [0.14, 0.16, 0.19, 0.23, 0.27, 0.32]; // share of top speed gained per second, by level
+const SUPER_FADE = 1.6;      // how fast that drains once you let go, so speed carries on a moment
+const SUPER_TURN = 1.4;      // how much a sharp turn scrubs off
+const WATER_PACE = 0.45;     // how much speed it takes to stay on top of water
+const RAM_PACE = 0.3;        // how much speed it takes to hit anything
+const CHASE = 1.5;           // radians per second the camera swings behind a runner at full speed
 const WATER_RUN = 3;         // from this level, fast enough to stay on top of water
 const FULL_SPRINT = 0.5;     // seconds of sprinting before you're at full tilt
 const SPRINT_AGAIN = 0.35;   // seconds to let go of sprint and press it again
+const CHARGE_SLOW = 0.35;    // walking speed while gathering a Destructive Blow
 const RAM_EVERY = 0.15;      // seconds between hits on whatever you barrel into
 const TAP = 0.16;            // holding the button this long turns a jump into flight
 const GLIDE = 0.35;          // gravity while falling, once you have wings
@@ -51,6 +58,7 @@ export default class Player {
     const hud = this.hud = new WorldHud(prefix);
     this.skills = new Skills((skill, level) => {
       if (skill.name === 'Jumping' && level === JUMP_MAX) hud.message('Jumping has evolved into Flight! Jump and hold X to fly.', true, 5000);
+      else if (skill.name === 'Punching' && level === 5) hud.message('Punching has evolved into Destructive Blow! Hold Square, then let go.', true, 5000);
       else if (skill.name === 'Running' && level === RUN_MAX) hud.message('Running has evolved into Superspeed! While sprinting, press sprint again.', true, 5000);
       else if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
       else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
@@ -152,21 +160,27 @@ export default class Player {
     state.sprintT = sprint && moving ? (state.sprintT ?? 0) + dt : 0;
     if (state.super && (!sprint || !moving || this.rush <= 0 || swim.inWater)) state.super = false;
     if (!state.super) {
+      // Speed bleeds away rather than cutting out, and all at once if you actually stop.
+      state.pace = moving ? Math.max(0, (state.pace ?? 0) - dt * SUPER_FADE) : 0;
       if (this.bolt) this.rush = most === Infinity ? 1 : Math.min(most, this.rush + (dt * most) / 6);
       return;
     }
+    state.pace = Math.min(1, (state.pace ?? 0) + dt * SUPER_BUILD[level]);
     if (most !== Infinity) this.rush -= dt;
     skills.add('superspeed', dt);
-    // Whatever you barrel into takes the hit.
-    if ((this.ram -= dt) <= 0) {
+    // Whatever you barrel into takes the hit, harder the faster you're going.
+    if (state.pace > RAM_PACE && (this.ram -= dt) <= 0) {
       this.ram = RAM_EVERY;
       world.work.actor = this;
-      melee.blast(state.x, state.z, melee.force, 0, 0, '#ff7ad9', null);
+      melee.blast(state.x, state.z, melee.force * state.pace, 0, 0, '#ff7ad9', null);
     }
   }
 
+  // From a normal sprint up to the top of the skill; it builds slowly, then pulls away.
   get superSpeed() {
-    return Math.min(SUPER_TOP, SPRINT * SUPER_BOOST[this.skills.level('superspeed')] * this.body.moveScale);
+    const { pace = 0 } = this.state, sprint = SPRINT * this.body.moveScale;
+    const top = Math.min(SUPER_TOP, sprint * SUPER_BOOST[this.skills.level('superspeed')]);
+    return sprint + (Math.max(top, sprint) - sprint) * pace * pace;
   }
 
   get wings() {
@@ -245,17 +259,31 @@ export default class Player {
     aim.pitch = THREE.MathUtils.clamp(aim.pitch + look.y, -0.25, 1.2);
 
     const m = !free || melee.active ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
-    if (!world.paused) this.updateSuper(dt, !!(controls.held.has('ShiftLeft') || controls.padHeld.R2), amount > 0.05 && free);
+    if (!world.paused) {
+      this.updateSuper(dt, !!(controls.held.has('ShiftLeft') || controls.padHeld.R2), amount > 0.05 && free);
+      melee.updateCharge(dt, state, free && !!(controls.held.has('KeyJ') || controls.padHeld.SQUARE));
+    }
     if (amount > 0.05) {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
       // Walking sideways slowly brings the camera round behind the hero.
       if (!world.together && !rooms.house && this.looked > LOOK_RESPECT) aim.yaw -= m.x * TURN_WITH_MOVE * dt;
-      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.super ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
+      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale) * amount * (melee.charging ? CHARGE_SLOW : 1);
       const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
+      if (state.pace > 0) {
+        // A hard turn at speed costs you: momentum has to go somewhere.
+        const was = Math.hypot(...state.dir) || 1, now = Math.hypot(wx, wz) || 1;
+        const across = 1 - (state.dir[0] * wx + state.dir[1] * wz) / (was * now);
+        state.pace = Math.max(0, state.pace - across * SUPER_TURN * dt);
+        // The camera swings round behind the runner, the faster the firmer.
+        if (!world.together && this.looked > 0.4) {
+          const behind = Math.atan2(-wx, -wz), diff = Math.atan2(Math.sin(behind - state.yaw), Math.cos(behind - state.yaw));
+          state.yaw += Math.max(-1, Math.min(1, diff)) * CHASE * state.pace * dt;
+        }
+      }
       const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
       const rise = rooms.house ? 0 : height(nx, nz) - height(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
       const wet = !rooms.house && height(nx, nz) < DEEP;
-      state.onWater = !!state.super && skills.level('superspeed') >= WATER_RUN && (wet || state.y < DEEP);
+      state.onWater = !!state.super && state.pace > WATER_PACE && skills.level('superspeed') >= WATER_RUN && (wet || state.y < DEEP);
       const steep = rise / Math.max(dist, 1e-3);
       // Slopes only matter on foot: a swimmer can make for any bank, however steep the bed.
       if (state.air > 2 || swim.inWater || state.onWater || (steep < body.climbLimit && (FEATURES.swimming || !wet))) {
@@ -282,11 +310,12 @@ export default class Player {
       if (swim.inWater) world.splash(this, dt);
     }
     // Swimming hides this bar every frame on land, so flight draws it afterward.
-    if (state.super && SUPER_TIME[skills.level('superspeed')] !== Infinity) hud.setBreath(Math.max(0, this.rush) / SUPER_TIME[skills.level('superspeed')]);
+    if (melee.charging) hud.setBreath(melee.charge);
+    else if (state.super && SUPER_TIME[skills.level('superspeed')] !== Infinity) hud.setBreath(Math.max(0, this.rush) / SUPER_TIME[skills.level('superspeed')]);
     if (state.flying && FLY_TIME[skills.level('flight')] !== Infinity) hud.setBreath(Math.max(0, this.wind) / FLY_TIME[skills.level('flight')]);
     state.y = y;
     this.hero.mesh.scale.setScalar(body.heroScale);
-    this.hero.leaveTrail(!!state.super, dt);
+    this.hero.leaveTrail(state.pace ?? 0, dt);
 
     if (body.level !== this.level) {
       if (body.level > this.level) hud.message(`Level ${body.level}! The monsters stir...`, true);
@@ -367,7 +396,7 @@ export default class Player {
     // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
     const heroY = swim.inWater ? SURFACE + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air;
     const pose = melee.pose, flip = pose && view !== 2 ? pose.chain === 1 : right < 0;
-    hero.update(state.x, heroY, state.z, camera, view, flip, pose ? punchFrame(pose.t) : state.air ? JUMP : state.moving || swim.flailing ? walkFrame(time, swim.flailing ? 16 : state.super ? 26 : state.sprinting ? 15 : 10) : IDLE);
+    hero.update(state.x, heroY, state.z, camera, view, flip, pose ? punchFrame(pose.t) : state.air ? JUMP : state.moving || swim.flailing ? walkFrame(time, swim.flailing ? 16 : state.sprinting ? 15 + (state.pace ?? 0) * 13 : 10) : IDLE);
     hero.trailFrom(camera);
     hero.punch(pose, flip ? -1 : 1);
   }

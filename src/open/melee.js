@@ -24,6 +24,13 @@ const WAVE_SPEED = 45;       // tiles per second; things break as the wave reach
 const AIR_PRACTICE = 0.1;
 const RINGS = 4, CRATERS = 8, CRATER_GRID = 10, CRATER_LIFE = 40;
 const CRATER_MARK = 34;      // largest crack mark, in tiles; past this the dent speaks for itself
+// Destructive Blow, by its skill level: seconds to charge fully, force, and reach in tiles.
+const BLOW_TIME = [2, 1.8, 1.6, 1.4, 1.2, 1];
+const BLOW_POWER = [8, 12, 18, 26, 38, 60];
+const BLOW_REACH = [14, 20, 28, 38, 50, 64];
+const BLOW_MOST = 64;        // as far as nearby objects can be searched
+const BLOW_HOLD = 0.35;      // seconds of holding punch before it starts to charge
+const BLOW_COLOR = '#ffb020';
 const HARD_LANDING = 10;      // tiles fallen before a stomp breaks the ground
 const HOP_STOMP = 0.25;      // an ordinary jump's landing reaches this share of a hard one
 const DEEPEST_PIT = 8;      // the land can't be pushed down further than this
@@ -105,6 +112,14 @@ export default class Melee {
       scene.add(ring);
       return { ring, age: 9, size: 0 };
     });
+    this.charging = false;
+    this.charge = 0;
+    this.heldFor = 0;
+    this.orb = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshBasicMaterial({ color: BLOW_COLOR, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    this.orb.visible = false;
+    this.orbAge = 9;
+    this.orbSize = 1;
+    scene.add(this.orb);
     const map = crackTexture();
     this.craters = Array.from({ length: CRATERS }, () => makeCrater(scene, map));
   }
@@ -124,6 +139,52 @@ export default class Melee {
   // A blow from this hero at their current punch, before the combo adds to it.
   get force() {
     return PUNCHES[this.stage].power * this.body.damageScale * this.body.massScale;
+  }
+
+  get blowReady() {
+    return FEATURES.blow && this.skills.level('punching') >= PUNCHES.length - 1;
+  }
+
+  // Holding punch gathers a Destructive Blow; letting go sets it off.
+  updateCharge(dt, state, held) {
+    const { house } = this.player.rooms;
+    this.heldFor = held ? this.heldFor + dt : 0;
+    if (!this.charging) {
+      if (this.blowReady && this.heldFor >= BLOW_HOLD && !this.active && (!house || house.hostile)) {
+        this.charging = true;
+        this.charge = 0;
+      }
+    } else if (held) {
+      this.charge = Math.min(1, this.charge + dt / BLOW_TIME[this.skills.level('blow')]);
+      this.work.shake = Math.max(this.work.shake, this.charge * 0.12);
+      this.work.shakeAt = state;
+      this.orb.visible = true;
+      this.orb.position.set(state.x, this.height(state.x, state.z) + state.air + 1.4, state.z);
+      this.orb.scale.setScalar(0.8 + this.charge * 3 + Math.sin(this.heldFor * 30) * 0.15 * this.charge);
+      this.orb.material.opacity = 0.2 + this.charge * 0.4;
+      if (Math.random() < dt * 30) this.work.burst(state.x, this.height(state.x, state.z) + 0.5, state.z, [BLOW_COLOR, '#ffffff'], 2, 3 + this.charge * 5);
+    } else this.release(state);
+  }
+
+  release(state) {
+    const level = this.skills.level('blow'), c = this.charge;
+    const force = this.force * BLOW_POWER[level] * (0.4 + 0.6 * c);
+    // Reach is the skill's to grow; Mass adds a little, and force does the rest.
+    const reach = Math.min(BLOW_MOST, BLOW_REACH[level] * (0.5 + 0.5 * c) * (1 + Math.sqrt(this.body.massScale) * 0.08));
+    this.charging = false;
+    this.charge = 0;
+    this.work.actor = this.player;
+    this.blast(state.x, state.z, force, reach, this.player.rooms.house ? 0 : reach * 0.45, BLOW_COLOR, null);
+    this.ring(state.x, this.height(state.x, state.z), state.z, reach * 0.6, '#ffffff');
+    this.work.burst(state.x, this.height(state.x, state.z) + 1.5, state.z, [BLOW_COLOR, '#fff0b0', '#ff5a3d'], 90, 14);
+    this.work.shake = Math.max(this.work.shake, 0.45);
+    this.work.shakeAt = state;
+    this.work.stop = 0.18;
+    this.orbAge = 0;
+    this.orbSize = reach;
+    this.orb.position.set(state.x, this.height(state.x, state.z) + 1.4, state.z);
+    this.orb.visible = true;
+    this.skills.add('blow', 1 + c * 2);
   }
 
   // For the sprite: null when not punching.
@@ -274,6 +335,16 @@ export default class Melee {
   update(dt, state) {
     this.work.actor = this.player;
     const shook = this.work.shake;
+    if (this.orbAge < 9) {
+      this.orbAge += dt;
+      const k = Math.min(1, this.orbAge / 0.45);
+      this.orb.scale.setScalar(Math.max(1, this.orbSize * Math.sqrt(k)));
+      this.orb.material.opacity = (1 - k) * 0.85;
+      if (k === 1) {
+        this.orbAge = 9;
+        this.orb.visible = false;
+      }
+    }
     this.idle += dt;
     const a = this.active;
     if (a) {

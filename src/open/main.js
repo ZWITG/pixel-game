@@ -19,8 +19,9 @@ import Sites from './sites.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
-const RUSH_FOV = 14;       // the view stretches while in Superspeed
-const RUSH_PULL = 3;       // and drops back this many tiles
+const RUSH_FOV = 10;       // the view stretches with speed
+const RUSH_PULL = 2.5;     // and drops back this many tiles
+const RUSH_TRACK = 40;     // how much harder it follows the ground
 const SPLIT_FOV = 72;      // a half-height picture needs a wider lens to show as much
 const SPLIT_PULL = 0.35;   // and the camera sits this much further back
 const SPLIT_RUN = 3;       // plus this many tiles while the hero is on the move
@@ -311,25 +312,29 @@ function personal(p, dt) {
   if (Math.hypot(s.x - (p.camX ?? s.x), s.z - (p.camZ ?? s.z)) > TELEPORT) p.camY = p.camLift = p.camDist = undefined;
   p.camX = s.x;
   p.camZ = s.z;
-  p.camY = p.camY === undefined || Math.abs(p.camY - eyeY) > 30 ? eyeY : p.camY + (eyeY - p.camY) * Math.min(1, dt * CAMERA_LIFT);
+  // At speed it holds a steadier height and tracks the ground harder, so hills don't throw it.
+  const rush = p.camRush = (p.camRush ?? 0) + ((s.pace ?? 0) - (p.camRush ?? 0)) * Math.min(1, dt * 4);
+  p.camY = p.camY === undefined || Math.abs(p.camY - eyeY) > 30 ? eyeY : p.camY + (eyeY - p.camY) * Math.min(1, dt * (CAMERA_LIFT + rush * RUSH_TRACK));
   // A jump leaves the camera where it is; real flight takes it along.
   p.camAir = (p.camAir ?? 0) + ((s.air > HOP ? s.air : 0) - (p.camAir ?? 0)) * Math.min(1, dt * 6);
   const lookY = p.camY + p.camAir + LOOK_HEIGHT * big, inside = !!p.rooms.house;
   // Eased, so starting and stopping don't bump the camera.
   p.camRun = (p.camRun ?? 0) + ((s.moving ? 1 : 0) - (p.camRun ?? 0)) * Math.min(1, dt * 2);
   const room = players.length > 1 ? split.amount : 0;
-  p.camRush = (p.camRush ?? 0) + ((s.super ? 1 : 0) - (p.camRush ?? 0)) * Math.min(1, dt * 5);
-  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) + p.camRun * SPLIT_RUN * room + p.camRush * RUSH_PULL;
+  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) + p.camRun * SPLIT_RUN * room + rush * RUSH_PULL;
   const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(s.pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
   const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz);
   // Backed against a wall, it moves in and rises to look down past the shoulder.
   const open = inside ? 1 : solidStop(s.x, s.z, cx, cz), lift = Math.min(need, MAX_HILL_LIFT) + (1 - open) * WALL_RISE;
   // Quick to rise for a hill, slow to settle back, so it doesn't pump.
-  p.camLift = (p.camLift ?? lift) + (lift - (p.camLift ?? lift)) * Math.min(1, dt * (lift > (p.camLift ?? lift) ? 10 : 2));
+  p.camLift = (p.camLift ?? lift) + (lift - (p.camLift ?? lift)) * Math.min(1, dt * (lift > (p.camLift ?? lift) ? 10 - rush * 6 : 2));
   const want = Math.min(need > MAX_HILL_LIFT ? far * Math.max(0.45, MAX_HILL_LIFT / need) : far, far * Math.max(0.18, open));
   p.camDist = (p.camDist ?? want) + (want - (p.camDist ?? want)) * Math.min(1, dt * (want < (p.camDist ?? want) ? 10 : 2.5));
   const d = p.camDist;
   tmp.set(s.x + Math.sin(s.yaw) * cp * d, lookY + Math.sin(s.pitch) * d + p.camLift, s.z + Math.cos(s.yaw) * cp * d);
+  // At speed the bumps underfoot go past too quickly to follow, so the height is smoothed out.
+  p.camHigh = rush > 0.02 ? (p.camHigh ?? tmp.y) + (tmp.y - (p.camHigh ?? tmp.y)) * Math.min(1, dt * (14 - rush * 6)) : tmp.y;
+  tmp.y = p.camHigh;
   if (inside) p.rooms.clampCamera(tmp, s.x, s.z);
   else tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
   p.camPos.copy(tmp);

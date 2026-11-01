@@ -24,8 +24,12 @@ export default class Body {
   get endurance() { return this.skills.attribute('endurance'); }
   get mass() { return this.skills.attribute('mass') + this.bonus('mass'); }
 
-  // Movement: every point of Speed is 1.5% faster, on land and in water.
-  get moveScale() { return (1 + (this.speed - 10) * 0.015) * (1 + this.bonus('speed')); }
+  // Movement, on land and in water. Early points of Speed add about 1.5% each, then it levels
+  // off, so a sprint stays a sprint and Superspeed always has room above it.
+  get moveScale() {
+    const gain = (this.speed - 10) * 0.015;
+    return (1 + gain / (1 + gain * 0.35)) * (1 + this.bonus('speed'));
+  }
   // Every point of Endurance is 3% more breath.
   get breathScale() { return (1 + (this.endurance - 10) * 0.03) * (1 + this.bonus('breath')); }
   // Strength lets the hero haul up steeper ground.

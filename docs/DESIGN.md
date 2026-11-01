@@ -118,7 +118,9 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Jumping and Flight (built 2026-11-01):** every jump is Jumping practice. Its top level evolves it into Flight: jump and hold X (Cross or Space) to climb, release to glide. Flight is its own skill, practised by time aloft; its level sets time in the air, top height and speed, up to unlimited (`FLY_*` in player.js). Above 22 tiles nothing blocks the hero.
 
-**Superspeed (built 2026-11-01):** Running's top level evolves it into Superspeed, its own skill, practised by time at speed. At full sprint, let go and press sprint again. Level sets duration (4 s to unlimited) and speed (`SUPER_*` in player.js, capped at 130 tiles a second); from level 3 the hero runs across water. Whatever they barrel into takes a full-force hit.
+**Superspeed (built 2026-11-01):** Running's top level evolves it into Superspeed, its own skill, practised by time at speed. At full sprint, let go and press sprint again. Speed builds from a sprint over several seconds and carries on a moment after letting go; hard turns scrub it off. Level sets duration (4 s to unlimited), top speed and how quickly it builds (`SUPER_*` in player.js, capped at 130 tiles a second). From level 3 the hero stays on top of water if moving fast enough. Whatever they barrel into takes a hit, harder with speed. The camera becomes a steady chase view as speed rises.
+
+**Destructive Blow (built 2026-11-01):** the top level of Punching evolves into it. Hold Square to gather it, walking slowly, and let go to explode around the hero. Its own skill, practised by using it, sets charge time, force and reach (`BLOW_*` in melee.js); a longer charge is stronger, and force and Mass add on top. It breaks and craters like other blows.
 
 ## 7. UI direction (from the taste rules)
 

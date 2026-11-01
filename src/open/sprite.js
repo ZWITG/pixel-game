@@ -345,19 +345,19 @@ export default class HeroSprite {
   }
 
   // Drops an afterimage where the hero is, every few hundredths of a second.
-  leaveTrail(on, dt) {
+  leaveTrail(pace, dt) {
     this.ghosts.forEach((g) => {
       g.material.opacity -= dt * 2.6;
       if (g.material.opacity <= 0) g.visible = false;
     });
-    if (!on || (this.ghostIn -= dt) > 0) return;
+    if (pace < 0.05 || (this.ghostIn -= dt) > 0) return;
     this.ghostIn = GHOST_EVERY;
     const g = this.ghosts[this.ghostAt = (this.ghostAt + 1) % GHOSTS];
     g.position.copy(this.mesh.position);
     g.scale.copy(this.mesh.scale);
     g.material.map.offset.copy(this.map.offset);
     g.material.map.repeat.copy(this.map.repeat);
-    g.material.opacity = 0.5;
+    g.material.opacity = 0.15 + pace * 0.4;
     g.visible = true;
   }
 

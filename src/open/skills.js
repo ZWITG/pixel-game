@@ -103,6 +103,19 @@ export const SKILLS = {
       { at: 850, title: 'Living Siege', icon: 'nova' },
     ],
   },
+  // Destructive Blow can't be practised until Punching is maxed.
+  blow: {
+    name: 'Destructive Blow',
+    color: '#ffb020',
+    trains: { strength: 0.1, endurance: 0.02 },
+    levels: [
+      { at: 4, title: 'Blast', icon: 'burst' },
+      { at: 14, title: 'Detonation', icon: 'flame' },
+      { at: 35, title: 'Devastation', icon: 'quake' },
+      { at: 80, title: 'Cataclysm', icon: 'crack' },
+      { at: 170, title: 'World Ender', icon: 'nova' },
+    ],
+  },
   woodcutting: {
     name: 'Woodcutting',
     color: '#8fd86a',
