@@ -11,7 +11,8 @@ import Body, { ATTRIBUTES } from './body.js';
 import { Bag } from './work.js';
 import { ITEMS } from './items.js';
 import Melee from './melee.js';
-import Rooms, { ROOM_Y } from './rooms.js';
+import Rooms from './rooms.js';
+import Cave, { CaveLevel } from './cave.js';
 
 // One hero: their own input, body, skills, bag, HUD and sprite. The world they stand in is shared.
 const RUN = 6, SPRINT = 16;
@@ -38,7 +39,8 @@ export default class Player {
     this.swim = new Swim(this.skills, this.body, hud);
     this.bag = new Bag(this.body, `${save}bag`);
     this.body.bag = this.bag;
-    this.rooms = new Rooms(world.scene);
+    this.rooms = this.homeRooms = new Rooms(world.scene);
+    this.cave = new Cave(world.scene, this);
     this.melee = new Melee(world.scene, this, world.work);
     this.melee.monsters = world.monsters;
     this.hero = new HeroSprite(world.scene, LOOKS[index]);
@@ -64,9 +66,12 @@ export default class Player {
   // Doors, beds and chests, all used with the same button.
   use(spot) {
     const { hud, rooms, state, bag, world } = this;
-    if (spot.site) {
-      if (!spot.held) world.sites.use(this, spot.site);
-    } else if (spot.action === 'enter' || spot.action === 'leave') {
+    if (spot.person) world.people.talk(this, spot.person);
+    else if (spot.site) {
+      if (spot.site.cat.goal === 'cave') this.enterCave(spot.site);
+      else if (!spot.held) world.sites.use(this, spot.site);
+    } else if (spot.action === 'chest') world.sites.finish(this.rooms.house.site, this);
+    else if (spot.action === 'enter' || spot.action === 'leave') {
       hud.gasp();
       if (spot.action === 'enter') rooms.enter(spot.house, state);
       else rooms.leave(state);
@@ -92,8 +97,8 @@ export default class Player {
       return false;
     }
     const door = !rooms.house && !swim.inWater && world.work.door(state);
-    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this);
-    if (FEATURES.punching && just.punch && !state.air && !rooms.house && !swim.inWater) melee.punch(state);
+    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.people.spot(this);
+    if (FEATURES.punching && just.punch && !state.air && (!rooms.house || rooms.house.hostile) && !swim.inWater) melee.punch(state);
     if (!spot) {
       hud.setAction('');
       return false;
@@ -121,7 +126,7 @@ export default class Player {
     const aim = world.together ? world.shared : state;
     if (!this.frozen) {
       if (!hud.open && just.recenter) aim.recenter = Math.atan2(-state.dir[0], -state.dir[1]);
-      if (!hud.open && just.camera) world.travel(this);
+      if (!hud.open && just.camera && !world.players.some((p) => p.rooms.house)) world.travel(this);
       if (hud.packOpen ? just.back || just.pack || just.pause : !hud.open && just.pack) {
         hud.togglePack(this);
         world.checkPause();
@@ -182,7 +187,7 @@ export default class Player {
     state.moving = amount > 0.05;
     if (rooms.house) rooms.collide(state);
     else if (FEATURES.worldWork) world.work.collide(state);
-    let y = rooms.house ? ROOM_Y : height(state.x, state.z);
+    let y = rooms.house ? rooms.floor : height(state.x, state.z);
     if (!world.paused) this.jump(dt, y);
     if (FEATURES.swimming && !world.paused && !rooms.house) {
       const shore = swim.update(dt, state.x, state.z, y, state.moving);
@@ -215,6 +220,15 @@ export default class Player {
       this.hp = Math.min(body.maxHealth, this.hp + REGEN * dt);
       hud.setHealth(this.hp / body.maxHealth);
     }
+  }
+
+  enterCave(site) {
+    const { world, state, hud } = this;
+    site.level ??= new CaveLevel(world.scene, site, world.monsters, site.index * 971 + 13);
+    hud.gasp();
+    this.rooms = this.cave;
+    this.cave.enter(site.level, state);
+    hud.message(site.cat.name, true);
   }
 
   canCraft(recipe) {

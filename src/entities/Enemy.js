@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { FEATURES } from '../config/features.js';
-import { SLIME_COLORS } from '../art/looks.js';
-import { makeSlime, makeBoar, makeWisp, makeMushroom } from '../render/models.js';
+import { SLIME_COLORS, LOOKS } from '../art/looks.js';
+import { makeSlime, makeBoar, makeWisp, makeMushroom, makeHumanoid, walkPose } from '../render/models.js';
 import { disposeModel } from '../render/voxel.js';
 
 const DEATH_TIME = 0.22;
@@ -16,6 +16,7 @@ const MODELS = {
   boar: () => makeBoar(),
   wisp: () => makeWisp(),
   mushroom: () => makeMushroom(),
+  human: (def) => makeHumanoid(LOOKS[def.look], { sword: !!def.sword }),
 };
 
 // A data-driven enemy: looks and behaviour come from an entry in data/enemies.js.
@@ -157,6 +158,9 @@ export default class Enemy {
       const shake = this.state === 'windup' ? Math.sin(t * 45) * 0.03 : 0;
       m.root.position.set(shake, moving ? Math.abs(Math.sin(this.phase)) * 0.05 : 0, 0);
       m.root.rotation.set(this.state === 'windup' ? 0.12 : 0, 0, this.state === 'stunned' ? Math.sin(t * 14) * 0.15 : 0);
+    } else if (this.def.model === 'human') {
+      this.phase += dt * 9;
+      walkPose(m, this.phase, moving ? 1 : 0);
     } else if (this.def.model === 'wisp') {
       this.phase += dt * 3;
       m.root.position.y = 0.8 + Math.sin(this.phase) * 0.1;

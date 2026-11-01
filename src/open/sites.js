@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
-import { height, biome, PLACES, SPAWN, WORLD } from './terrain.js';
+import { height, biome, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
 import { ITEMS } from './items.js';
 
 // Places worth finding. Every category has its own goal and its own kind of reward, and a
@@ -19,6 +19,9 @@ export const CATEGORIES = {
   cairn: { name: 'Summit Cairn', color: '#f3ead8', count: 8, goal: 'reach', text: 'Climb to the very top', steep: 9, land: (y) => y > 220 && y < 900, reward: { practice: { climbing: 80 }, perk: { carry: 10 } } },
   wreck: { name: 'Sunken Cache', color: '#5fd8f0', count: 7, goal: 'hold', secs: 3, verb: 'Dive', text: 'Dive down and pull it up', land: (y) => y < -4 && y > -30, reward: { items: { pearl: 2, dust: 2 }, practice: { swimming: 60 } } },
   hermit: { name: 'Hermit Camp', color: '#8fd86a', count: 8, goal: 'trade', pay: { wood: 8, stone: 4 }, verb: 'Trade', text: 'Bring 8 Wood and 4 Stone', land: (y) => y > 5 && y < 180, reward: { items: { salve: 3, tonic: 1 } } },
+  cave: { name: 'Cave', color: '#b08cff', count: 9, goal: 'cave', verb: 'Enter the cave', text: 'Go in and find its treasure', steep: 9, land: (y) => y > 15 && y < 300, reward: { items: { pearl: 1, iron: 5, dust: 2 }, perk: { health: 3 } } },
+  bandit: { name: 'Bandit Camp', color: '#ff6f6f', count: 0, goal: 'clear', mobs: ['chief', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit'], size: 7, built: true, text: 'Drive out the bandits', reward: { items: { iron: 4, hide: 4, tusk: 1, tonic: 1 } } },
+  keep: { name: 'Ruined Keep', color: '#c9bcc4', count: 0, goal: 'clear', mobs: ['boar', 'fireSlime', 'puffcap', 'fireSlime'], size: 9, built: true, text: 'Clear the ruins of what nests there', reward: { items: { iron: 8, pearl: 2 }, perk: { force: 0.02 } } },
   cache: { name: 'Lost Cache', color: '#ffb547', count: 12, goal: 'open', verb: 'Open', text: 'Open the old chest', land: (y) => y > 3 && y < 260, reward: { items: { salve: 1, iron: 2, wood: 4 } } },
 };
 
@@ -70,6 +73,10 @@ function prop(key, color) {
   } else if (key === 'hermit') {
     b.box(0, 0.5, 0, 1.6, 1, 1.4, '#c9b89e', 0.08).box(0, 1.15, 0, 1.2, 0.35, 1.1, '#8a7a5e', 0.08).box(0, 1.4, 0, 0.7, 0.25, 0.7, '#8a7a5e', 0.08).box(0, 0.35, 0.72, 0.4, 0.7, 0.03, '#3a2c30');
     pile(5, 1.6, wood);
+  } else if (key === 'cave') {
+    // A rock arch around a dark mouth.
+    b.box(0, 1.1, -0.3, 2.8, 2.2, 1.4, '#5a5260', 0.1).box(0, 0.8, 0.42, 1.4, 1.6, 0.05, '#0c0a12', 0).box(-1.4, 0.7, 0.2, 0.6, 1.4, 0.8, stone, 0.1).box(1.4, 0.9, 0.2, 0.6, 1.8, 0.8, stone, 0.1).box(0, 2.3, 0.1, 2.2, 0.5, 1, stone, 0.1);
+    pile(4, 1.8, stone);
   } else {
     b.box(0, 0.3, 0, 1.1, 0.6, 0.7, '#8a5a30', 0.05).box(0, 0.72, 0, 1.14, 0.24, 0.74, '#6a4428').box(0, 0.5, 0.37, 0.2, 0.25, 0.04, color);
     pile(4, 1, stone);
@@ -90,6 +97,11 @@ export default class Sites {
         if (!spot) continue;
         this.list.push({ id: `${key}${n}`, key, cat, ...spot, done: done.has(`${key}${n}`), seen: false, hits: 0, held: 0, mobs: null, timer: 0, runner: null, wave: 0, mesh: null });
       }
+    }
+    for (const T of TOWNS) {
+      if (!CATEGORIES[T.kind]) continue;
+      const id = `${T.kind}-${T.name}`, cat = { ...CATEGORIES[T.kind], name: T.name };
+      this.list.push({ id, key: T.kind, cat, x: T.x, y: T.y, z: T.z, done: done.has(id), seen: false, hits: 0, held: 0, mobs: null, timer: 0, runner: null, wave: 0, mesh: null });
     }
     // One beam per site, all in one draw.
     const geo = new THREE.CylinderGeometry(1.6, 1.6, 500, 6, 1, true).translate(0, 250, 0);
@@ -126,6 +138,7 @@ export default class Sites {
       if (!cat.land(y) || Math.hypot(x - PLACES.hollow.x, z - PLACES.hollow.z) < SAFE) continue;
       if (y > 0 && Math.max(Math.abs(height(x + 8, z) - y), Math.abs(height(x, z + 8) - y)) > (cat.steep ?? 5)) continue; // not on a cliff face
       if (Math.hypot(x - PLACES.spire.x, z - PLACES.spire.z) < 260 || biome(x, z)[0] === undefined) continue;
+      if (TOWNS.some((T) => Math.hypot(x - T.x, z - T.z) < T.r + 60)) continue;
       if (this.list.some((s) => Math.hypot(s.x - x, s.z - z) < SPACING)) continue;
       return { x, y: Math.max(y, 0), z };
     }
@@ -138,7 +151,7 @@ export default class Sites {
     if (!s || s.done || p.siteDist > REACH + 2) return null;
     const { goal, verb } = s.cat;
     if (goal === 'hold') return { label: verb, site: s, held: true };
-    if (goal === 'open' || goal === 'trade') return { label: verb, site: s };
+    if (goal === 'open' || goal === 'trade' || goal === 'cave') return { label: verb, site: s };
     if (goal === 'survive' && !s.timer) return { label: verb, site: s };
     return null;
   }
@@ -205,7 +218,7 @@ export default class Sites {
   }
 
   showProp(s) {
-    if (s.mesh) return;
+    if (s.mesh || s.cat.built) return;
     s.mesh = new THREE.Mesh(prop(s.key, s.cat.color), vmat({ color: s.done ? '#6a6470' : '#ffffff' }));
     s.mesh.castShadow = true;
     s.mesh.position.set(s.x, s.y, s.z);
@@ -218,7 +231,7 @@ export default class Sites {
     const { cat } = s, count = cat.goal === 'boss' ? 1 : cat.size;
     s.mobs = [];
     for (let i = 0; i < count; i++) {
-      const a = (i / count) * 6.28, x = s.x + Math.cos(a) * 12, z = s.z + Math.sin(a) * 12;
+      const reach = s.cat.built ? 20 : 12, a = (i / count) * 6.28, x = s.x + Math.cos(a) * reach, z = s.z + Math.sin(a) * reach;
       const e = this.monsters.add(cat.mobs[i % cat.mobs.length], x, z, this.monsters.danger(s.x, s.z), cat.goal === 'boss');
       s.mobs.push(e);
     }
@@ -277,7 +290,7 @@ export default class Sites {
       p.site = best;
       p.siteDist = d;
       if (!best || p.rooms.house) {
-        p.hud.setGoal('');
+        p.hud.setGoal(p.rooms.house?.goalText ?? '');
         continue;
       }
       if (d < SEEN_AT && !best.seen) {

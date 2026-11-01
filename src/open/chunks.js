@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { height, biome, roadDistance, forest, addDent, dentAt, dentShape, WORLD, PLACES } from './terrain.js';
+import { height, biome, roadDistance, forest, addDent, dentAt, dentShape, WORLD, PLACES, TOWNS } from './terrain.js';
 import { terrainMaterial, shared } from './materials.js';
 import { makeTreeMeshes, makeGrass, makeRocks } from './foliage.js';
 
@@ -12,7 +12,10 @@ const BUILDS_PER_FRAME = 2;
 const MAX_TREES = 9000, MAX_BLADES = 90000, MAX_ROCKS = 4000;
 const ROCK_TINTS = ['#b0a2ac', '#9aa39a', '#a8968c'], ORE_TINT = '#c08a64';
 // Trees stay out of these, so landmarks stand in the open.
-const CLEARINGS = [PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }];
+const CLEARINGS = [PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }, ...TOWNS];
+// No grass through the paving of cities and village squares.
+const PAVED = TOWNS.filter((T) => T.kind === 'city' || T.kind === 'village').map((T) => ({ x: T.x, z: T.z, half: T.kind === 'city' ? T.r * 0.62 : 28 }));
+const paved = (x, z) => PAVED.some((T) => Math.abs(x - T.x) < T.half && Math.abs(z - T.z) < T.half);
 const stepFor = (ring) => (ring <= 1 ? 1 : ring <= 2 ? 2 : 4);
 const rnd = (x, z, k) => {
   const v = Math.sin(x * 127.1 + z * 311.7 + k * 74.7) * 43758.5453;
@@ -128,7 +131,7 @@ export default class Chunks {
       const r = rnd(cx, cz, i + 11000);
       if (r < 0.25) continue;
       const y = height(x, z);
-      if (y < 2.5 || y > 280 || Math.abs(height(x + 1, z) - y) > 0.8 || roadDistance(x, z) < 4.5 || dentAt(x, z) > 0.2) continue;
+      if (y < 2.5 || y > 280 || Math.abs(height(x + 1, z) - y) > 0.8 || roadDistance(x, z) < 4.5 || dentAt(x, z) > 0.2 || paved(x, z)) continue;
       const pick = r > 0.97 ? 5 : r > 0.92 ? 4 : p > m && p > a ? 3 : a > m ? 2 : r > 0.6 ? 1 : 0;
       blades.push([x, y, z, 0.8 + r * 0.7, col[pick]]);
     }

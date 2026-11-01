@@ -93,6 +93,21 @@ function rubble(scene, x, z, seed) {
   return mesh;
 }
 
+// A house you can enter and wreck. Turned by quarter turns; its door faces `rot`.
+export function placeHouse(scene, out, id, hx, hz, rot, roof) {
+  const house = makeHouse(...roof);
+  house.position.set(hx, height(hx, hz), hz);
+  house.scale.setScalar(3.4);
+  house.rotation.y = rot;
+  house.castShadow = true;
+  scene.add(house);
+  const ox = Math.sin(rot), oz = Math.cos(rot), turned = Math.abs(Math.round(rot / (Math.PI / 2))) % 2 === 1;
+  const sx = turned ? HOUSE.z : HOUSE.x, sz = turned ? HOUSE.x : HOUSE.z;
+  const solid = { x0: hx - sx, x1: hx + sx, z0: hz - sz, z1: hz + sz };
+  out.houses.push({ id, mesh: house, solid, rubble: null, makeRubble: () => rubble(scene, hx, hz, out.houses.length), x: hx, z: hz, rot, door: { x: hx + ox * HOUSE.door, z: hz + oz * HOUSE.door } });
+  out.solids.push(solid);
+}
+
 export function addLandmarks(scene) {
   // `solids` stop the hero: { x, z, r } circles or { x0, x1, z0, z1 } boxes.
   const out = { isles: [], houses: [], solids: [] };
@@ -139,18 +154,7 @@ export function addLandmarks(scene) {
   for (let i = 0; i < 18; i++) {
     const a = i * 2.4, d = 26 + i * 8.5;
     const hx = H.x + Math.cos(a) * d, hz = H.z + Math.sin(a) * d;
-    const house = makeHouse(...roofs[i % 4]);
-    house.position.set(hx, height(hx, hz), hz);
-    house.scale.setScalar(3.4);
-    house.rotation.y = Math.round(a * 2) * (Math.PI / 2);
-    house.castShadow = true;
-    scene.add(house);
-    const rot = house.rotation.y, ox = Math.sin(rot), oz = Math.cos(rot);
-    const quarter = Math.abs(Math.round(rot / (Math.PI / 2))) % 2 === 1;
-    const sx = quarter ? HOUSE.z : HOUSE.x, sz = quarter ? HOUSE.x : HOUSE.z;
-    const solid = { x0: hx - sx, x1: hx + sx, z0: hz - sz, z1: hz + sz };
-    out.houses.push({ id: `h${i}`, mesh: house, solid, rubble: rubble(scene, hx, hz, i), x: hx, z: hz, rot, door: { x: hx + ox * HOUSE.door, z: hz + oz * HOUSE.door } });
-    out.solids.push(solid);
+    placeHouse(scene, out, `h${i}`, hx, hz, Math.round(a * 2) * (Math.PI / 2), roofs[i % 4]);
   }
   return out;
 }

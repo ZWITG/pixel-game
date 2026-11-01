@@ -103,18 +103,18 @@ function dress(e, tier) {
   const { accent, tint } = TIERS[tier];
   e.model.mat.color.set(tint);
   const { body, glow } = buildParts(e.box, tier, accent);
-  if (tier >= 1) {
+  if (tier >= 1 && !e.def.plain) {
     const mesh = new THREE.Mesh(body.build(), vmat());
     mesh.castShadow = true;
     e.parts.add(mesh);
   }
-  if (tier >= 2) e.parts.add(new THREE.Mesh(glow.build(), new THREE.MeshBasicMaterial({ color: accent, vertexColors: true })));
+  if (tier >= 2 && !e.def.plain) e.parts.add(new THREE.Mesh(glow.build(), new THREE.MeshBasicMaterial({ color: accent, vertexColors: true })));
   if (tier >= 3) {
     e.aura = new THREE.Mesh(new THREE.RingGeometry(0.75, 1, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     e.aura.position.y = 0.05;
     e.group.add(e.aura);
   }
-  if (tier >= 4) {
+  if (tier >= 4 && !e.def.plain) {
     // Stones that circle it.
     const b = new VoxelBuilder(), u = e.box.max.x - e.box.min.x;
     for (let i = 0; i < 5; i++) {

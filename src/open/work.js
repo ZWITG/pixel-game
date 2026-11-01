@@ -269,7 +269,8 @@ export default class Work {
     const gone = this.chunks.isGone(h.id);
     h.mesh.visible = !gone;
     h.mesh.rotation.z = 0;
-    h.rubble.visible = gone;
+    if (gone) h.rubble ??= h.makeRubble();
+    if (h.rubble) h.rubble.visible = gone;
     h.solid.off = gone;
   }
 

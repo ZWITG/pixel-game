@@ -20,6 +20,8 @@ export const LOOKS = {
   kid: { ...base, hair: '#ef7d57', hairShine: '#ffcd75', tunic: '#41a6f6', tunicShade: '#3b5dc9', pants: '#333c57', scale: 0.78 },
   guard: { ...base, hair: '#7a4a2a', hairShine: '#a86a3a', tunic: '#94b0c2', tunicShade: '#566c86', pants: '#333c57', belt: '#333c57', helmet: true },
   smith: { ...base, skin: '#e0a878', hair: '#2b2f45', hairShine: '#566c86', tunic: '#5a3a22', tunicShade: '#3a2a1f', pants: '#333c57', belt: '#94b0c2', apron: '#3a2a1f', beard: '#2b2f45', scale: 1.08 },
+  bandit: { ...base, skin: '#d8a078', hair: '#2b2f45', hairShine: '#566c86', tunic: '#5a4a38', tunicShade: '#3a2c30', pants: '#3a2a1f', belt: '#b13e53', hat: '#8e2036' },
+  chief: { ...base, skin: '#d8a078', hair: '#7a2a3e', hairShine: '#b13e53', tunic: '#8e2036', tunicShade: '#5a1a26', pants: '#2b2f45', belt: '#ffcd75', beard: '#7a2a3e', scale: 1.15 },
   bard: { ...base, hair: '#ffcd75', hairShine: '#fff3c0', tunic: '#b13e53', tunicShade: '#73eff7', pants: '#257179', hat: '#257179' },
 };
 

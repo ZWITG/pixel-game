@@ -14,6 +14,26 @@ export const PLACES = {
 };
 export const SPAWN = { x: 3650, z: 4600 };
 
+// Built places (see towns.js). `r` is the ground levelled for it.
+export const TOWNS = [
+  { kind: 'city', name: 'Aurelgate', x: 5400, z: 5000, r: 300, y: 36 },
+  { kind: 'city', name: 'Thornmere', x: 2250, z: 4000, r: 260, y: 30 },
+  { kind: 'village', name: 'Fernwick', x: 3350, z: 5950, r: 110, y: 24 },
+  { kind: 'village', name: 'Mossford', x: 4650, z: 6100, r: 110, y: 22 },
+  { kind: 'village', name: 'Emberfield', x: 1700, z: 5050, r: 110, y: 26 },
+  { kind: 'village', name: 'Larkrest', x: 5450, z: 3650, r: 110, y: 34 },
+  { kind: 'village', name: 'Hollowbrook', x: 3050, z: 3250, r: 110, y: 28 },
+  { kind: 'bandit', name: 'Redfang Camp', x: 2250, z: 6150, r: 75, y: 22 },
+  { kind: 'bandit', name: 'Crow\'s Rest', x: 4150, z: 6750, r: 75, y: 20 },
+  { kind: 'bandit', name: 'Ashpit Camp', x: 6100, z: 4450, r: 75, y: 44 },
+  { kind: 'bandit', name: 'Blackmoor Camp', x: 1500, z: 4250, r: 75, y: 26 },
+  { kind: 'bandit', name: 'Wolfrock Camp', x: 6500, z: 3650, r: 75, y: 60 },
+  { kind: 'bandit', name: 'Gallows Hill', x: 3650, z: 2950, r: 75, y: 40 },
+  { kind: 'keep', name: 'The Old Bastion', x: 4900, z: 2550, r: 85, y: 60 },
+  { kind: 'keep', name: 'Sunder Keep', x: 1950, z: 2650, r: 85, y: 50 },
+  { kind: 'keep', name: 'Greywatch', x: 5600, z: 6400, r: 85, y: 30 },
+];
+
 const ROADS = [
   [[2900, 5300], [3200, 5120], [3470, 4960], [3560, 4700], [3700, 4000]],
   [[3700, 4000], [4000, 3360], [4700, 3280], [5300, 3050], [5640, 2860]],
@@ -114,6 +134,10 @@ function baseHeight(x, z) {
   h = mix(h, T.y + (1 - near(T, x, z)) * 60, sstep(1.0, 0.45, near(T, x, z)));
   const R = PLACES.ribs;
   h = mix(h, R.y, sstep(1.0, 0.6, near(R, x, z)) * 0.8);
+  for (const T of TOWNS) {
+    const d = near(T, x, z);
+    if (d < 1) h = mix(h, T.y, sstep(1.0, 0.6, d));
+  }
 
   // Roads smooth out the land they cross.
   if (h > 2) {

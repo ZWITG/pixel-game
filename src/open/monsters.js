@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import Enemy from '../entities/Enemy.js';
 import { ENEMIES } from '../data/enemies.js';
 import { makeOrb } from '../render/models.js';
-import { height, biome, PLACES, SPAWN } from './terrain.js';
+import { height, biome, PLACES, SPAWN, TOWNS } from './terrain.js';
+import { CAVE_FLOOR } from './cave.js';
 import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts } from './evolve.js';
 
 // Monsters in the open world. They use the game's own Enemy class; this file is the small
@@ -55,11 +56,12 @@ export default class Monsters {
     this.spawnIn = 0;
     this.evolveIn = 0;
     this.player = { x: 0, z: 0, dead: false };
+    this.pushing = this.player;
     this.collision = {
       // Land only, so nothing wades in after a swimmer.
       move: (e, dx, dz) => {
         const x = e.group.position.x + dx, z = e.group.position.z + dz;
-        if (height(x, z) < 0.5) return;
+        if (e.cave ? !e.cave.walk(x - e.cave.x, z - e.cave.z) : height(x, z) < 0.5) return;
         e.group.position.x = x;
         e.group.position.z = z;
       },
@@ -71,12 +73,17 @@ export default class Monsters {
     return (this.work.actor ?? this.players[0]).hud;
   }
 
+  ward(x, z) {
+    if (Math.hypot(x - PLACES.hollow.x, z - PLACES.hollow.z) < WARD) return PLACES.hollow;
+    return TOWNS.find((T) => (T.kind === 'city' || T.kind === 'village') && Math.hypot(x - T.x, z - T.z) < T.r);
+  }
+
   inVillage(x, z) {
-    return Math.hypot(x - PLACES.hollow.x, z - PLACES.hollow.z) < WARD;
+    return !!this.ward(x, z);
   }
 
   villageCenter() {
-    return PLACES.hollow;
+    return this.ward(this.pushing.x, this.pushing.z) ?? PLACES.hollow;
   }
 
   fireOrb(e, dx, dz) {
@@ -105,12 +112,14 @@ export default class Monsters {
     return 1 + Math.hypot(x - SPAWN.x, z - SPAWN.z) / DANGER_SPAN;
   }
 
-  add(type, x, z, danger, elder) {
+  // `cave`: lives in that cave instead of on the land.
+  add(type, x, z, danger, elder, cave = null) {
     const e = new Enemy(this, x, z, fit(ENEMIES[type], danger, elder));
     e.air = 0;
     e.rise = 0;
-    e.group.position.y = height(x, z);
-    const hero = this.nearest(x, z) ?? this.players[0];
+    e.cave = cave;
+    e.group.position.y = cave ? CAVE_FLOOR : height(x, z);
+    const hero = this.nearest(e) ?? this.players[0];
     setTier(e, Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
     this.list.push(e);
     return e;
@@ -158,7 +167,7 @@ export default class Monsters {
 
   hurt(p, amount, fromX, fromZ) {
     const s = p.state;
-    if (p.guard > 0 || p.rooms.house) return;
+    if (p.guard > 0 || (p.rooms.house && !p.rooms.house.hostile)) return;
     const heavy = p.body.massScale, taken = Math.max(0.5, (amount * (1 - p.body.guard)) / Math.sqrt(heavy));
     p.hp -= taken;
     p.guard = HURT_GUARD;
@@ -176,7 +185,7 @@ export default class Monsters {
 
   // A monster bursts into its next form.
   evolved(e, tier) {
-    const hero = this.nearest(e.x, e.z) ?? this.players[0], { accent } = TIERS[tier];
+    const hero = this.nearest(e) ?? this.players[0], { accent } = TIERS[tier];
     setTier(e, tier, hero);
     this.work.burst(e.x, e.group.position.y + 2, e.z, [accent, '#ffffff'], 30, 8);
     hero.melee.ring(e.x, e.group.position.y, e.z, 12, accent);
@@ -187,17 +196,18 @@ export default class Monsters {
   // Those behind the heroes' level start to change, one at a time, close enough to watch.
   stir() {
     for (const e of this.list) {
-      const hero = this.nearest(e.x, e.z);
+      const hero = this.nearest(e);
       if (!hero || e.dying || e.evolving !== undefined || e.tier >= tierFor(hero.body.level)) continue;
       if (Math.hypot(e.x - hero.state.x, e.z - hero.state.z) < EVOLVE_WATCH && Math.random() < EVOLVE_ODDS) startEvolving(e);
     }
   }
 
-  nearest(x, z) {
+  // The closest hero this monster can reach. `e` is a monster, or anything with x and z.
+  nearest(e) {
     let best = null, d = 1e9;
     for (const p of this.players) {
-      if (p.rooms.house) continue;
-      const k = Math.hypot(p.state.x - x, p.state.z - z);
+      if (p.rooms.house !== (e.cave ?? null) && (p.rooms.house || e.cave)) continue;
+      const k = Math.hypot(p.state.x - e.x, p.state.z - e.z);
       if (k < d) { d = k; best = p; }
     }
     return best;
@@ -215,9 +225,9 @@ export default class Monsters {
       this.stir();
     }
     for (const e of [...this.list]) {
-      const hero = this.nearest(e.x, e.z);
+      const hero = this.nearest(e);
       const far = hero ? Math.hypot(e.x - hero.state.x, e.z - hero.state.z) : 0;
-      if (far > FORGET * 1.3) {
+      if (far > FORGET * 1.3 && !e.cave) {
         this.removeEnemy(e);
         continue;
       }
@@ -228,6 +238,7 @@ export default class Monsters {
         this.player.z = hero.state.z;
       }
       if (e.evolving !== undefined && !e.dying) updateEvolving(e, dt, this.time, (m, tier) => this.evolved(m, tier));
+      this.pushing = e;
       e.update(dt);
       if (this.list.indexOf(e) < 0) continue;
       animateParts(e, dt, this.time);
@@ -236,7 +247,7 @@ export default class Monsters {
         e.air = Math.max(0, e.air + e.rise * dt);
         if (!e.air) e.rise = 0;
       }
-      e.group.position.y = height(e.x, e.z) + e.air;
+      e.group.position.y = (e.cave ? CAVE_FLOOR : height(e.x, e.z)) + e.air;
       if (hero && !e.dying && e.air < 1 && far < e.radius + 0.7) this.hurt(hero, e.def.damage, e.x, e.z);
     }
     for (const o of this.orbs) {

@@ -54,6 +54,7 @@ function build() {
 export default class Rooms {
   constructor(scene) {
     this.house = null;
+    this.floor = ROOM_Y;
     this.group = new THREE.Group();
     this.group.position.y = ROOM_Y;
     this.group.add(build());

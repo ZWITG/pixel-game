@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { height, PLACES } from './terrain.js';
+import { height as landHeight, PLACES, TOWNS } from './terrain.js';
 import { FEATURES } from '../config/features.js';
 
 // Punching. Square throws a three-hit chain anywhere, at anything. The punch itself grows in
@@ -111,7 +111,7 @@ export default class Melee {
       this.queued = true; // remembered, so mashing Square keeps the chain going
       return;
     }
-    const target = this.monsters.target(state) ?? this.work.target(state);
+    const target = this.monsters.target(state) ?? (this.player.rooms.house ? null : this.work.target(state));
     if (target) state.dir = [target.x - state.x, target.z - state.z];
     const len = Math.hypot(...state.dir) || 1;
     this.chain = this.idle < CHAIN_WINDOW ? (this.chain + 1) % CHAIN.length : 0;
@@ -129,6 +129,11 @@ export default class Melee {
     return a && { t: a.t / a.time, chain: a.chain, stage: this.stage, color: PUNCHES[this.stage].color };
   }
 
+  // Inside a cave the ground is the cave floor, whatever the land does above.
+  height(x, z) {
+    return this.player.rooms.house ? this.player.state.y : landHeight(x, z);
+  }
+
   land(a, state) {
     const p = PUNCHES[this.stage], finisher = a.chain === 2, heavy = this.body.massScale, spread = Math.sqrt(heavy);
     const force = this.force * CHAIN[a.chain];
@@ -136,13 +141,13 @@ export default class Melee {
     const r = t ? (t.r ?? t.radius) : 0;
     const x = t ? t.x - a.fx * r : state.x + a.fx * 1.2, z = t ? t.z - a.fz * r : state.z + a.fz * 1.2;
     const reach = p.radius * (finisher ? FINISHER_REACH : 1) * spread;
-    const crater = finisher || this.stage >= 3 ? p.crater * spread * (finisher ? FINISHER_REACH : 1) : 0;
+    const crater = !this.player.rooms.house && (finisher || this.stage >= 3) ? p.crater * spread * (finisher ? FINISHER_REACH : 1) : 0;
 
     const struck = this.blast(x, z, force, reach, crater, p.color, t);
     this.skills.add('punching', struck ? 1 : AIR_PRACTICE);
     if (t && !t.def) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);
     if (struck || reach) {
-      this.work.burst(x, height(x, z) + 1.1, z, [p.color, '#fff8ea', '#94808a'], p.chips, 4 + this.stage * 1.5);
+      this.work.burst(x, this.height(x, z) + 1.1, z, [p.color, '#fff8ea', '#94808a'], p.chips, 4 + this.stage * 1.5);
       this.work.stop = p.stop * (finisher ? 1.6 : 1);
     }
     this.work.shake = Math.max(this.work.shake, (struck || reach ? p.shake : 0) * (finisher ? 1.5 : 1));
@@ -167,14 +172,15 @@ export default class Melee {
       const d = Math.hypot(m.x - x, m.z - z);
       if (m !== target) queue.push({ m, at: d / WAVE_SPEED, force: falloff(d) });
     }
+    const inside = !!this.player.rooms.house;
     if (reach) {
-      for (const o of this.work.chunks.near(x, z, reach)) {
+      for (const o of inside ? [] : this.work.chunks.near(x, z, reach)) {
         const d = Math.hypot(o.x - x, o.z - z);
         if (o !== target && d < reach) queue.push({ o, at: d / WAVE_SPEED, force: falloff(d) });
       }
-      this.ring(x, height(x, z), z, reach, color);
+      this.ring(x, this.height(x, z), z, reach, color);
     }
-    for (const h of this.work.housesAt(x, z, Math.max(reach, HOUSE_REACH))) queue.push({ h, at: Math.hypot(h.x - x, h.z - z) / WAVE_SPEED, force: falloff(0) });
+    for (const h of inside ? [] : this.work.housesAt(x, z, Math.max(reach, HOUSE_REACH))) queue.push({ h, at: Math.hypot(h.x - x, h.z - z) / WAVE_SPEED, force: falloff(0) });
     if (FEATURES.friendlyFire) {
       for (const foe of this.player.world.players) {
         const d = Math.hypot(foe.state.x - x, foe.state.z - z);
@@ -182,7 +188,7 @@ export default class Melee {
       }
     }
     queue.sort((m, n) => m.at - n.at);
-    this.player.world.sites.struck(x, z, reach, this.stage, this.player);
+    if (!inside) this.player.world.sites.struck(x, z, reach, this.stage, this.player);
     if (crater) this.tear(x, z, crater);
     this.waves.push({ queue, x, z, t: 0, drops: {}, broke: false });
     return queue.length > 0;
@@ -190,7 +196,7 @@ export default class Melee {
 
   // Tears the ground open, except right under the great landmarks.
   tear(x, z, size) {
-    const safe = [PLACES.spire, { ...PLACES.ribs, r: 260 }, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 90 }];
+    const safe = [PLACES.spire, { ...PLACES.ribs, r: 260 }, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 90 }, ...TOWNS];
     if (safe.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + size)) return;
     this.work.chunks.deform(x, z, size, size * CRATER_DEPTH);
     this.crater(x, z, Math.min(CRATER_MARK, size * 1.1));
@@ -226,7 +232,7 @@ export default class Melee {
     const pos = c.mesh.geometry.attributes.position, n = CRATER_GRID + 1;
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const px = x + (i / CRATER_GRID - 0.5) * size * 2, pz = z + (j / CRATER_GRID - 0.5) * size * 2;
-      pos.setXYZ(j * n + i, px, height(px, pz) + 0.08, pz);
+      pos.setXYZ(j * n + i, px, landHeight(px, pz) + 0.08, pz);
     }
     pos.needsUpdate = true;
     c.age = 0;

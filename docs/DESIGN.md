@@ -114,6 +114,8 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Hero against hero (built 2026-11-01):** blows and shockwaves hurt the other hero, capped at a quarter of their health per blow, and send them flying.
 
+**Explorable locations (built 2026-11-01):** `TOWNS` in terrain.js levels the land for two walled cities, five villages, six bandit camps and three ruined keeps; `towns.js` builds them from their names. Houses there are normal houses. Townsfolk wander, talk, heal and trade, and monsters stay out. Caves (`cave.js`) are interiors of chambers and tunnels with their own monsters and a chest at the end. Bandits are a human enemy that evolves in strength without monster parts.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

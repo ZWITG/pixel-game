@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { PAD } from '../systems/controls.js';
 import { prompt, buttonHtml, keyHtml } from '../ui/glyphs.js';
-import { height, PLACES, SPAWN, WORLD } from './terrain.js';
+import { height, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
 import Chunks from './chunks.js';
 import { addLandmarks } from './landmarks.js';
+import { addTowns, People } from './towns.js';
 import { skyMaterial, waterMaterial, shared } from './materials.js';
 import { windTime } from '../render/wind.js';
 import { focus } from './foliage.js';
@@ -32,6 +33,7 @@ const TELEPORT = 25;       // tiles moved in one frame that count as a jump
 const MAX_SHAKE = 0.45;
 const SHAKE_REACH = 70;
 const MAX_HILL_LIFT = 9;   // tiles the camera may climb to see over ground behind the hero
+const CAVE_LIGHT = 0.12;   // how much daylight reaches a cave
 const ROOM_CAMERA = 5.5;   // camera distance indoors
 const SPLIT_AT = 30, MERGE_AT = 20; // tiles apart; the gap keeps it from flickering at the edge
 const SPLIT_HEIGHT = 14;  // a big difference in height splits too
@@ -76,6 +78,7 @@ scene.add(water);
 
 const chunks = new Chunks(scene);
 const marks = addLandmarks(scene);
+addTowns(scene, marks);
 const work = new Work(scene, chunks, marks);
 const players = [];
 const monsters = new Monsters(scene, work, players);
@@ -83,6 +86,7 @@ const shared2 = { yaw: 0, pitch: 0.2, recenter: null }; // the camera both heroe
 const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'dusk', setTime, travel, splash };
 
 world.sites = new Sites(scene, monsters, work, players);
+world.people = new People(scene, world);
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
 // fills its owner's half: the other hero plays on, and both can have theirs open.
 world.checkPause = () => {
@@ -139,7 +143,7 @@ resize();
 
 function nearestPlace() {
   let best = null, d = 1e9;
-  for (const p of Object.values(PLACES)) {
+  for (const p of [...Object.values(PLACES), ...TOWNS]) {
     const k = Math.hypot(state.x - p.x, state.z - p.z) - p.r;
     if (k < d) { d = k; best = p; }
   }
@@ -406,6 +410,7 @@ function renderView(v, p, dir) {
   water.position.x = v.camera.position.x;
   water.position.z = v.camera.position.z;
   v.post.indoors = !!p.rooms.house;
+  hemi.intensity = TIMES[world.time].amb * (p.rooms.house?.dark ? CAVE_LIGHT : 1);
   v.post.render(dir);
 }
 
@@ -431,6 +436,7 @@ function step(dt) {
   if (!world.paused) {
     if (FEATURES.monsters) monsters.update(dt);
     if (FEATURES.sites) world.sites.update(dt);
+    world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);
     work.update(dt);
   }
