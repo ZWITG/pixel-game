@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: six new enemies by land and four huge bosses with powers in their own lairs
 - 2026-11-01 prototype: split-screen camera fixed for flight and Superspeed: follows heroes into the air and across water, splits by real height, splits faster at speed, never flickers
 - 2026-11-01 prototype: combat rebuilt: enemy tells, moves, turn-taking, stagger; roll, guard, parry, counter, grab, throw, slam, air dive, lock-on, enemy health bar
 - 2026-11-01 prototype: ground fixes: no walls around pits, oldest craters fill back in cleanly and up to 1500 are kept, props and crack marks settle with the land, no gaps in the ground at speed, nothing placed on cliff faces, softer crack marks

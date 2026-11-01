@@ -125,7 +125,8 @@ function dress(e, tier) {
     e.parts.add(e.shards);
   }
   e.model.root.add(e.parts);
-  e.baseGlow.set(tier >= 3 ? accent : '#000000').multiplyScalar(tier >= 3 ? 0.18 : 0);
+  // Beasts carry a little light of their own, so dark hides still read against the grass.
+  e.baseGlow.set(tier >= 3 ? accent : '#ffffff').multiplyScalar(tier >= 3 ? 0.18 : e.def.model === 'beast' ? 0.14 : 0);
 }
 
 // Sets a monster's form and stats from a hero. Called on spawning and on evolving.

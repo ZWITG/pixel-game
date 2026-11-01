@@ -126,6 +126,8 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Combat (rebuilt 2026-11-01):** monsters no longer hurt by touch. Each has moves (`src/open/foes.js`): a tell, a strike, a recovery; areas warn on the ground and heavy moves break guards. Only two attack a hero at once; the rest circle. Blows interrupt them until the Ancient form. The hero has Roll (Circle, invincible at the start), Guard (L2, tap just before a hit to Parry, then a Counter punch does triple force), Grab (R1, then R1 throws and Square slams), Lock-on (R3) and an air Dive (Square while airborne). All of it lives in `melee.js`.
 
+**Enemies and bosses (built 2026-11-01):** new creatures live by land: wolves in the woods, scorpions and golems in the badlands, lurkers in the swamp, wraiths on the heights, bats in caves (`src/render/beasts.js`). Four huge bosses hold lairs (`TOWNS` kind `lair`, `src/open/bosses.js`): Gravemaw, the Mirewyrm, the Frostwarden and Emberhorn. They fight with powers that all carry a warning: ground waves you jump, marked eruptions, lines of eruptions, shot volleys, charges and summons. Below half health they enrage. Only a parry makes them reel, and they can't be grabbed.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

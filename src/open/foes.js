@@ -20,6 +20,11 @@ const FIGHTERS = {
   boar: ['charge'],
   bandit: ['swipe', 'flurry'],
   chief: ['charge', 'slam', 'flurry'],
+  wolf: ['swipe', 'hop'],
+  golem: ['slam', 'swipe'],
+  scorpion: ['swipe', 'charge'],
+  lurker: ['hop', 'burst'],
+  bat: ['hop'],
 };
 const TURN_TAKERS = 2;       // monsters attacking one hero at a time
 const PRESS = 8;             // tiles from a hero that those waiting their turn circle at

@@ -1,10 +1,11 @@
 import Enemy from '../entities/Enemy.js';
 import { ENEMIES } from '../data/enemies.js';
 import { makeOrb } from '../render/models.js';
-import { height, biome, PLACES, SPAWN, TOWNS } from './terrain.js';
+import { height, biome, region, PLACES, SPAWN, TOWNS } from './terrain.js';
 import { CAVE_FLOOR } from './cave.js';
 import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts } from './evolve.js';
 import { arm, stagger, standDown, TURN_TAKERS, PARRIED } from './foes.js';
+import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
 
 // Monsters in the open world. They use the game's own Enemy class; this file is the small
 // `game` it expects, plus spawning around the hero and the hero's health.
@@ -24,9 +25,14 @@ const EVOLVE_WATCH = 130;    // tiles: they change where you can see it
 const HARDEN_ODDS = 0.1;     // chance a monster that survives a blow starts evolving
 const GROUPS = [
   ['slime', 'slime', 'boar', 'fireSlime'],  // meadow
-  ['boar', 'fireSlime', 'slime', 'puffcap'], // autumn wood
-  ['puffcap', 'puffcap', 'slime', 'wisp'],  // pine wood
+  ['boar', 'fireSlime', 'wolf', 'puffcap'], // autumn wood
+  ['puffcap', 'wolf', 'wolf', 'wisp'],      // pine wood
 ];
+const BADLANDS = ['scorpion', 'scorpion', 'golem', 'fireSlime'];
+const MARSH = ['lurker', 'lurker', 'puffcap', 'wisp'];
+const HEIGHTS = ['wraith', 'wraith', 'golem', 'wolf'];
+const HIGH_GROUND = 180;
+const BOSS_BAR = 110;        // tiles from a boss that its health bar stays up
 
 // A main-game enemy stretched to open-world size, then made tougher by where it lives.
 function fit(def, danger, elder) {
@@ -52,6 +58,9 @@ export default class Monsters {
     this.nightfall = false;
     this.list = [];
     this.orbs = [];
+    this.marks = [];
+    this.waves = [];
+    this.quake = null;
     this.time = 0;
     this.spawnIn = 0;
     this.evolveIn = 0;
@@ -148,11 +157,12 @@ export default class Monsters {
     e.air = 0;
     e.rise = 0;
     e.cave = cave;
-    arm(e, type, this);
+    if (POWERS[type]) armBoss(e, type, this);
+    else arm(e, type, this);
     e.rootScale = e.model.root.scale.x;
     e.group.position.y = cave ? CAVE_FLOOR : height(x, z);
     const hero = this.nearest(e) ?? this.players[0];
-    setTier(e, Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
+    setTier(e, e.def.boss ? 0 : Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
     this.list.push(e);
     return e;
   }
@@ -163,8 +173,8 @@ export default class Monsters {
     const a = Math.random() * 6.28, d = SPAWN_FROM + Math.random() * (SPAWN_TO - SPAWN_FROM);
     const x = hero.x + Math.cos(a) * d, z = hero.z + Math.sin(a) * d;
     if (height(x, z) < 2 || this.inVillage(x, z)) return;
-    const b = biome(x, z), kind = b.indexOf(Math.max(...b.slice(0, 3)));
-    const group = GROUPS[kind], type = this.nightfall ? 'wisp' : group[Math.floor(Math.random() * group.length)];
+    const b = biome(x, z), [bad, marsh] = region(x, z);
+    const group = bad > 0.5 ? BADLANDS : marsh > 0.5 ? MARSH : height(x, z) > HIGH_GROUND ? HEIGHTS : GROUPS[b.indexOf(Math.max(...b.slice(0, 3)))], type = this.nightfall ? 'wisp' : group[Math.floor(Math.random() * group.length)];
     this.add(type, x, z, this.danger(x, z), Math.random() < ELDER_CHANCE);
   }
 
@@ -190,6 +200,13 @@ export default class Monsters {
     e.takeHit(Math.round(force * 10) / 10, x, z);
     e.recoil = 1;
     this.work.skills.add('fighting', 1);
+    if (e.boss) {
+      // Far too big to knock about. It only reels from a parry.
+      e.knockUntil = 0;
+      e.vel.set(0, 0);
+      this.work.actor.melee.struck = e;
+      return;
+    }
     const fling = Math.min(KNOCK_LIMIT, 7 + force * 1.5);
     e.vel.normalize().multiplyScalar(fling);
     e.knockUntil = this.time + 0.2 + Math.min(0.8, force * 0.02);
@@ -227,6 +244,62 @@ export default class Monsters {
     p.hud.setHealth(p.hp / p.body.maxHealth);
   }
 
+  // ---- what bosses' powers leave in the world ----
+  startWave(e, color) {
+    const y = e.group.position.y;
+    this.waves.push({ x: e.x, z: e.z, r: e.radius, hit: new Set(), damage: e.def.damage });
+    if (e.foe) e.foe.melee.ring(e.x, y, e.z, WAVE_REACH, color);
+    this.work.burst(e.x, y + 1, e.z, [color, '#c9bcc4'], 24, 12);
+    this.work.shake = Math.max(this.work.shake, 0.25);
+    this.work.shakeAt = (e.foe ?? this.players[0]).state;
+  }
+
+  mark(x, z, size, delay, e, color) {
+    const hero = e.foe;
+    if (hero) hero.melee.ring(x, markGround(x, z), z, size, color);
+    this.marks.push({ x, z, size, at: delay, damage: e.def.damage * 1.2, e, color, ticks: 0 });
+  }
+
+  fireOrbFrom(x, y, z, dx, dz, e) {
+    const orb = makeOrb();
+    orb.scale.setScalar(SIZE * 1.6);
+    orb.position.set(x, y, z);
+    this.scene.add(orb);
+    this.orbs.push({ orb, dx, dz, speed: 15, damage: e.def.damage, life: 4, sinks: (y - 1.5) / 1.2 });
+  }
+
+  roar(e) {
+    const hero = e.foe;
+    if (hero) hero.hud.message(`${e.def.name} rages!`, true);
+    this.work.shake = Math.max(this.work.shake, 0.4);
+    this.work.shakeAt = (hero ?? this.players[0]).state;
+    this.work.burst(e.x, e.group.position.y + 6, e.z, [e.kit.color, '#ffffff'], 40, 12);
+  }
+
+  updatePowers(dt) {
+    for (const w of this.waves) {
+      w.r += WAVE_SPEED * dt;
+      for (const p of this.players) {
+        const d = Math.hypot(p.state.x - w.x, p.state.z - w.z);
+        if (!p.rooms.house && !w.hit.has(p) && Math.abs(d - w.r) < 3 && p.state.air < 1.5) {
+          w.hit.add(p);
+          this.hurt(p, w.damage, w.x, w.z, { heavy: true });
+        }
+      }
+    }
+    this.waves = this.waves.filter((w) => w.r < WAVE_REACH);
+    for (const m of this.marks) {
+      m.at -= dt;
+      if (m.at > 0) continue;
+      this.quake.pillar(m.x, m.z, 7 + Math.random() * 7, 0);
+      this.work.burst(m.x, markGround(m.x, m.z) + 1, m.z, [m.color, '#ffffff'], 12, 8);
+      for (const p of this.players) {
+        if (!p.rooms.house && p.state.air < 2 && Math.hypot(p.state.x - m.x, p.state.z - m.z) < m.size) this.hurt(p, m.damage, m.x, m.z);
+      }
+    }
+    this.marks = this.marks.filter((m) => m.at > 0);
+  }
+
   // A monster bursts into its next form.
   evolved(e, tier) {
     const hero = this.nearest(e) ?? this.players[0], { accent } = TIERS[tier];
@@ -241,7 +314,7 @@ export default class Monsters {
   stir() {
     for (const e of this.list) {
       const hero = this.nearest(e);
-      if (!hero || e.dying || e.evolving !== undefined || e.tier >= tierFor(hero.body.level)) continue;
+      if (!hero || e.boss || e.dying || e.evolving !== undefined || e.tier >= tierFor(hero.body.level)) continue;
       if (Math.hypot(e.x - hero.state.x, e.z - hero.state.z) < EVOLVE_WATCH && Math.random() < EVOLVE_ODDS) startEvolving(e);
     }
   }
@@ -314,6 +387,7 @@ export default class Monsters {
       o.life -= dt;
       o.orb.position.x += o.dx * o.speed * dt;
       o.orb.position.z += o.dz * o.speed * dt;
+      if (o.sinks) o.orb.position.y = Math.max(height(o.orb.position.x, o.orb.position.z) + 1.5, o.orb.position.y - o.sinks * dt);
       for (const p of out) {
         if (Math.hypot(o.orb.position.x - p.state.x, o.orb.position.z - p.state.z) < 1) {
           this.hurt(p, o.damage, o.orb.position.x, o.orb.position.z);
@@ -323,5 +397,16 @@ export default class Monsters {
       if (o.life <= 0) this.scene.remove(o.orb);
     }
     this.orbs = this.orbs.filter((o) => o.life > 0);
+    this.updatePowers(dt);
+    // A boss's health stays on the screen of anyone fighting it.
+    for (const e of this.list) {
+      if (!e.boss) continue;
+      for (const p of this.players) {
+        if (Math.hypot(p.state.x - e.x, p.state.z - e.z) < BOSS_BAR) {
+          p.melee.barOn = e;
+          p.melee.barFor = 1;
+        }
+      }
+    }
   }
 }

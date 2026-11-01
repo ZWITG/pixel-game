@@ -152,7 +152,18 @@ function keep(T, b, add, rand) {
   }
 }
 
-const BUILD = { village, city, bandit, keep };
+// A boss's lair: a ring of standing stones around an open floor to fight on.
+function lair(T, b, add, rand) {
+  const R = 92;
+  b.box(0, 0.06, 0, R * 2, 0.12, R * 2, '#4a3e44', 0.08);
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * 6.28, x = Math.cos(a) * R, z = Math.sin(a) * R, h = 12 + rand() * 12;
+    b.box(x, h / 2, z, 6, h, 6, STONE_DARK, 0.08).box(x, h + 1, z, 7.6, 2, 7.6, STONE, 0.08);
+    add.circle(x, z, 3.6);
+  }
+}
+
+const BUILD = { village, city, bandit, keep, lair };
 
 export function addTowns(scene, marks) {
   for (const T of TOWNS) {

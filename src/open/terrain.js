@@ -32,6 +32,10 @@ export const TOWNS = [
   { kind: 'keep', name: 'The Old Bastion', x: 4900, z: 2550, r: 85, y: 60 },
   { kind: 'keep', name: 'Sunder Keep', x: 1950, z: 2650, r: 85, y: 50 },
   { kind: 'keep', name: 'Greywatch', x: 5600, z: 6400, r: 85, y: 30 },
+  { kind: 'lair', name: 'The Gravepit', boss: 'gravemaw', x: 7000, z: 4750, r: 150, y: 60 },
+  { kind: 'lair', name: 'The Drowned Hollow', boss: 'mirewyrm', x: 1700, z: 6300, r: 150, y: 4 },
+  { kind: 'lair', name: 'The Frozen Throne', boss: 'frostwarden', x: 3000, z: 1750, r: 150, y: 320 },
+  { kind: 'lair', name: 'The Ember Caldera', boss: 'emberhorn', x: 5500, z: 7000, r: 150, y: 30 },
 ];
 
 // Every town can be walked to by road; city roads end at their gates.

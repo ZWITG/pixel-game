@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FEATURES } from '../config/features.js';
 import { SLIME_COLORS, LOOKS } from '../art/looks.js';
 import { makeSlime, makeBoar, makeWisp, makeMushroom, makeHumanoid, walkPose } from '../render/models.js';
+import { makeBeast } from '../render/beasts.js';
 import { disposeModel } from '../render/voxel.js';
 
 const DEATH_TIME = 0.22;
@@ -16,6 +17,7 @@ const MODELS = {
   boar: () => makeBoar(),
   wisp: () => makeWisp(),
   mushroom: () => makeMushroom(),
+  beast: (def) => makeBeast(def.shape),
   human: (def) => makeHumanoid(LOOKS[def.look], { sword: !!def.sword }),
 };
 
@@ -158,6 +160,14 @@ export default class Enemy {
       const shake = this.state === 'windup' ? Math.sin(t * 45) * 0.03 : 0;
       m.root.position.set(shake, moving ? Math.abs(Math.sin(this.phase)) * 0.05 : 0, 0);
       m.root.rotation.set(this.state === 'windup' ? 0.12 : 0, 0, this.state === 'stunned' ? Math.sin(t * 14) * 0.15 : 0);
+    } else if (this.def.model === 'beast') {
+      // Legged ones trot, floaters bob, the great serpent sways, and the rest shuffle.
+      this.phase += dt * (moving ? 12 : 3);
+      const swing = moving ? Math.sin(this.phase) * 0.6 : 0;
+      (m.legs ?? []).forEach((l, i) => { l.rotation.x = i % 2 ? -swing : swing; });
+      if (m.hover) m.root.position.y = m.hover + Math.sin(this.phase * 0.5) * 0.12;
+      if (m.sway) m.root.rotation.z = Math.sin(this.phase * 0.4) * 0.08;
+      if (!m.legs && !m.hover && !m.sway) m.root.position.y = moving ? Math.abs(Math.sin(this.phase)) * 0.05 : 0;
     } else if (this.def.model === 'human') {
       this.phase += dt * 9;
       walkPose(m, this.phase, moving ? 1 : 0);

@@ -8,7 +8,7 @@ export const CAVE_FLOOR = 1600;
 const CELL = 2, ROOF = 9;
 const LEVEL_ROCK = ['#4a4250', '#544a5a', '#403844'];
 const WALL_ROCK = ['#5e5462', '#6a5e6c', '#524858'];
-const MOBS = ['puffcap', 'slime', 'boar', 'wisp'];
+const MOBS = ['bat', 'puffcap', 'bat', 'golem'];
 const HERO_RADIUS = 0.4;
 
 export class CaveLevel {

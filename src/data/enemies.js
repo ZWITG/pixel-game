@@ -126,6 +126,18 @@ export const ENEMIES = {
     spawns: false,
     drops: [{ item: 'tusk', chance: 0.6 }, { item: 'pearl', chance: 0.3 }],
   },
+  // Open-world creatures. `spawns: false` keeps them out of the original game's map.
+  wolf: { name: 'Dusk Wolf', model: 'beast', shape: 'wolf', ai: 'chase', hp: 3, damage: 1, speed: 3, chaseSpeed: 5.4, aggro: 10, radius: 0.34, xp: 5, spawns: false, drops: [{ item: 'hide', chance: 0.5 }] },
+  golem: { name: 'Stone Golem', model: 'beast', shape: 'golem', scale: 1.5, ai: 'chase', hp: 14, damage: 3, speed: 1, chaseSpeed: 1.8, aggro: 7, radius: 0.5, xp: 16, spawns: false, drops: [{ item: 'iron', chance: 0.8 }, { item: 'stone', chance: 0.9 }] },
+  scorpion: { name: 'Dune Scorpion', model: 'beast', shape: 'scorpion', ai: 'chase', hp: 6, damage: 2, speed: 2, chaseSpeed: 3.8, aggro: 8, radius: 0.42, xp: 9, spawns: false, drops: [{ item: 'ember', chance: 0.5 }, { item: 'tusk', chance: 0.15 }] },
+  lurker: { name: 'Mire Lurker', model: 'beast', shape: 'lurker', ai: 'chase', hp: 7, damage: 2, speed: 1.4, chaseSpeed: 3.2, aggro: 7, radius: 0.42, xp: 8, spawns: false, drops: [{ item: 'gel', chance: 0.7 }, { item: 'spore', chance: 0.4 }] },
+  wraith: { name: 'Frost Wraith', model: 'beast', shape: 'wraith', ai: 'shoot', hp: 5, damage: 2, speed: 2, chaseSpeed: 3, aggro: 9, keepAway: [4, 7], fireEvery: 2, shotSpeed: 5.5, radius: 0.34, xp: 11, spawns: false, drops: [{ item: 'dust', chance: 0.7 }, { item: 'pearl', chance: 0.08 }] },
+  bat: { name: 'Cave Bat', model: 'beast', shape: 'bat', ai: 'chase', hp: 2, damage: 1, speed: 3.2, chaseSpeed: 5, aggro: 9, radius: 0.3, xp: 4, spawns: false, drops: [{ item: 'dust', chance: 0.3 }] },
+  // Bosses: huge, and fought with powers (see src/open/bosses.js).
+  gravemaw: { name: 'Gravemaw the Colossus', boss: true, plain: true, model: 'beast', shape: 'colossus', scale: 7, ai: 'chase', hp: 45, damage: 5, speed: 1.2, chaseSpeed: 1.6, aggro: 60, radius: 2.6, xp: 200, spawns: false, drops: [] },
+  mirewyrm: { name: 'The Mirewyrm', boss: true, plain: true, model: 'beast', shape: 'wyrm', scale: 7, ai: 'chase', hp: 40, damage: 4, speed: 1.4, chaseSpeed: 2, aggro: 60, radius: 2.2, xp: 200, spawns: false, drops: [] },
+  frostwarden: { name: 'The Frostwarden', boss: true, plain: true, model: 'beast', shape: 'warden', scale: 7, ai: 'chase', hp: 42, damage: 4, speed: 1.2, chaseSpeed: 1.8, aggro: 60, radius: 2.2, xp: 200, spawns: false, drops: [] },
+  emberhorn: { name: 'Emberhorn', boss: true, plain: true, model: 'beast', shape: 'emberhorn', scale: 6, ai: 'chase', hp: 40, damage: 5, speed: 1.6, chaseSpeed: 2.4, aggro: 60, radius: 2.4, xp: 200, spawns: false, drops: [] },
   wisp: {
     name: 'Wisp',
     model: 'wisp',

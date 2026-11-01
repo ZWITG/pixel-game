@@ -99,6 +99,7 @@ const world = { scene, renderer, chunks, work, monsters, marks, players, shared:
 world.sites = new Sites(scene, monsters, work, players);
 world.people = new People(scene, world);
 world.quake = new Quake(scene, chunks);
+monsters.quake = world.quake;
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
 // fills its owner's half: the other hero plays on, and both can have theirs open.
 world.checkPause = () => {

@@ -22,6 +22,7 @@ export const CATEGORIES = {
   cave: { name: 'Cave', color: '#b08cff', count: 9, goal: 'cave', verb: 'Enter the cave', text: 'Go in and find its treasure', steep: 9, land: (y) => y > 15 && y < 300, reward: { items: { pearl: 1, iron: 5, dust: 2 }, perk: { health: 3 } } },
   bandit: { name: 'Bandit Camp', color: '#ff6f6f', count: 0, goal: 'clear', mobs: ['chief', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit'], size: 7, built: true, text: 'Drive out the bandits', reward: { items: { iron: 4, hide: 4, tusk: 1, tonic: 1 } } },
   keep: { name: 'Ruined Keep', color: '#c9bcc4', count: 0, goal: 'clear', mobs: ['boar', 'fireSlime', 'puffcap', 'fireSlime'], size: 9, built: true, text: 'Clear the ruins of what nests there', reward: { items: { iron: 8, pearl: 2 }, perk: { force: 0.02 } } },
+  lair: { name: 'Lair', color: '#ff3a6a', count: 0, goal: 'boss', built: true, text: 'Bring down what rules here', reward: { items: { pearl: 3, iron: 12, tusk: 4 }, perk: { force: 0.1, health: 15 }, practice: { fighting: 200 } } },
   cache: { name: 'Lost Cache', color: '#ffb547', count: 12, goal: 'open', verb: 'Open', text: 'Open the old chest', land: (y) => y > 3 && y < 260, reward: { items: { salve: 1, iron: 2, wood: 4 } } },
 };
 
@@ -100,7 +101,7 @@ export default class Sites {
     }
     for (const T of TOWNS) {
       if (!CATEGORIES[T.kind]) continue;
-      const id = `${T.kind}-${T.name}`, cat = { ...CATEGORIES[T.kind], name: T.name };
+      const id = `${T.kind}-${T.name}`, cat = { ...CATEGORIES[T.kind], name: T.name, ...(T.boss ? { mobs: [T.boss] } : {}) };
       this.list.push({ id, key: T.kind, cat, x: T.x, y: T.y, z: T.z, done: done.has(id), seen: false, hits: 0, held: 0, mobs: null, timer: 0, runner: null, wave: 0, mesh: null });
     }
     // One beam per site, all in one draw.
@@ -241,7 +242,7 @@ export default class Sites {
     s.mobs = [];
     for (let i = 0; i < count; i++) {
       const reach = s.cat.built ? 20 : 12, a = (i / count) * 6.28, x = s.x + Math.cos(a) * reach, z = s.z + Math.sin(a) * reach;
-      const e = this.monsters.add(cat.mobs[i % cat.mobs.length], x, z, this.monsters.danger(s.x, s.z), cat.goal === 'boss');
+      const e = this.monsters.add(cat.mobs[i % cat.mobs.length], x, z, this.monsters.danger(s.x, s.z), cat.goal === 'boss' && s.key !== 'lair');
       s.mobs.push(e);
     }
   }
