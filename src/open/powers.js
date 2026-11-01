@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CONQUERORS, MAX_RANK, svg } from './conquerors.js';
 import { stagger } from './foes.js';
 import { prompt } from '../ui/glyphs.js';
+import { Flames, makeBolt, shapeBolt } from './elementFx.js';
 
 // What a power does when it's used, by `kind`, and the light it makes. Each hero has a PowerSet;
 // the effects themselves are shared. Rank makes everything stronger and quicker.
@@ -24,7 +25,10 @@ const TRAIL_EVERY = 3;       // tiles between patches of a fiery trail
 const SOLID_STEP = 1.5;      // tiles between checks along a dash
 const CAST_POSE = { bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam' };
 const STATUS_COLORS = { burn: ['#ff9a3a', '#ff5a2a', '#ffd070'], freeze: ['#dff4ff', '#8fe0ff'], shock: ['#fff4b0', '#ffe25a'] };
-const GLOWS = 160, PILLARS = 20, DISCS = 12, ZAPS = 14, CRYSTALS = 40;
+const GLOWS = 160, PILLARS = 20, DISCS = 12, BOLTS = 18, CRYSTALS = 60, ROCKS = 60, SHELLS = 16, HOLES = 6;
+const SKY = 46;              // tiles up that falling things start
+const GROW = 0.14;           // seconds for stone and ice to burst out of the ground
+const SINK = 0.5;            // seconds to go back down
 
 function softTexture() {
   const c = document.createElement('canvas');
@@ -55,17 +59,29 @@ export class PowerFx {
     this.pillars = pool(PILLARS, () => new THREE.Mesh(pillar, new THREE.MeshBasicMaterial({ ...add, side: THREE.DoubleSide })));
     const disc = new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2);
     this.discs = pool(DISCS, () => new THREE.Mesh(disc, new THREE.MeshBasicMaterial({ map, ...add, side: THREE.DoubleSide, depthTest: false })));
-    this.zaps = pool(ZAPS, () => {
-      const g = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(24), 3));
-      return new THREE.Line(g, new THREE.LineBasicMaterial({ ...add }));
-    });
+    this.bolts = pool(BOLTS, () => makeBolt(scene));
+    this.flames = new Flames(scene);
+    this.later = [];
+    this.falling = [];
     const crystal = new THREE.ConeGeometry(1.5, 8, 5).translate(0, 3.2, 0);
     this.crystals = pool(CRYSTALS, () => {
       const m = new THREE.Mesh(crystal, new THREE.MeshLambertMaterial({ color: '#bfeaff', emissive: '#2a7aa8', emissiveIntensity: 0.7, flatShading: true, transparent: true, opacity: 0.92 }));
       m.castShadow = true;
       return m;
     });
-    this.live = [this.glows, this.pillars, this.discs, this.zaps, this.crystals];
+    const stone = new THREE.MeshLambertMaterial({ color: '#6e6258', flatShading: true });
+    const spike = new THREE.ConeGeometry(1.6, 6.5, 6).translate(0, 2.6, 0);
+    this.rocks = pool(ROCKS, () => {
+      const m = new THREE.Mesh(spike, stone);
+      m.castShadow = true;
+      return m;
+    });
+    const lump = new THREE.DodecahedronGeometry(1, 0), shard = new THREE.ConeGeometry(0.34, 2.4, 5).rotateX(Math.PI / 2), ball = new THREE.SphereGeometry(1, 16, 12);
+    const ice = new THREE.MeshLambertMaterial({ color: '#d8f4ff', emissive: '#4ac0f0', emissiveIntensity: 0.9, flatShading: true });
+    const black = new THREE.MeshBasicMaterial({ color: '#000000', fog: false });
+    this.shells = { earth: pool(SHELLS, () => new THREE.Mesh(lump, stone)), ice: pool(SHELLS, () => new THREE.Mesh(shard, ice)), void: pool(SHELLS, () => new THREE.Mesh(ball, black)), fire: pool(SHELLS, () => new THREE.Mesh(lump, new THREE.MeshBasicMaterial({ color: '#ffb040', fog: false }))) };
+    this.holes = pool(HOLES, () => new THREE.Mesh(ball, black));
+    this.live = [this.glows, this.pillars, this.discs, this.bolts, this.crystals, this.rocks, this.holes];
   }
 
   take(list) {
@@ -102,29 +118,150 @@ export class PowerFx {
     return d;
   }
 
-  zap(a, b, color, life = 0.16) {
-    const z = this.take(this.zaps), p = z.o.geometry.attributes.position;
+  flame(x, y, z, size, life, kind) {
+    this.flames.add(x, y, z, size, life, kind);
+  }
+
+  lightning(a, b, color, width = 0.16, life = 0.18) {
+    const z = this.take(this.bolts);
     Object.assign(z, { age: 0, life });
-    for (let i = 0; i < 8; i++) {
-      const t = i / 7, wild = i && i < 7 ? 0.9 : 0;
-      p.setXYZ(i, a.x + (b.x - a.x) * t + (Math.random() - 0.5) * wild, a.y + (b.y - a.y) * t + (Math.random() - 0.5) * wild, a.z + (b.z - a.z) * t + (Math.random() - 0.5) * wild);
-    }
-    p.needsUpdate = true;
-    z.o.material.color.set(color);
+    shapeBolt(z.o, a, b, width);
+    z.o.material.color.set(color).multiplyScalar(3);
     z.o.visible = true;
   }
 
-  crystal(x, y, z, life) {
-    const c = this.take(this.crystals);
-    Object.assign(c, { age: 0, life });
-    c.o.position.set(x, y, z);
-    c.o.rotation.set((Math.random() - 0.5) * 0.3, Math.random() * 6, (Math.random() - 0.5) * 0.3);
-    c.o.material.opacity = 0.92;
+  zap(a, b, color) {
+    this.lightning(a, b, color, 0.12);
+  }
+
+  // Stone and ice punch up out of the ground and sink back at the end of their time.
+  spike(list, x, y, z, size, life) {
+    const c = this.take(list);
+    Object.assign(c, { age: 0, life, size });
+    c.o.position.set(x, y - 0.4, z);
+    c.o.rotation.set((Math.random() - 0.5) * 0.45, Math.random() * 6, (Math.random() - 0.5) * 0.45);
+    c.o.scale.set(size, 0.01, size);
     c.o.visible = true;
     return c;
   }
 
+  crystal(x, y, z, life, size = 1) {
+    const c = this.spike(this.crystals, x, y, z, size, life);
+    c.o.material.opacity = 0.92;
+    return c;
+  }
+
+  rock(x, y, z, size, life) {
+    return this.spike(this.rocks, x, y, z, size, life);
+  }
+
+  // A hole in the picture that swells and then collapses to nothing.
+  hole(x, y, z, size, life) {
+    const h = this.take(this.holes);
+    Object.assign(h, { age: 0, life, size });
+    h.o.position.set(x, y, z);
+    h.o.visible = true;
+    this.glow(x, y, z, size * 3.4, '#8a3aff', life, 1);
+    return h;
+  }
+
+  // A solid thing to throw: a stone, a shard, a ball of nothing, a core of fire.
+  shell(element, size) {
+    const list = this.shells[element];
+    if (!list) return null;
+    const s = list.find((x) => !x.o.visible);
+    if (!s) return null;
+    s.o.scale.setScalar(size);
+    s.o.visible = true;
+    return s;
+  }
+
+  // Something coming down out of the sky onto a spot, due in `secs`.
+  fall(element, x, y, z, secs, size) {
+    const s = this.shell(element, size);
+    if (s) this.falling.push({ s, element, x, y, z, secs, left: secs, size });
+  }
+
+  after(secs, fn) {
+    this.later.push({ left: secs, fn });
+  }
+
+  // The moment an element lands.
+  impact(element, x, y, z, r) {
+    const n = Math.min(12, 4 + Math.round(r));
+    const around = (fn) => {
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * 6.283 + Math.random(), d = r * (0.25 + Math.random() * 0.75);
+        fn(x + Math.cos(a) * d, z + Math.sin(a) * d, a);
+      }
+    };
+    if (element === 'fire') {
+      around((px, pz) => this.flame(px, y, pz, 3 + r * 0.5 + Math.random() * 3, 0.75, 0));
+      this.flame(x, y, z, 5 + r, 0.6, 0);
+      this.glow(x, y + 1.5, z, r * 1.5, '#ff7a2a', 0.4, 1.8);
+    } else if (element === 'ice') {
+      around((px, pz) => this.crystal(px, y, pz, 3 + Math.random() * 3, 0.45 + Math.random() * 0.6));
+      this.glow(x, y + 1, z, r * 1.2, '#bfeaff', 0.4, 1.6);
+    } else if (element === 'storm') {
+      const top = { x: x + (Math.random() - 0.5) * 6, y: y + SKY, z: z + (Math.random() - 0.5) * 6 }, foot = { x, y, z };
+      this.lightning(top, foot, '#fff6a8', 0.5, 0.24);
+      this.lightning(top, foot, '#a8c8ff', 0.22, 0.3);
+      around((px, pz) => this.lightning(foot, { x: px, y, z: pz }, '#fff48a', 0.12, 0.22));
+      this.glow(x, y + 2, z, r * 1.6, '#fff6c0', 0.3, 1.5);
+    } else if (element === 'void') {
+      this.hole(x, y + r * 0.2, z, Math.max(0.8, r * 0.4), 0.55);
+      around((px, pz) => this.lightning({ x, y: y + 1, z }, { x: px, y, z: pz }, '#9a3aff', 0.1, 0.3));
+      around((px, pz) => this.flame(px, y, pz, 2.4 + Math.random() * 2, 0.8, 1));
+    } else {
+      around((px, pz) => this.rock(px, y, pz, 0.6 + Math.random() * 0.9, 2.5 + Math.random() * 2));
+      this.glow(x, y + 0.6, z, r * 1.1, '#a89070', 0.45, 1.5);
+    }
+  }
+
+  // A ring of the element rolling outward.
+  wave(element, x, y, z, r) {
+    const rings = Math.max(2, Math.min(5, Math.round(r / 4)));
+    for (let k = 1; k <= rings; k++) {
+      const radius = (r * k) / rings, n = Math.min(14, 5 + Math.round(radius));
+      this.after(k * 0.07, () => {
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * 6.283, px = x + Math.cos(a) * radius, pz = z + Math.sin(a) * radius;
+          if (element === 'fire') this.flame(px, y, pz, 3.6, 0.55, 0);
+          else if (element === 'void') this.flame(px, y, pz, 3, 0.6, 1);
+          else if (element === 'ice') this.crystal(px, y, pz, 2.4 + Math.random() * 2, 0.34 + Math.random() * 0.3);
+          else if (element === 'earth') this.rock(px, y, pz, 0.45 + Math.random() * 0.4, 1.6);
+          else if (i % 2) this.lightning({ x: x + Math.cos(a) * (radius * 0.6), y: y + 1, z: z + Math.sin(a) * (radius * 0.6) }, { x: px, y, z: pz }, '#fff48a', 0.12, 0.16);
+        }
+      });
+    }
+  }
+
+  // A beat of a power worn around the body.
+  aura(element, x, y, z, r) {
+    const a = Math.random() * 6.283, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+    if (element === 'fire') this.flame(px, y, pz, 2.4, 0.55, 0);
+    else if (element === 'void') this.flame(px, y, pz, 2.2, 0.6, 1);
+    else if (element === 'storm') this.lightning({ x, y: y + 1.6, z }, { x: px, y: y + Math.random() * 2, z: pz }, '#fff48a', 0.08, 0.14);
+    else this.glow(px, y + 1 + Math.random() * 1.5, pz, 0.5, element === 'ice' ? '#bfeaff' : '#a89070', 0.5, 0.4);
+  }
+
   update(dt) {
+    this.flames.update(dt);
+    this.later = this.later.filter((l) => {
+      if ((l.left -= dt) > 0) return true;
+      l.fn();
+      return false;
+    });
+    this.falling = this.falling.filter((f) => {
+      f.left -= dt;
+      const k = Math.max(0, f.left / f.secs), y = f.y + k * SKY;
+      f.s.o.position.set(f.x + k * 14, y, f.z - k * 9);
+      f.s.o.rotation.x += dt * 5;
+      if (f.element === 'fire') this.flame(f.x + k * 14, y - f.size, f.z - k * 9, f.size * 3.2, 0.3, 0);
+      if (k > 0) return true;
+      f.s.o.visible = false;
+      return false;
+    });
     for (const list of this.live) for (const item of list) {
       if (!item.o.visible) continue;
       item.age += dt;
@@ -140,10 +277,14 @@ export class PowerFx {
         item.o.material.opacity = 1 - k;
       } else if (list === this.discs) {
         item.o.material.opacity = Math.min(0.75, (1 - k) * 2.5) * (0.8 + Math.sin(item.age * 7) * 0.2);
-      } else if (list === this.zaps) {
+      } else if (list === this.bolts) {
         item.o.material.opacity = 1 - k;
+      } else if (list === this.holes) {
+        item.o.scale.setScalar(item.size * Math.sin(Math.min(1, k * 1.05) * Math.PI) ** 0.6);
       } else {
-        item.o.material.opacity = Math.min(0.92, (1 - k) * 8);
+        // Up fast, and sinking back down at the end of its time.
+        const up = Math.min(1, item.age / GROW), down = Math.min(1, (item.life - item.age) / SINK);
+        item.o.scale.y = item.size * up * down;
       }
     }
   }
@@ -184,6 +325,15 @@ export default class PowerSet {
 
   get fx() {
     return this.player.world.fx;
+  }
+
+  get element() {
+    return this.def.element;
+  }
+
+  // Leaves the element on the land, to go on spreading by its own rules.
+  scar(job, x, z, reach, gen = 2 + job.rank) {
+    this.player.world.scars.mark(this.element, x, z, reach, this.player, gen, rankScale(job.rank) * 0.5);
   }
 
   // Permanent: nothing in the game calls this once a conqueror is set.
@@ -269,8 +419,10 @@ export default class PowerSet {
   bolt(job, aim) {
     const { def, rank, color } = job, { state } = this.player, n = (def.count ?? 1) + (def.count ? Math.floor(rank / 2) : 0), base = Math.atan2(aim.dx, aim.dz);
     for (let i = 0; i < n; i++) {
-      const a = base + (i - (n - 1) / 2) * (def.spread ?? 0), glow = this.fx.glow(state.x, 0, state.z, def.size ?? 0.8, color, 99, 1);
-      this.bolts.push({ ...job, x: state.x, z: state.z, dx: Math.sin(a), dz: Math.cos(a), left: def.range, hit: new Set(), glow, chain: (def.chain ?? 0) + (def.chain ? rank : 0) });
+      const a = base + (i - (n - 1) / 2) * (def.spread ?? 0), size = def.size ?? 0.8;
+      const shell = this.fx.shell(this.element, this.element === 'ice' ? size * 1.2 : this.element === 'fire' ? size * 0.5 : size * 0.7);
+      const glow = this.element === 'earth' || this.element === 'ice' ? null : this.fx.glow(state.x, 0, state.z, size * (this.element === 'void' ? 2.6 : 1.8), color, 99, 1);
+      this.bolts.push({ ...job, x: state.x, z: state.z, dx: Math.sin(a), dz: Math.cos(a), left: def.range, hit: new Set(), glow, shell, chain: (def.chain ?? 0) + (def.chain ? rank : 0) });
     }
   }
 
@@ -282,9 +434,11 @@ export default class PowerSet {
     else for (const e of list) this.harm(pid, e, force);
     for (const e of list) this.afflict(pid, e, def, rank);
     if (def.drain && list.length) this.heal(list.length * def.drain * rankScale(rank));
-    this.fx.glow(state.x, y + 1.5, state.z, reach * 0.7, color, 0.5, 2.6);
+    this.fx.wave(this.element, state.x, y, state.z, reach);
+    this.fx.impact(this.element, state.x, y, state.z, reach * 0.45);
     melee.ring(state.x, y, state.z, reach, color);
     this.player.world.work.burst(state.x, y + 0.5, state.z, STATUS_COLORS[def.status] ?? [color], 18, 7);
+    if (!def.pull) this.scar({ rank }, state.x, state.z, reach * 0.8);
     this.player.world.work.shake = Math.max(this.player.world.work.shake ?? 0, Math.min(0.5, reach * 0.02));
     this.player.world.work.shakeAt = this.player.state;
     if (list.length) this.player.skills.add(this.skillOf(pid), PRACTICE_HIT * Math.min(4, list.length));
@@ -294,7 +448,10 @@ export default class PowerSet {
     const { def, rank } = job, { melee, state } = this.player, wait = def.wait ?? STRIKE_WAIT;
     const place = (x, z, at) => {
       this.strikes.push({ ...job, x, z, at });
-      melee.ring(x, melee.height(x, z), z, def.reach, job.color);
+      const y = melee.height(x, z);
+      melee.ring(x, y, z, def.reach, job.color);
+      // Fire and ice come down from the sky; lightning needs no warning, stone comes from below.
+      if (at > 0.3 && (this.element === 'fire' || this.element === 'ice')) this.fx.fall(this.element, x, y, z, at, Math.min(5, def.reach * 0.3));
     };
     if (def.each) {
       for (const e of melee.monsters.within(state.x, state.z, def.each)) place(e.x, e.z, wait);
@@ -402,19 +559,33 @@ export default class PowerSet {
       melee.blast(x, z, force, def.blast * (1 + rank * 0.06), def.crater ?? 0, color);
       for (const e of melee.monsters.within(x, z, def.blast)) this.afflict(b.pid, e, def, rank);
     }
-    this.fx.glow(x, y, z, (def.blast ?? 2) * 1.2, color, 0.45, 2);
+    this.fx.impact(this.element, x, y - 1, z, def.blast ?? 2);
+    this.scar(b, x, z, Math.max(3, (def.blast ?? 2) * 0.8), 1 + rank);
+    if (!def.blast) this.fx.glow(x, y, z, 2.4, color, 0.3, 1.6);
   }
 
   updateBolts(dt) {
-    const { melee } = this.player, { fx } = this;
+    const { melee } = this.player, { fx } = this, el = this.element;
     this.bolts = this.bolts.filter((b) => {
       const move = b.speed ?? b.def.speed;
       b.x += b.dx * move * dt;
       b.z += b.dz * move * dt;
       b.left -= move * dt;
       const y = melee.height(b.x, b.z) + FLY_HEIGHT;
-      b.glow.o.position.set(b.x, y, b.z);
-      fx.glow(b.x, y, b.z, (b.def.size ?? 0.8) * 0.7, b.color, 0.22, 0.4);
+      const size = b.def.size ?? 0.8;
+      if (b.glow) b.glow.o.position.set(b.x, y, b.z);
+      if (b.shell) {
+        b.shell.o.position.set(b.x, y, b.z);
+        if (el === 'ice') b.shell.o.rotation.y = Math.atan2(b.dx, b.dz);
+        else b.shell.o.rotation.x += dt * 9;
+      }
+      if (el === 'fire') fx.flame(b.x, y - size * 1.4, b.z, 3 + size * 2.4, 0.3, 0);
+      else if (el === 'void') fx.flame(b.x, y - size, b.z, 2 + size * 1.6, 0.3, 1);
+      else if (el === 'ice') fx.glow(b.x, y, b.z, 0.7, '#bfeaff', 0.25, 0.3);
+      else if (el === 'earth') fx.glow(b.x, y - 0.4, b.z, size, '#a89070', 0.3, 1.2);
+      else {
+        fx.lightning({ x: b.x, y, z: b.z }, { x: b.x - b.dx * 11, y: y + (Math.random() - 0.5), z: b.z - b.dz * 11 }, b.color, 0.16, 0.1);
+      }
       let done = b.left <= 0;
       for (const e of melee.monsters.within(b.x, b.z, 1.2)) {
         if (b.hit.has(e)) continue;
@@ -426,8 +597,11 @@ export default class PowerSet {
       }
       if (!done) return true;
       this.explode(b, b.x, b.z);
-      b.glow.age = b.glow.life;
-      b.glow.o.visible = false;
+      if (b.glow) {
+        b.glow.age = b.glow.life;
+        b.glow.o.visible = false;
+      }
+      if (b.shell) b.shell.o.visible = false;
       return false;
     });
   }
@@ -454,8 +628,8 @@ export default class PowerSet {
       const y = melee.height(s.x, s.z), reach = s.def.reach * (1 + s.rank * 0.06);
       melee.blast(s.x, s.z, s.force, reach, s.def.crater ?? 0, s.color);
       for (const e of melee.monsters.within(s.x, s.z, reach)) this.afflict(s.pid, e, s.def, s.rank);
-      this.fx.pillar(s.x, y, s.z, Math.max(1.2, reach * 0.3), s.color);
-      this.fx.glow(s.x, y + 1, s.z, reach * 1.1, s.color, 0.4, 2);
+      this.fx.impact(this.element, s.x, y, s.z, reach);
+      this.scar(s, s.x, s.z, reach * 0.8);
       this.player.world.work.burst(s.x, y + 0.5, s.z, STATUS_COLORS[s.def.status] ?? [s.color, '#a89a8c'], 8, 6);
       this.player.skills.add(this.skillOf(s.pid), PRACTICE_HIT * 0.5);
       return false;
@@ -471,7 +645,11 @@ export default class PowerSet {
     d.left -= dt;
     this.casting = CAST_TIME;
     const y = melee.height(state.x, state.z) + 1.4;
-    this.fx.glow(state.x, y, state.z, 2.2, d.color, 0.35, 0.5);
+    if (this.element === 'fire') this.fx.flame(state.x, y - 1.2, state.z, 4, 0.5, 0);
+    else if (this.element === 'void') this.fx.flame(state.x, y - 1.2, state.z, 3.4, 0.5, 1);
+    else if (this.element === 'storm') this.fx.lightning({ x: state.x, y, z: state.z }, { x: state.x - d.dx * 5, y, z: state.z - d.dz * 5 }, d.color, 0.2, 0.16);
+    else if (this.element === 'earth') this.fx.rock(state.x - d.dx * 2, y - 1.4, state.z - d.dz * 2, 0.7, 2);
+    else this.fx.crystal(state.x - d.dx * 2, y - 1.4, state.z - d.dz * 2, 2, 0.5);
     if (d.def.power) {
       for (const e of melee.monsters.within(state.x, state.z, d.def.reach)) {
         if (d.hit.has(e)) continue;
@@ -479,7 +657,10 @@ export default class PowerSet {
         this.harm(d.pid, e, d.force);
       }
     }
-    if (d.left <= 0) this.dashing = null;
+    if (d.left <= 0) {
+      this.dashing = null;
+      if (d.def.power) this.scar(d, state.x, state.z, 4, 1);
+    }
   }
 
   updateLasting(dt) {
@@ -490,7 +671,9 @@ export default class PowerSet {
     this.buffs = this.buffs.filter((b) => {
       b.left -= dt;
       if (beat) {
-        world.work.burst(state.x, melee.height(state.x, state.z) + 1, state.z, [b.color], 2, 2);
+        const ground = melee.height(state.x, state.z);
+        for (let i = 0; i < 3; i++) this.fx.aura(this.element, state.x, ground, state.z, b.def.aura ? b.def.aura * 0.6 : 1.4);
+        if (b.def.aura) this.scar(b, state.x, state.z, b.def.aura * 0.6, 0);
         if (b.def.aura) for (const e of melee.monsters.within(state.x, state.z, b.def.aura)) {
           this.sting(e, melee.force * b.def.dps * rankScale(b.rank) * TICK);
           this.afflict(b.pid, e, b.def, b.rank);
@@ -499,7 +682,7 @@ export default class PowerSet {
       if (b.def.trail && Math.hypot(state.x - (this.trailX ?? 1e9), state.z - (this.trailZ ?? 1e9)) > TRAIL_EVERY) {
         this.trailX = state.x;
         this.trailZ = state.z;
-        this.addZone({ ...b, def: { ...b.def, status: 'burn' } }, state.x, state.z, 2.4, 3);
+        this.scar(b, state.x, state.z, 2.6, 1);
       }
       return b.left > 0;
     });
@@ -509,6 +692,12 @@ export default class PowerSet {
         z.x = state.x;
         z.z = state.z;
         z.disc.o.position.set(z.x, melee.height(z.x, z.z) + 0.5, z.z);
+      }
+      if (beat) {
+        this.scar(z, z.x, z.z, z.reach * 0.75, 1);
+        const a = Math.random() * 6.283, d = Math.random() * z.reach, px = z.x + Math.cos(a) * d, pz = z.z + Math.sin(a) * d, ground = melee.height(px, pz);
+        if (this.element === 'storm') this.fx.impact('storm', px, ground, pz, 3);
+        else if (this.element === 'void') this.fx.hole(z.x, melee.height(z.x, z.z) + 2, z.z, z.reach * 0.22, TICK * 1.6);
       }
       if (beat) for (const e of melee.monsters.within(z.x, z.z, z.reach)) {
         if (z.def.pull && !e.boss) e.vel.set(z.x - e.x, z.z - e.z).multiplyScalar(1.4);
@@ -523,6 +712,7 @@ export default class PowerSet {
       s.next -= dt;
       const r = 3 * this.player.body.heroScale, x = state.x + Math.cos(s.turn) * r, z = state.z + Math.sin(s.turn) * r, y = melee.height(state.x, state.z) + 2 + Math.sin(s.turn * 2) * 0.4;
       s.glow.o.position.set(x, y, z);
+      this.fx.flame(x, y - 1.3, z, 2.2, 0.28, 1);
       if (s.next <= 0) {
         const e = melee.monsters.within(x, z, SHADE_REACH)[0];
         if (e) {
@@ -558,7 +748,7 @@ export default class PowerSet {
     if ((this.mote = (this.mote ?? 0) - dt) <= 0) {
       this.mote = MOTE_EVERY;
       const { state } = this.player, a = Math.random() * 6.28, d = 0.6 + Math.random() * 1.2;
-      this.fx.glow(state.x + Math.cos(a) * d, Math.max(state.y, 0) + state.air + Math.random() * 2.4, state.z + Math.sin(a) * d, 0.34, this.def.color, 0.8, 0.15);
+      this.fx.glow(state.x + Math.cos(a) * d, Math.max(state.y, 0) + state.air + Math.random() * 2.4, state.z + Math.sin(a) * d, 0.2, this.def.color, 0.8, 0.15);
     }
     this.updateDash(dt);
     this.updateBolts(dt);

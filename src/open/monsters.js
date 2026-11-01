@@ -366,8 +366,15 @@ export default class Monsters {
       if (e.evolving !== undefined && !e.dying) updateEvolving(e, dt, this.time, (m, tier) => this.evolved(m, tier));
       this.pushing = e;
       // One broken monster is taken out of the world; it must never stop the game.
+      const wasX = e.group.position.x, wasZ = e.group.position.z;
       try {
         e.update(dt);
+        // Ice underfoot steals most of every step.
+        const drag = this.world.scars.drag(wasX, wasZ);
+        if (drag < 1) {
+          e.group.position.x = wasX + (e.group.position.x - wasX) * drag;
+          e.group.position.z = wasZ + (e.group.position.z - wasZ) * drag;
+        }
       } catch (error) {
         console.error(`${e.def.name} failed and was removed:`, error);
         this.removeEnemy(e);

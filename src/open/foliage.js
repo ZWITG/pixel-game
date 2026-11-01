@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { addWind } from '../render/wind.js';
+import { shared, SCAR_GLSL } from './materials.js';
 
 // Trees and ground cover made of crossed cards. A card is two triangles, so a crown of soft
 // leaves costs less than a few boxes. Far trees swap to a single picture of the near one.
@@ -39,6 +40,33 @@ function parting(material, near, far) {
   };
   const key = material.customProgramCacheKey?.() ?? '';
   material.customProgramCacheKey = () => `${key}-part-${near}-${far}`;
+  return material;
+}
+
+// Plants take the marks of the land they stand on: burnt away, frosted white, or rotted black.
+// `burn`: how far a burnt plant shrinks toward its own center.
+function scarred(material, shrink) {
+  const inner = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    inner?.(shader, renderer);
+    shader.uniforms.uScars = shared.uScars;
+    shader.uniforms.uScarAt = shared.uScarAt;
+    shader.vertexShader = `${SCAR_GLSL}\nvarying vec4 vScar;\n${shader.vertexShader}`.replace(
+      '#include <project_vertex>',
+      `vScar = scarAt(instanceMatrix[3].xz);
+      ${shrink}
+      #include <project_vertex>`,
+    );
+    shader.fragmentShader = `varying vec4 vScar;\n${shader.fragmentShader}`.replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.03), smoothstep(.1, .45, vScar.r));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.86, .94, 1.), smoothstep(.08, .4, vScar.g) * .9);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.08, .03, .13), smoothstep(.1, .45, vScar.b) * .9);`,
+    );
+  };
+  const key = material.customProgramCacheKey?.() ?? '';
+  material.customProgramCacheKey = () => `${key}-scar-${shrink.length}`;
   return material;
 }
 
@@ -261,7 +289,7 @@ export function makeTreeMeshes(scene, renderer, max, farMax) {
     scene.add(stump);
     const map = leafTexture(LEAVES[kind]);
     const leaf = new THREE.MeshLambertMaterial({ map, alphaTest: 0.4, alphaToCoverage: true, side: THREE.DoubleSide, vertexColors: true });
-    const mat = parting(cardLight(addWind(leaf, { from: 5, amount: 0.014 })), 3, 8);
+    const mat = parting(scarred(cardLight(addWind(leaf, { from: 5, amount: 0.014 })), 'transformed = mix(transformed, aCard, smoothstep(.35, .8, vScar.r));'), 3, 8);
     const geo = crown(kind), bark = trunkMaterial(kind), trunkGeo = trunkGeometry();
     const crownMesh = new THREE.InstancedMesh(geo, mat, max);
     crownMesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.4, side: THREE.DoubleSide });
@@ -276,7 +304,7 @@ export function makeTreeMeshes(scene, renderer, max, farMax) {
     }
     crownMesh.setColorAt(0, new THREE.Color());
     const pic = bakeImpostor(renderer, kind, geo, leaf, trunkGeo, bark);
-    const far = new THREE.InstancedMesh(impostorGeometry(), crisp(new THREE.MeshLambertMaterial({ map: pic, alphaTest: 0.45, alphaToCoverage: true, side: THREE.DoubleSide })), farMax);
+    const far = new THREE.InstancedMesh(impostorGeometry(), scarred(crisp(new THREE.MeshLambertMaterial({ map: pic, alphaTest: 0.45, alphaToCoverage: true, side: THREE.DoubleSide })), ''), farMax);
     far.frustumCulled = false;
     far.count = 0;
     far.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -365,7 +393,7 @@ export function makeGrass(scene, max) {
       #include <project_vertex>`,
     );
   };
-  const mesh = new THREE.InstancedMesh(g, parting(cardLight(material), 1.6, 4), max);
+  const mesh = new THREE.InstancedMesh(g, parting(scarred(cardLight(material), 'transformed.y *= 1.0 - smoothstep(.15, .5, vScar.r) * .94;'), 1.6, 4), max);
   mesh.frustumCulled = false;
   mesh.receiveShadow = true;
   mesh.count = 0;

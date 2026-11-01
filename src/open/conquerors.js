@@ -2,6 +2,7 @@
 // of its own: trained by using them, four worn at a time on the D-pad, swapped in the menu.
 // Add a power by adding a line to `powers`; `kind` picks what it does (see powers.js).
 //   power: blows as a share of the hero's force. reach, range, dist: tiles. secs, cool: seconds.
+//   element: what the Conqueror's powers look like and do to the land (scars.js, elementFx.js).
 //   status: 'burn' | 'freeze' | 'shock'. mastery: total ranks needed before it can be worn.
 const RANKS = [10, 30, 70, 150, 320];
 export const MAX_RANK = RANKS.length;
@@ -11,6 +12,7 @@ const P = (name, kind, mastery, cool, text, more) => ({ name, kind, mastery, coo
 export const CONQUERORS = {
   titan: {
     name: 'Titan',
+    element: 'earth',
     tag: 'The mountain that walks. Nations break beneath its fists.',
     color: '#e8964a',
     emblem: 'titan',
@@ -32,6 +34,7 @@ export const CONQUERORS = {
   },
   storm: {
     name: 'Stormcaller',
+    element: 'storm',
     tag: 'The sky, turned against the living. It strikes, and the world goes white.',
     color: '#ffe25a',
     emblem: 'storm',
@@ -53,6 +56,7 @@ export const CONQUERORS = {
   },
   void: {
     name: 'Voidwalker',
+    element: 'void',
     tag: 'What remained when the light died. It is always hungry.',
     color: '#b06aff',
     emblem: 'void',
@@ -74,6 +78,7 @@ export const CONQUERORS = {
   },
   ember: {
     name: 'Emberlord',
+    element: 'fire',
     tag: 'The end of every city. Where it walks, only ash remains.',
     color: '#ff5a2a',
     emblem: 'ember',
@@ -95,6 +100,7 @@ export const CONQUERORS = {
   },
   frost: {
     name: 'Frostwarden',
+    element: 'ice',
     tag: 'The last winter, given a body. All things stop before it.',
     color: '#8fe0ff',
     emblem: 'frost',

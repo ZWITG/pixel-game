@@ -321,8 +321,9 @@ export default class Player {
         }
       }
       const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
-      const rise = rooms.house ? 0 : height(nx, nz) - height(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
-      const wet = !rooms.house && height(nx, nz) < DEEP;
+      const footing = (x, z) => world.scars.floor(x, z, height(x, z)); // frozen water holds the hero up
+      const rise = rooms.house ? 0 : footing(nx, nz) - footing(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
+      const wet = !rooms.house && footing(nx, nz) < DEEP;
       state.onWater = !!state.super && state.pace > WATER_PACE && skills.level('superspeed') >= WATER_RUN && (wet || state.y < DEEP);
       const steep = rise / Math.max(dist, 1e-3);
       // Slopes only matter on foot: a swimmer can make for any bank, however steep the bed.
@@ -354,7 +355,7 @@ export default class Player {
     }
     if (rooms.house) rooms.collide(state);
     else if (FEATURES.worldWork) world.work.collide(state);
-    const y = rooms.house ? rooms.floor : height(state.x, state.z);
+    const y = rooms.house ? rooms.floor : world.scars.floor(state.x, state.z, height(state.x, state.z));
     if (!world.paused) this.jump(dt, y);
     if (FEATURES.swimming && !world.paused && !rooms.house) {
       swim.update(dt, state.air > 0 || (state.super && state.onWater) ? 0 : y, state.moving, state.sprinting); // the air over a lake isn't the lake

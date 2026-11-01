@@ -23,6 +23,7 @@ import ConquerorPick from './conquerorPick.js';
 import { PowerFx } from './powers.js';
 import { CONQUERORS } from './conquerors.js';
 import Nations from './nations.js';
+import Scars from './scars.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -123,6 +124,7 @@ const shared2 = { yaw: 0, pitch: 0.2, recenter: null }; // the camera both heroe
 const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'morning', clock: 0.3, clockHold: 0, setTime, travel, splash };
 
 world.fx = new PowerFx(scene);
+world.scars = new Scars(world);
 world.pick = new ConquerorPick();
 world.sites = new Sites(scene, monsters, work, players);
 world.people = new People(scene, world);
@@ -575,6 +577,7 @@ function renderView(v, p, dir) {
   sun.position.copy(sun.target.position).addScaledVector(dir, 180);
   sun.shadow.needsUpdate = split.amount > 0 || (stopWatch.frame = (stopWatch.frame ?? 0) + 1) % 2 === 0;
   sky.position.copy(v.camera.position);
+  shared.uScarAt.value.set(p.state.x, p.state.z);
   water.position.x = v.camera.position.x;
   water.position.z = v.camera.position.z;
   v.post.indoors = !!p.rooms.house;
@@ -613,6 +616,8 @@ function step(dt) {
     if (FEATURES.monsters) monsters.update(dt);
     if (FEATURES.sites) world.sites.update(dt);
     world.nations.update(dt);
+    world.scars.update(dt);
+    world.fx.update(dt);
     world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);
     work.update(dt);

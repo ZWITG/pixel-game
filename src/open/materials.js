@@ -21,7 +21,20 @@ function noiseTexture() {
   return t;
 }
 
+// The land's scars (see scars.js): a window of the world that wraps, so it never has to scroll.
+export const SCAR_CELLS = 128, SCAR_SIZE = 384;
+function scarTexture() {
+  const t = new THREE.DataTexture(new Uint8Array(SCAR_CELLS * SCAR_CELLS * 4), SCAR_CELLS, SCAR_CELLS, THREE.RGBAFormat, THREE.UnsignedByteType);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = t.minFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+}
+export const SCAR_GLSL = `uniform sampler2D uScars; uniform vec2 uScarAt;
+  vec4 scarAt(vec2 p){ return texture2D(uScars,p/${SCAR_SIZE.toFixed(1)})*(1.-smoothstep(150.,180.,distance(p,uScarAt))); }`;
+
 export const shared = {
+  uScars: { value: scarTexture() }, uScarAt: { value: new THREE.Vector2() },
   uTime: { value: 0 }, uNoise: { value: noiseTexture() }, uHole: { value: new THREE.Vector3(0, 0, 0) }, uHole2: { value: new THREE.Vector3(0, 0, 0) },
   uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color() }, uSkyTop: { value: new THREE.Color() }, uSkyLow: { value: new THREE.Color() }, uNight: { value: 0 },
 };
@@ -57,6 +70,8 @@ export function terrainMaterial({ far = false } = {}) {
     s.uniforms.uHole2 = shared.uHole2;
     s.uniforms.uTime = shared.uTime;
     s.uniforms.uNoise = shared.uNoise;
+    s.uniforms.uScars = shared.uScars;
+    s.uniforms.uScarAt = shared.uScarAt;
     s.vertexShader = `attribute vec3 aBiome; attribute float aRoad; attribute vec2 aLand;
       varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL;\n${s.vertexShader}`.replace(
       '#include <begin_vertex>',
@@ -66,6 +81,7 @@ export function terrainMaterial({ far = false } = {}) {
     );
     s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL; uniform vec3 uHole,uHole2; uniform float uTime;
       ${HASH}
+      ${SCAR_GLSL}
       float groundBump(vec2 p){ return vn(p*.9)*.5+vn(p*3.1)*.25; }
       \n${s.fragmentShader}`.replace(
       '#include <color_fragment>',
@@ -114,6 +130,18 @@ export function terrainMaterial({ far = false } = {}) {
           way=mix(way,mix(vec3(.46,.42,.37),vec3(.68,.62,.52),id),stone*smoothstep(3.6,2.2,vR)*detail);
         }
         col=mix(col,way,road);
+      }
+      // what powers have done to the ground: char, frost, rot, and embers still glowing
+      {
+        vec4 sc=scarAt(vP.xz); float rough=(fine-.5)*.5+(speck-.5)*.5+(mid-.5)*.4;
+        col=mix(col,vec3(.05,.042,.04)*(.7+fine*.7),smoothstep(.1,.45,sc.r+rough*.25));
+        float ice=smoothstep(.12,.42,sc.g+rough*.3);
+        col=mix(col,mix(vec3(.62,.8,.92),vec3(.93,.97,1.),speck),ice);
+        float rot=smoothstep(.12,.5,sc.b+rough*.35);
+        col=mix(col,vec3(.05,.02,.09),rot);
+        totalEmissiveRadiance+=vec3(.42,.08,.8)*rot*smoothstep(.022,.004,abs(vn(vP.xz*.21+uTime*.012)-.5))*detail;
+        totalEmissiveRadiance+=vec3(1.8,.5,.08)*smoothstep(.1,.7,sc.a)*(.35+speck*1.2);
+        totalEmissiveRadiance+=vec3(1.1,.26,.04)*smoothstep(.45,.8,sc.r)*smoothstep(.72,.8,vn(vP.xz*.9))*.5;
       }
       // cloud shade drifting over the land
       float shade=smoothstep(.42,.68,fb(vP.xz*.0016+vec2(uTime*.006,uTime*.003)));
@@ -186,6 +214,7 @@ ${THREE.ShaderChunk.fog_vertex}
       }`,
     fragmentShader: /* glsl */`varying vec3 vP; varying float vD; uniform float uTime; uniform vec3 uHole,uHole2,uSunDir,uSunCol,uSkyTop,uSkyLow; uniform float uNight;
       ${HASH}
+      ${SCAR_GLSL}
       ${THREE.ShaderChunk.fog_pars_fragment}
       float wave(vec2 p){ return vn(p*.21+vec2(uTime*.16,uTime*.05))*.6+vn(p*.53-vec2(uTime*.13,-uTime*.2))*.3+vn(p*1.3+vec2(uTime*.3,0.))*.1; }
       void main(){
@@ -205,7 +234,12 @@ ${THREE.ShaderChunk.fog_vertex}
         float lap=vD-(.25+.2*sin(uTime*.9+vn(p*.2)*9.));
         float foam=smoothstep(.2,0.,abs(lap))*smoothstep(.3,.6,vn(p*1.7+uTime*.1));
         col=mix(col,vec3(.9,.95,.95)*(.4+.6*max(uSunDir.y+.2,.2))*(1.-uNight*.7),foam*.75);
-        gl_FragColor=vec4(col,clamp(max(smoothstep(0.,2.6,vD)*.58+.36*deep+glint,foam),0.,1.)*smoothstep(0.,.14,vD));
+        // frost closes over the water in plates, cracked between them
+        float ice=smoothstep(.16,.36,scarAt(vP.xz).g+(vn(p*.5)-.5)*.2);
+        float crack=smoothstep(.02,.0,abs(vn(p*.42)-.5))*.5+smoothstep(.015,.0,abs(vn(p*1.1+9.)-.5))*.3;
+        col=mix(col,mix(vec3(.5,.74,.88),vec3(.86,.95,1.),vn(p*.16))*(1.-crack)*(.5+.6*max(uSunDir.y+.2,.2)),ice);
+        float water=clamp(max(smoothstep(0.,2.6,vD)*.58+.36*deep+glint,foam),0.,1.)*smoothstep(0.,.14,vD);
+        gl_FragColor=vec4(col,max(water,ice*.97));
 ${THREE.ShaderChunk.fog_fragment}
 
       }`,
