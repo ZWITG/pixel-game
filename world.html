@@ -86,6 +86,12 @@
   </head>
   <body>
     <div id="game"></div>
+    <script>
+      // Opened straight from the file, the game's code can't load: say what to do instead.
+      if (!location.protocol.startsWith('http')) {
+        document.getElementById('game').innerHTML = '<p style="color:#f3ead8;font:700 20px sans-serif;text-align:center;padding:30vh 24px 0">This page does not run on its own.<br>Double-click <b>Play Pixel RPG</b> on your Desktop to start the game.</p>';
+      }
+    </script>
     <div id="where"></div>
     <div id="foe" hidden><div id="foe-name"></div><div id="foe-bar"><div id="foe-fill"></div></div></div>
     <div id="p2-foe" hidden><div id="p2-foe-name"></div><div id="p2-foe-bar"><div id="p2-foe-fill"></div></div></div>
