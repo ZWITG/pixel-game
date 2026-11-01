@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lumen</title>
+    <title>Eradication</title>
     <script>
       // A browser with no save takes the one the offline launcher keeps, if there is one.
       try {
@@ -94,11 +94,72 @@
       #toast, #p2-toast, #gains, #p2-gains { z-index: 5; }
       #skill-map { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
       #skill-tag { position: fixed; left: 0; right: 0; bottom: 11%; text-align: center; font: 700 26px 'Zen Maru Gothic', sans-serif; text-shadow: 0 2px 0 #0a0f22; }
+      #blink.fading { opacity: 1; transition: opacity 0.4s; }
+      body.title #hp, body.title #lv, body.title #goal, body.title .compass, body.title #help, body.title #pad-status, body.title #act, body.title #toast, body.title #gains, body.title .place, body.title #foe, body.title #breath { display: none; }
+      #start { position: fixed; inset: 0; z-index: 3; color: #f7efdf; font-family: 'Zen Maru Gothic', sans-serif; background: linear-gradient(90deg, #090c1ee0 0%, #090c1eb0 26%, #090c1e00 52%), linear-gradient(0deg, #090c1e70, #090c1e00 22%); }
+      .start-side { position: absolute; left: clamp(28px, 7vw, 110px); top: 0; bottom: 0; width: min(600px, calc(100% - 56px)); display: flex; flex-direction: column; justify-content: center; }
+      .start-logo { font-weight: 700; font-size: clamp(34px, 5.6vw, 76px); line-height: 1; letter-spacing: 0.1em; color: #ffe2cf; text-shadow: 0 0 30px #ff4a2a99, 0 3px 0 #6a1a14, 0 6px 22px #090c1e; animation: logo 6s ease-in-out infinite; }
+      @keyframes logo { 50% { text-shadow: 0 0 50px #ff5a30cc, 0 3px 0 #6a1a14, 0 6px 22px #090c1e; } }
+      .start-tag { margin: 8px 0 34px 4px; font-size: 16px; font-weight: 500; letter-spacing: 0.08em; color: #d9d1c4; }
+      #start-list { min-height: 250px; }
+      #start-list h2 { margin: 0 0 12px; font-size: 24px; color: #ffe7b0; }
+      .start-note { margin: 0 0 14px; font-size: 15px; line-height: 1.5; color: #d9d1c4; }
+      #start-list button { display: block; position: relative; width: 100%; max-width: 420px; padding: 9px 12px 9px 30px; border: 0; border-radius: 6px; background: none; color: #d9d1c4; font: 500 21px 'Zen Maru Gothic', sans-serif; text-align: left; cursor: pointer; transition: background 0.12s, color 0.12s, padding 0.12s; }
+      #start-list button b { font-weight: 500; }
+      #start-list button small { display: block; margin-top: 1px; font-size: 13px; color: #b5ad9f; }
+      #start-list button.at { padding-left: 38px; color: #fff6e0; background: linear-gradient(90deg, #ffb54733, #ffb54700); }
+      #start-list button.at b { font-weight: 700; }
+      #start-list button.at::before { content: ''; position: absolute; left: 14px; top: 50%; width: 10px; height: 10px; margin-top: -5px; transform: rotate(45deg); background: #ffc86f; box-shadow: 0 0 12px #ffb547; }
+      #start-list button.on b::after { content: ' ✓'; color: #ffc86f; }
+      #start-list button.danger.at { color: #ffd2c8; background: linear-gradient(90deg, #e8505a44, #e8505a00); }
+      #start-list button.danger.at::before { background: #ff8f7f; box-shadow: 0 0 12px #e8505a; }
+      .start-rows { max-width: 440px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; font-size: 15px; }
+      .start-rows div { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+      #start-hints { position: absolute; left: clamp(28px, 7vw, 110px); bottom: 26px; font-size: 15px; font-weight: 500; }
+      #start-version { position: absolute; right: 18px; bottom: 16px; font-size: 13px; color: #d9d1c4; opacity: 0.75; }
+      @media (max-height: 560px) { .start-tag { margin-bottom: 14px; } #start-list { min-height: 0; } #start-list button { padding-top: 5px; padding-bottom: 5px; font-size: 18px; } }
+      #splash { position: fixed; inset: 0; z-index: 9; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0d0d0e, #050506 50%, #0c0c0d); transition: opacity 0.7s; }
+      #splash.out { opacity: 0; }
+      #splash svg { width: min(78vw, 980px); overflow: visible; }
+      #splash .edge, #splash .bar, #splash .mark { will-change: transform, opacity; }
+      #splash .edge { transform-box: fill-box; transform-origin: center; animation: edge 0.6s 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      #splash .bar { transform-box: fill-box; transform-origin: left; animation: bar 0.75s 1.05s cubic-bezier(0.7, 0, 0.15, 1) both; }
+      #splash .mark { animation: mark 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+      #splash .mark:nth-of-type(1) { animation-delay: 0.45s; }
+      #splash .mark:nth-of-type(2) { animation-delay: 0.53s; }
+      #splash .mark:nth-of-type(3) { animation-delay: 0.61s; }
+      #splash .mark:nth-of-type(4) { animation-delay: 0.69s; }
+      #splash .mark:nth-of-type(5) { animation-delay: 0.77s; }
+      @keyframes edge { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: none; } }
+      @keyframes bar { from { transform: scaleX(0); } to { transform: none; } }
+      @keyframes mark { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
       [hidden] { display: none !important; }
     </style>
   </head>
   <body>
+    <div id="splash">
+      <svg viewBox="90 560 1290 320" role="img" aria-label="ZWITG">
+        <rect class="edge" x="104" y="570" width="4" height="300" fill="#58585a" />
+        <g fill="#ece7e0">
+          <path class="mark" d="M237 602H392V632L288 722H394V753H235V724L338 634H237Z" />
+          <path class="mark" d="M445 602H489L531 708L570 602H612L652 708L690 602H735L677 753H632L591 655L552 753H507Z" />
+          <path class="mark" d="M796 602H838V753H796Z" />
+          <path class="mark" d="M899 602H1068V635H1004V753H963V635H899Z" />
+          <path class="mark" d="M1305 610C1270 600 1250 598 1225 598C1155 598 1118 632 1118 678C1118 726 1155 758 1227 758C1262 758 1290 752 1307 745V671H1219V701H1266V722C1255 725 1240 727 1227 727C1185 727 1160 708 1160 678C1160 648 1185 630 1225 630C1255 630 1285 636 1305 645Z" />
+        </g>
+        <rect class="bar" x="220" y="848" width="1141" height="12" fill="#c8292f" />
+      </svg>
+    </div>
     <div id="game"></div>
+    <div id="start" hidden>
+      <div class="start-side">
+        <div class="start-logo">ERADICATION</div>
+        <div class="start-tag">Nothing stays standing</div>
+        <div id="start-list"></div>
+      </div>
+      <div id="start-hints"></div>
+      <div id="start-version"></div>
+    </div>
     <script>
       // Opened straight from the file, the game's code can't load: say what to do instead.
       if (!location.protocol.startsWith('http')) {

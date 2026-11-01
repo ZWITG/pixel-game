@@ -17,6 +17,7 @@ import Player from './player.js';
 import SplitView from './splitView.js';
 import Sites from './sites.js';
 import Quake from './quake.js';
+import StartMenu, { loadSettings } from './startMenu.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -49,6 +50,9 @@ const SHAKE_REACH = 70;
 const MAX_HILL_LIFT = 9;   // tiles the camera may climb to see over ground behind the hero
 const CAVE_LIGHT = 0.12;   // how much daylight reaches a cave
 const ROOM_CAMERA = 5.5;   // camera distance indoors
+const SPOT_KEY = 'lumen.spot', SPOT_EVERY = 10; // where the hero stands, and seconds between saves
+const QUALITY_LEVEL = { high: 0, balanced: 2, fast: 4 };
+const TITLE_BACK = 6.5, TITLE_SIDE = 3; // tiles behind and to the side of the hero in the title shot
 const SPLIT_AT = 30, MERGE_AT = 20; // tiles apart; the gap keeps it from flickering at the edge
 const SPLIT_HEIGHT = 7;   // a big difference in height splits too
 const SPLIT_TIME = 0.6;   // seconds to slide between one view and two
@@ -120,7 +124,7 @@ monsters.quake = world.quake;
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
 // fills its owner's half: the other hero plays on, and both can have theirs open.
 world.checkPause = () => {
-  world.paused = players.some((p) => p.hud.mapOpen) || (players.length === 1 && p1.hud.packOpen);
+  world.paused = world.menu || players.some((p) => p.hud.mapOpen) || (players.length === 1 && p1.hud.packOpen);
 };
 world.viewYaw = (p) => (world.together ? shared2.yaw : p.state.yaw);
 
@@ -198,9 +202,10 @@ function applySky(t) {
 }
 
 // Holds the frame rate on any machine by trading resolution for speed, never the other way.
-const pace = { level: Number(QUERY.get('level') ?? 0), avg: FAST, wait: SCALE_WAIT, held: 0 };
+const settings = loadSettings();
+const pace = { level: Number(QUERY.get('level') ?? QUALITY_LEVEL[settings.quality] ?? 0), avg: FAST, wait: SCALE_WAIT, held: 0 };
 function holdPace(dt) {
-  if (QUERY.has('level') || dt > PAUSED_FRAME) return;
+  if (QUERY.has('level') || settings.quality !== 'auto' || dt > PAUSED_FRAME) return;
   pace.avg += (dt - pace.avg) * 0.05;
   pace.wait -= dt;
   if (pace.wait > 0) return;
@@ -211,6 +216,12 @@ function holdPace(dt) {
   pace.level += down ? 1 : -1;
   pace.wait = down ? SCALE_WAIT : SCALE_WAIT * 8;
   if (down) setTimeout(() => { pace.held = 0; }, 60000);
+  resize();
+}
+
+function setQuality(id) {
+  pace.level = QUALITY_LEVEL[id] ?? 0;
+  pace.held = 0;
   resize();
 }
 
@@ -252,6 +263,24 @@ function splash(p, dt) {
   r.ring.position.z = p.state.z;
 }
 
+// Every button in play, for the bar along the bottom and the Controls page.
+function buttonRows(usePad) {
+  const btn = buttonHtml, key = keyHtml, p = (action) => prompt(action, usePad ? 'pad' : 'keyboard');
+  return [
+    [usePad ? btn('L-stick') : `${key('KeyW')}${key('KeyA')}${key('KeyS')}${key('KeyD')}`, 'Move'],
+    [usePad ? btn('R-stick') : key('Drag'), 'Look'],
+    [usePad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
+    [p('jump'), 'Jump'],
+    [p('punch'), PUNCHES[p1.melee.stage].name],
+    [p('grab'), 'Grab'],
+    [p('guard'), 'Guard'],
+    [p('roll'), 'Roll'],
+    [p('target'), 'Lock on'],
+    [p('pack'), 'Satchel'],
+    [p('pause'), 'Spirit Tree'],
+  ];
+}
+
 // Button prompts follow the device used last.
 function renderPrompts() {
   const { controls, melee } = p1, pad = controls.pad, two = players.length > 1;
@@ -270,19 +299,7 @@ function renderPrompts() {
   stopWatch.quietAt = performance.now() + QUIET_AFTER;
   const usePad = d === 'pad', btn = buttonHtml, key = keyHtml;
   const p = (action) => prompt(action, d);
-  document.getElementById('help').innerHTML = [
-    [usePad ? btn('L-stick') : `${key('KeyW')}${key('KeyA')}${key('KeyS')}${key('KeyD')}`, 'Move'],
-    [usePad ? btn('R-stick') : key('Drag'), 'Look'],
-    [usePad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
-    [p('jump'), 'Jump'],
-    [p('punch'), PUNCHES[melee.stage].name],
-    [p('grab'), 'Grab'],
-    [p('guard'), 'Guard'],
-    [p('roll'), 'Roll'],
-    [p('target'), 'Lock on'],
-    [p('pack'), 'Satchel'],
-    [p('pause'), 'Spirit Tree'],
-  ].map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');
+  document.getElementById('help').innerHTML = buttonRows(usePad).map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');
   document.getElementById('map-hints').innerHTML = `${usePad ? btn('D-pad') : `${key('KeyW')}${key('KeyA')}${key('KeyS')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
 }
 
@@ -340,7 +357,7 @@ function leave() {
 // A second pad pressing OPTIONS joins in; holding it down leaves again.
 const OPTIONS = PAD.OPTIONS;
 function joinOrLeave(dt) {
-  if (!FEATURES.coop) return;
+  if (!FEATURES.coop || world.menu) return;
   if (players.length > 1) {
     stopWatch.leaving = extra.controls.padHeld.OPTIONS ? stopWatch.leaving + dt : 0;
     if (stopWatch.leaving > LEAVE_HOLD) {
@@ -471,6 +488,15 @@ function setLens(cam, fov) {
   cam.updateProjectionMatrix();
 }
 
+// The title shot: over the hero's shoulder toward the Spire, drifting very slowly.
+function titleView() {
+  const [dx, dz] = state.dir, len = Math.hypot(dx, dz) || 1, ax = dx / len, az = dz / len, time = shared.uTime.value;
+  const drift = Math.sin(time * 0.08) * 0.8, y = Math.max(state.y, 0);
+  camera.position.set(state.x - ax * TITLE_BACK + az * (TITLE_SIDE + drift), y + 2.6 + Math.sin(time * 0.11) * 0.15, state.z - az * TITLE_BACK - ax * (TITLE_SIDE + drift));
+  camera.lookAt(state.x + ax * 60 - az * -16, y + 13, state.z + az * 60 + ax * -16);
+  setLens(camera, FOV);
+}
+
 function aimCameras(dt) {
   const [a, b] = players;
   personal(a, dt);
@@ -504,6 +530,7 @@ function aimCameras(dt) {
       v.camera.position.addScaledVector(tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), Math.min(MAX_SHAKE + work.rumble * 0.1, work.shake));
     }
   });
+  if (world.menu) titleView();
   if (state.drone) {
     // Preview only: a raised camera aimed at a landmark.
     const [up, lx, ly, lz] = state.drone;
@@ -545,6 +572,7 @@ function step(dt) {
   shared.uTime.value += dt;
   windTime.value = shared.uTime.value;
   for (const p of players) p.controls.update(dt);
+  const begin = world.menu ? menu.update(dt) : null;
   joinOrLeave(dt);
   renderPrompts();
   world.checkPause();
@@ -576,6 +604,8 @@ function step(dt) {
     r.ring.material.opacity = Math.max(0, 0.8 - r.age * 1.2);
     r.ring.scale.setScalar(1 + r.age * 2.5);
   }
+  if (!world.menu) keepSpot(dt);
+  if (begin) beginGame(begin);
   if (world.skipRender) return;
   const [a, b] = players;
   if (b && split.amount > 0) {
@@ -588,6 +618,38 @@ function step(dt) {
     views[0].post.toScreen = true;
     renderView(views[0], a, dir);
   }
+}
+
+// Saves where the hero stands, and the hour, so Continue picks up right there.
+function saveSpot() {
+  if (world.menu || p1.rooms.house) return;
+  try {
+    localStorage.setItem(SPOT_KEY, JSON.stringify({ x: state.x, z: state.z, dir: state.dir, clock: world.clock }));
+  } catch { /* no storage: the hero simply starts from the shore */ }
+}
+
+function keepSpot(dt) {
+  if ((stopWatch.spot = (stopWatch.spot ?? SPOT_EVERY) - dt) > 0) return;
+  stopWatch.spot = SPOT_EVERY;
+  saveSpot();
+}
+
+function beginGame(how) {
+  world.menu = false;
+  menu.hide();
+  let spot = null;
+  try {
+    spot = how === 'continue' ? JSON.parse(localStorage.getItem(SPOT_KEY)) : null;
+  } catch { /* an unreadable spot just means the shore */ }
+  if (spot) {
+    world.clock = spot.clock;
+    applySky(skyAt(spot.clock));
+    goto(spot.x, spot.z, spot.x + spot.dir[0], spot.z + spot.dir[1]);
+  } else {
+    setTime('morning');
+    goto(SPAWN.x, SPAWN.z, PLACES.spire.x, PLACES.spire.z);
+  }
+  p1.hud.message(spot ? 'Welcome back.' : 'The Lantern Spire stands across the water.', true);
 }
 
 // Previews: stand somewhere, look at something, at a time of day.
@@ -616,11 +678,19 @@ const SHOTS = {
 };
 addEventListener('keydown', (e) => {
   const s = SHOTS[e.key];
-  if (s) goto(...s);
+  if (s && !world.menu) goto(...s);
 });
 
-setTime('morning');
-window.__world = { players, world, split, views, join, leave, monsters, height, PUNCHES, work, marks, melee: p1.melee, bag: p1.bag, rooms: p1.rooms, body: p1.body, controls: p1.controls, skills: p1.skills, swim: p1.swim, hud: p1.hud, camera, step, goto, SHOTS, setTime, state, renderer, chunks };
+const fresh = sessionStorage.getItem('lumen.fresh');
+sessionStorage.removeItem('lumen.fresh');
+const menu = new StartMenu(p1, settings, { onQuality: setQuality, rows: buttonRows });
+world.menu = !fresh && !QUERY.has('play');
+document.getElementById('start').hidden = !world.menu;
+document.body.classList.toggle('title', world.menu);
+if (!world.menu) menu.hide();
+addEventListener('pagehide', saveSpot);
+setTime(world.menu ? 'dusk' : 'morning');
+window.__world = { menu, players, world, split, views, join, leave, monsters, height, PUNCHES, work, marks, melee: p1.melee, bag: p1.bag, rooms: p1.rooms, body: p1.body, controls: p1.controls, skills: p1.skills, swim: p1.swim, hud: p1.hud, camera, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
   step((now - last) / 1000);

@@ -1,4 +1,6 @@
-# Pixel RPG
+# Eradication (repo: pixel-rpg)
+
+The game's title, chosen by the user on 2026-11-01. Save keys stay `lumen.*` so saves keep working.
 
 An original anime-fantasy action RPG in 3D voxel style, rendered in HD (the user wants it high quality, not low-res), built with Three.js (JS) + Vite.
 It grows feature by feature with the user, who plays and tests with a controller.
@@ -54,6 +56,7 @@ It grows feature by feature with the user, who plays and tests with a controller
   `monsters.js`: adapter around `entities/Enemy.js`. `rooms.js`: house interiors. `splitView.js`: puts two views on screen.
 - `terrain.js`: pure height plus saved dents. `ground.js`: land, tree and grass data as plain arrays, run off the frame in `groundWorker.js`. `chunks.js`: streaming around every hero (near trees, far picture trees, per-chunk water), `deform()` edits live ground; dents go to the workers too. Use `chunks.settle()` after a teleport.
 - `post.js`: own picture pipeline (scene, glow, shafts, tone curve). `materials.js`: terrain, water, sky, `masonry()`, shared noise texture, fog chunks. `foliage.js`: leaf and grass cards. `compass.js`: compass strip and place names.
+- `startMenu.js`: the title screen (Continue, New Game, Controls, Graphics). `/world.html?play` skips it, which tests should use. Continue reads `lumen.spot`; New Game moves the save to `lumen.old.*`.
 - Debug handle: `window.__world`. Testing while the user plays: use a separate pane tab, stub `Storage.prototype.setItem` and
   `navigator.getGamepads`, set `__world.world.skipRender = true`, and render only captured frames, or the save changes or the tab crashes.
 
