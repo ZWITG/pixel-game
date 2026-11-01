@@ -55,6 +55,9 @@ const FLINCH = 0.28;         // seconds of recoil from a hit
 const DUST_EVERY = 0.13;     // seconds between puffs under a sprinter
 const TAP = 0.16;            // holding the button this long turns a jump into flight
 const GLIDE = 0.35;          // gravity while falling, once you have wings
+const WAKE_RINGS = [55, 80, 110, 150, 220, 320]; // tiles from where a hero fell
+const WAKE_TRIES = 12;
+const WAKE_CLEAR = 28;       // tiles a waking hero is kept from any enemy
 const TIME_ORDER = ['morning', 'dusk', 'mist', 'night'];
 
 export default class Player {
@@ -448,16 +451,32 @@ export default class Player {
     hud.gain(def, '');
   }
 
-  // Beaten: wake at the start with everything still in the bag.
+  // The closest safe ground to where a hero fell: dry, level, clear of walls and of enemies.
+  // Near rings first, each tried all the way round; the start is the last resort.
+  wakeSpot() {
+    const { state, world: { marks, monsters, scars } } = this;
+    const clearOf = (s, x, z) => (s.r ? Math.hypot(x - s.x, z - s.z) > s.r + 3 : x < s.x0 - 3 || x > s.x1 + 3 || z < s.z0 - 3 || z > s.z1 + 3);
+    for (const d of WAKE_RINGS) {
+      for (let i = 0; i < WAKE_TRIES; i++) {
+        const a = (i / WAKE_TRIES) * 6.283, x = state.x + Math.cos(a) * d, z = state.z + Math.sin(a) * d, y = height(x, z);
+        if (y < 2 || Math.abs(height(x + 4, z) - y) > 3 || Math.abs(height(x, z + 4) - y) > 3) continue;
+        if (scars.at(x, z)?.burn > 0 || monsters.within(x, z, WAKE_CLEAR).length) continue;
+        if (marks.solids.every((s) => s.off || clearOf(s, x, z))) return [x, z];
+      }
+    }
+    return [SPAWN.x + this.index * 3, SPAWN.z];
+  }
+
+  // Beaten: wake close by with everything still in the bag, and a moment before anyone notices.
   down() {
     const { state, hud } = this;
     hud.gasp();
-    hud.message('You came to by the water.', true);
+    hud.message('You came to, not far from where you fell.', true);
     this.world.realm.heroFell(this);
     if (this.rooms.house) this.rooms.leave(state);
-    state.x = SPAWN.x + this.index * 3;
-    state.z = SPAWN.z;
+    [state.x, state.z] = this.wakeSpot();
     state.air = state.rise = 0;
+    state.flying = false;
     this.hp = this.body.maxHealth;
     this.guard = 3;
   }
