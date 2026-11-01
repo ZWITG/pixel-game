@@ -40,6 +40,19 @@ export const SKILLS = {
       { at: 800, title: 'Windfoot', icon: 'star' },
     ],
   },
+  // Superspeed can't be practised until Running is maxed; then it grows like any other skill.
+  superspeed: {
+    name: 'Superspeed',
+    color: '#ff7ad9',
+    trains: { speed: 0.05, endurance: 0.02 },
+    levels: [
+      { at: 6, title: 'Quickstep', icon: 'dash' },
+      { at: 25, title: 'Blur', icon: 'wind' },
+      { at: 70, title: 'Waterstrider', icon: 'wave' },
+      { at: 180, title: 'Streak', icon: 'bolt' },
+      { at: 400, title: 'Faster Than Sight', icon: 'comet' },
+    ],
+  },
   jumping: {
     name: 'Jumping',
     color: '#9fd0ff',

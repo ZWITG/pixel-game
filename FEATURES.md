@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: Superspeed skill, evolved from maxed Running; press sprint again at full sprint; afterimages, camera rush, water running from level 3, ramming
 - 2026-11-01 prototype: Spirit Tree redrawn as an even fan on a larger map; left and right change bough, up and down move along it
 - 2026-11-01 offline launcher: Play Pixel RPG.bat runs the game with no internet and updates from GitHub when online; fonts now ship with the game
 - 2026-11-01 prototype: swimming rebuilt for free movement: faster, sprint with R2, no more being sent back to shore (tiring just slows you), jump and punch in water, swim up any bank, take off in flight from water

@@ -19,6 +19,8 @@ import Sites from './sites.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
+const RUSH_FOV = 14;       // the view stretches while in Superspeed
+const RUSH_PULL = 3;       // and drops back this many tiles
 const SPLIT_FOV = 72;      // a half-height picture needs a wider lens to show as much
 const SPLIT_PULL = 0.35;   // and the camera sits this much further back
 const SPLIT_RUN = 3;       // plus this many tiles while the hero is on the move
@@ -316,7 +318,8 @@ function personal(p, dt) {
   // Eased, so starting and stopping don't bump the camera.
   p.camRun = (p.camRun ?? 0) + ((s.moving ? 1 : 0) - (p.camRun ?? 0)) * Math.min(1, dt * 2);
   const room = players.length > 1 ? split.amount : 0;
-  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) + p.camRun * SPLIT_RUN * room;
+  p.camRush = (p.camRush ?? 0) + ((s.super ? 1 : 0) - (p.camRush ?? 0)) * Math.min(1, dt * 5);
+  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) + p.camRun * SPLIT_RUN * room + p.camRush * RUSH_PULL;
   const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(s.pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
   const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz);
   // Backed against a wall, it moves in and rises to look down past the shoulder.
@@ -366,12 +369,19 @@ function updateSplit(dt) {
   split.amount += THREE.MathUtils.clamp(goal - split.amount, -dt / SPLIT_TIME, dt / SPLIT_TIME);
 }
 
+function setLens(cam, fov) {
+  if (cam.fov === fov) return;
+  cam.fov = fov;
+  cam.updateProjectionMatrix();
+}
+
 function aimCameras(dt) {
   const [a, b] = players;
   personal(a, dt);
   if (!b) {
     camera.position.copy(a.camPos);
     camera.lookAt(a.camLook);
+    setLens(camera, FOV + a.camRush * RUSH_FOV);
   } else {
     personal(b, dt);
     together(a, b, Math.hypot(a.state.x - b.state.x, a.state.z - b.state.z), dt);
@@ -384,11 +394,7 @@ function aimCameras(dt) {
       tmp.y += (p.state.y + 1.4 * p.body.heroScale - p.camLook.y) * k;
       v.camera.lookAt(tmp);
       // Slide each picture so its hero stands in the middle of their half, not on the line.
-      const lens = FOV + (SPLIT_FOV - FOV) * k;
-      if (v.camera.fov !== lens) {
-        v.camera.fov = lens;
-        v.camera.updateProjectionMatrix();
-      }
+      setLens(v.camera, FOV + (SPLIT_FOV - FOV) * k + p.camRush * RUSH_FOV);
       const w = v.camera.aspect, side = (i ? 1 : -1) * k * SHIFT;
       if (k > 0) v.camera.setViewOffset(w, 1, -side * split.normal.x, side * split.normal.y, w, 1);
       else v.camera.clearViewOffset();

@@ -118,6 +118,8 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Jumping and Flight (built 2026-11-01):** every jump is Jumping practice. Its top level evolves it into Flight: jump and hold X (Cross or Space) to climb, release to glide. Flight is its own skill, practised by time aloft; its level sets time in the air, top height and speed, up to unlimited (`FLY_*` in player.js). Above 22 tiles nothing blocks the hero.
 
+**Superspeed (built 2026-11-01):** Running's top level evolves it into Superspeed, its own skill, practised by time at speed. At full sprint, let go and press sprint again. Level sets duration (4 s to unlimited) and speed (`SUPER_*` in player.js, capped at 130 tiles a second); from level 3 the hero runs across water. Whatever they barrel into takes a full-force hit.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

@@ -7,6 +7,8 @@ const W = 56, H = 84, ROWS = 3;
 const WALK = 6, IDLE = 6, WINDUP = 7, PUNCH = 8, JUMP = 9, FRAMES = 10;
 const CX = 28, GROUND = 81; // where the feet sit in a frame
 const SIZE = 2.9;           // height of a frame in the world, in tiles
+const GHOSTS = 12;          // afterimages behind a Superspeed runner
+const GHOST_EVERY = 0.016;  // seconds between them
 
 export const LOOKS = [
   // A wandering lantern-bearer: spiked blue hair, long red scarf, pale coat, wrapped fists.
@@ -330,6 +332,38 @@ export default class HeroSprite {
     this.flash = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshBasicMaterial({ map: burstTexture(), transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
     this.flash.visible = false;
     this.mesh.add(this.flash);
+
+    // Afterimages, each with its own copy of the texture so it can hold its own frame.
+    this.ghostIn = 0;
+    this.ghostAt = 0;
+    this.ghosts = Array.from({ length: GHOSTS }, () => {
+      const ghost = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: map.clone(), color: look.scarf, alphaTest: 0.5, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+      ghost.visible = false;
+      scene.add(ghost);
+      return ghost;
+    });
+  }
+
+  // Drops an afterimage where the hero is, every few hundredths of a second.
+  leaveTrail(on, dt) {
+    this.ghosts.forEach((g) => {
+      g.material.opacity -= dt * 2.6;
+      if (g.material.opacity <= 0) g.visible = false;
+    });
+    if (!on || (this.ghostIn -= dt) > 0) return;
+    this.ghostIn = GHOST_EVERY;
+    const g = this.ghosts[this.ghostAt = (this.ghostAt + 1) % GHOSTS];
+    g.position.copy(this.mesh.position);
+    g.scale.copy(this.mesh.scale);
+    g.material.map.offset.copy(this.map.offset);
+    g.material.map.repeat.copy(this.map.repeat);
+    g.material.opacity = 0.5;
+    g.visible = true;
+  }
+
+  // Afterimages face whichever camera is drawing.
+  trailFrom(camera) {
+    for (const g of this.ghosts) if (g.visible) g.rotation.y = Math.atan2(camera.position.x - g.position.x, camera.position.z - g.position.z);
   }
 
   // pose: { t, stage, color } from the melee system, or null. side 1 punches toward screen right.

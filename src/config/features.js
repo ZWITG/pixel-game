@@ -15,6 +15,7 @@ export const FEATURES = {
   evolution: true,       // open world: monsters change form as the heroes level
   sites: true,           // open world: places with their own goals and rewards
   flight: true,          // open world: maxing Jumping opens Flight, hold X in the air
+  superspeed: true,      // open world: maxing Running opens Superspeed, press sprint again
   worldWork: true,       // open world: solid trees and rocks, chopping, mining, house interiors       // open world: learn to swim by trying; shows on the Skills page
   dodgeRoll: true,      // roll with brief invincibility (Shift / K / Circle)
   topDownCamera: false, // angled top-down view you can switch to (C / Create); off = behind-the-hero camera only
