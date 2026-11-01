@@ -20,6 +20,7 @@ export function terrainMaterial({ far = false } = {}) {
       varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL;\n${s.vertexShader}`.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
+       ${far ? 'transformed.y-=3.;' : ''} // the far land sits just under the near land, where they overlap
        vP=(modelMatrix*vec4(position,1.)).xyz; vN=normal; vB=aBiome; vR=aRoad; vL=aLand;`,
     );
     s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL; uniform vec3 uHole,uHole2;

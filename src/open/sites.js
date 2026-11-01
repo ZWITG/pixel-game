@@ -114,6 +114,16 @@ export default class Sites {
       this.beams.setColorAt(i, c.set(s.cat.color));
     });
     scene.add(this.beams);
+    // Things standing at a place settle with the land if it's broken beneath them.
+    work.chunks.watchers.push((x, z, r) => {
+      for (const s of this.list) {
+        if (Math.hypot(s.x - x, s.z - z) > r + 8) continue;
+        s.y = Math.max(height(s.x, s.z), 0);
+        if (s.mesh) s.mesh.position.y = s.y;
+        if (!s.done) this.beams.setMatrixAt(s.index, new THREE.Matrix4().makeTranslation(s.x, s.y, s.z));
+        this.beams.instanceMatrix.needsUpdate = true;
+      }
+    });
   }
 
   load() {

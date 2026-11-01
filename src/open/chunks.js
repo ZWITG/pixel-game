@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { height, biome, region, roadDistance, forest, addDent, dentShape, WORLD, PLACES, TOWNS } from './terrain.js';
+import { height, biome, region, roadDistance, forest, addDent, dentAt, dentShape, WORLD, PLACES, TOWNS } from './terrain.js';
 import { terrainMaterial, shared } from './materials.js';
 import { makeTreeMeshes, makeGrass, makeRocks } from './foliage.js';
 
@@ -10,13 +10,15 @@ const RING = 4;            // chunks each way from the center (9 x 9 streamed)
 const GRASS_RING = 1;
 const BUILD_MS = 5;          // of a frame spent building terrain, after the first chunk
 const MAX_CACHED = 900;
-const GRASS_GRID = 8;        // land samples across a chunk when placing grass
+const GRASS_GRID = 12;       // land samples across a chunk when placing grass
 const GRASS_TRIES = 5000;
 const DRY_TONE = [0.72, 0.5, 0.26];
 const BLADE_TONES = [[0.5, 0.62, 0.15], [0.8, 0.68, 0.14], [0.7, 0.3, 0.1], [0.13, 0.36, 0.2], [0.95, 0.75, 0.18], [0.9, 0.18, 0.12]];
 const MAX_TREES = 9000, MAX_BLADES = 90000, MAX_ROCKS = 4000;
 const ROCK_TINTS = ['#b0a2ac', '#9aa39a', '#a8968c'], ORE_TINT = '#c08a64';
 // Trees stay out of these, so landmarks stand in the open.
+const TORN = 0.25;           // how far pushed down before grass won't grow
+const SKIRT = 10;            // tiles the hidden curtain under a chunk's edge hangs down, plus more for coarse ones
 const CLEARINGS = [PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }, ...TOWNS];
 // No grass through the paving of cities and village squares.
 const PAVED = TOWNS.filter((T) => T.kind === 'city' || T.kind === 'village').map((T) => ({ x: T.x, z: T.z, half: T.kind === 'city' ? T.r * 0.62 : 28 }));
@@ -58,7 +60,7 @@ function gridGeometry(x0, z0, size, step, skirt) {
       const start = k;
       for (let t = 0; t < v; t++) {
         const [i, j] = fn(t);
-        put(k++, i, j, hs[(j + 1) * (v + 2) + i + 1] - 10);
+        put(k++, i, j, hs[(j + 1) * (v + 2) + i + 1] - SKIRT - step * 4);
       }
       for (let t = 0; t < n; t++) {
         const [i, j] = fn(t), [i2, j2] = fn(t + 1);
@@ -82,6 +84,9 @@ function gridGeometry(x0, z0, size, step, skirt) {
   return g;
 }
 
+// The steepest rise or drop a step away from a point, so nothing is placed on a cliff face.
+const tilt = (x, z, y) => Math.max(Math.abs(height(x + 2, z) - y), Math.abs(height(x - 2, z) - y), Math.abs(height(x, z + 2) - y), Math.abs(height(x, z - 2) - y));
+
 export default class Chunks {
   constructor(scene) {
     this.scene = scene;
@@ -101,6 +106,7 @@ export default class Chunks {
     this.grass = makeGrass(scene, MAX_BLADES);
     this.rocks = makeRocks(scene, MAX_ROCKS);
     this.gone = new Map();  // chopped or mined: id -> time it grows back
+    this.watchers = [];     // called with (x, z, r) whenever the land changes
     this.slots = new Map(); // id -> instance index, so one object can move or vanish
     this.pose3 = new THREE.Object3D();
     this.stumps = [0, 0, 0];
@@ -117,7 +123,7 @@ export default class Chunks {
       const [bad, marsh] = region(x, z);
       if (rnd(cx, cz, i + 900) > forest(x, z) * (1 - bad * 0.96) * (1 - marsh * 0.25) || CLEARINGS.some((p) => Math.hypot(x - p.x, z - p.z) < p.r)) continue;
       const y = height(x, z);
-      if (y < (marsh > 0.5 ? 0.6 : 3) || y > 300 || height(x + 2, z) - y > 2.2 || roadDistance(x, z) < 9) continue;
+      if (y < (marsh > 0.5 ? 0.6 : 3) || y > 300 || tilt(x, z, y) > 2.2 || roadDistance(x, z) < 9) continue;
       const [m, a] = biome(x, z);
       const roll = rnd(cx, cz, i + 1300);
       // Old giants stand here and there among the rest; the swamp is all dark pine.
@@ -130,7 +136,7 @@ export default class Chunks {
       const stony = Math.max(0.12, 0.2 + forest(z + 500, x - 300) * 0.5 + region(x, z)[0] * 0.5);
       if (rnd(cx, cz, i + 21000) > stony || CLEARINGS.some((p) => Math.hypot(x - p.x, z - p.z) < p.r)) continue;
       const y = height(x, z);
-      if (y < 1 || y > 300 || roadDistance(x, z) < 7) continue;
+      if (y < 1 || y > 300 || tilt(x, z, y) > 3 || roadDistance(x, z) < 7) continue;
       const roll = rnd(cx, cz, i + 21500), size = roll < 0.6 ? 0 : roll < 0.9 ? 1 : 2;
       const sc = [0.5, 1.2, 3][size] + rnd(cx, cz, i + 22000) * [0.4, 0.8, 1.2][size];
       rocks.push({ id: `r${cx},${cz},${i}`, type: 'rock', size, x, y, z, sc, rot: rnd(cx, cz, i + 22500) * 6.28, r: 0.85 * sc, tint: size === 2 ? ORE_TINT : ROCK_TINTS[i % 3] });
@@ -167,7 +173,9 @@ export default class Chunks {
       const [m, a, p, bad, marsh] = tones[Math.round(v * 2) * 3 + Math.round(u * 2)];
       if (r < 0.25 + bad * 0.7) continue; // little grows in the badlands
       const c = bad > 0.5 ? DRY_TONE : marsh > 0.5 ? BLADE_TONES[3] : BLADE_TONES[r > 0.97 ? 5 : r > 0.92 ? 4 : p > m && p > a ? 3 : a > m ? 2 : r > 0.6 ? 1 : 0];
-      const sc = 0.8 + r * 0.7, x = x0 + u * CHUNK, z = z0 + v * CHUNK, turn = x, co = Math.cos(turn) * sc, si = Math.sin(turn) * sc;
+      const sc = 0.8 + r * 0.7, x = x0 + u * CHUNK, z = z0 + v * CHUNK, turn = x;
+      if (dentAt(x, z) > TORN) continue; // broken ground stays bare
+      const co = Math.cos(turn) * sc, si = Math.sin(turn) * sc;
       mats.set([co, 0, -si, 0, 0, sc, 0, 0, si, 0, co, 0, x, y, z, 1], b * 16);
       cols.set(c, b * 3);
       b++;
@@ -292,9 +300,19 @@ export default class Chunks {
     for (const [k, mesh] of this.live) {
       if (want.has(k)) continue;
       mesh.userData.stale = true;
+      // Long gone behind a fast hero: free it now rather than waiting for a quiet moment.
+      const { x0, z0 } = mesh.userData.cell;
+      if (this.cells.every(([cx, cz]) => Math.max(Math.abs(x0 / CHUNK - cx), Math.abs(z0 / CHUNK - cz)) > RING + 2)) this.drop(k, mesh);
     }
     this.queue = [...want.entries()].filter(([k]) => !this.live.has(k)).map(([k, c]) => ({ k, ...c })).sort((a, b) => a.ring - b.ring);
-    this.setHoles(this.queue.length ? undefined : (RING + 0.5) * CHUNK - 1);
+    // The far mesh is only cut away once the near ground is really there (see build).
+    if (!this.queue.length) this.setHoles((RING + 0.5) * CHUNK - 1);
+  }
+
+  drop(k, mesh) {
+    this.scene.remove(mesh);
+    mesh.geometry.dispose();
+    this.live.delete(k);
   }
 
   build(c) {
@@ -307,11 +325,7 @@ export default class Chunks {
     this.live.set(c.k, mesh);
     if (!this.queue.length) {
       // Everything is in place: drop what was replaced and open the hole in the far mesh.
-      for (const [k, m] of this.live) if (m.userData.stale) {
-        this.scene.remove(m);
-        m.geometry.dispose();
-        this.live.delete(k);
-      }
+      for (const [k, m] of this.live) if (m.userData.stale) this.drop(k, m);
       this.setHoles((RING + 0.5) * CHUNK - 1);
     }
   }
@@ -320,8 +334,11 @@ export default class Chunks {
   // which would stall the punch; anything standing there settles or is torn up with it.
   // `later`: many at once call scatter() themselves when they're done.
   deform(x, z, r, depth, later = false) {
-    addDent(x, z, r, depth);
-    for (const mesh of this.live.values()) this.patch(mesh, x, z, r, depth);
+    const old = addDent(x, z, r, depth);
+    for (const mesh of this.live.values()) {
+      this.patch(mesh, x, z, r, depth);
+      if (old) this.patch(mesh, old[0], old[1], old[2], -old[3]);
+    }
     const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
     for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
       const s = this.spots(cx + i, cz + j);
@@ -329,6 +346,7 @@ export default class Chunks {
       for (const o of s.things) if (Math.hypot(o.x - x, o.z - z) < r) o.y = height(o.x, o.z);
     }
     if (!later) this.scatter();
+    for (const watch of this.watchers) watch(x, z, r);
   }
 
   patch(mesh, x, z, r, depth) {
@@ -341,6 +359,8 @@ export default class Chunks {
       const k = j * v + i;
       pos.setY(k, pos.getY(k) - dentShape(Math.hypot(pos.getX(k) - x, pos.getZ(k) - z), r) * depth);
     }
+    // The curtain around the edge sinks too, or it stands up out of a pit like a wall.
+    for (let k = v * v; k < pos.count; k++) pos.setY(k, pos.getY(k) - dentShape(Math.hypot(pos.getX(k) - x, pos.getZ(k) - z), r) * depth);
     const y = (i, j) => pos.getY(Math.min(n, Math.max(0, j)) * v + Math.min(n, Math.max(0, i)));
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const nx = y(i - 1, j) - y(i + 1, j), nz = y(i, j - 1) - y(i, j + 1), ny = 2 * step, l = Math.hypot(nx, ny, nz);

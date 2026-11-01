@@ -23,7 +23,7 @@ const HIT_AT = 0.4;          // how far through the punch the blow lands
 const LUNGE = 3;             // tiles per second, stepping into the punch
 const WAVE_SPEED = 45;       // tiles per second; things break as the wave reaches them
 const AIR_PRACTICE = 0.1;
-const RINGS = 4, CRATERS = 8, CRATER_GRID = 10, CRATER_LIFE = 40;
+const RINGS = 4, CRATERS = 8, CRATER_GRID = 18, CRATER_LIFE = 40, CRATER_FADE = 0.7;
 const CRATER_MARK = 34;      // largest crack mark, in tiles; past this the dent speaks for itself
 // Destructive Blow, by its skill level: seconds to charge fully, force, and reach in tiles.
 const BLOW_TIME = [2, 1.8, 1.6, 1.4, 1.2, 1];
@@ -56,7 +56,7 @@ function crackTexture() {
   const g = c.getContext('2d');
   let seed = 53;
   const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  g.fillStyle = '#2a2024';
+  g.fillStyle = '#3c2e2a';
   for (let i = 0; i < 500; i++) {
     const a = r() * 6.28, d = r() * r() * 46;
     g.fillRect(Math.floor(64 + Math.cos(a) * d), Math.floor(64 + Math.sin(a) * d), 2, 2);
@@ -90,7 +90,7 @@ function makeCrater(scene, map) {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(idx);
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map, transparent: true, alphaTest: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 }));
   mesh.frustumCulled = false;
   mesh.visible = false;
   scene.add(mesh);
@@ -125,6 +125,7 @@ export default class Melee {
     this.orbAge = 9;
     this.orbSize = 1;
     scene.add(this.orb);
+    work.chunks.watchers.push((x, z, r) => this.settle(x, z, r));
     const map = crackTexture();
     this.craters = Array.from({ length: CRATERS }, () => makeCrater(scene, map));
   }
@@ -360,15 +361,26 @@ export default class Melee {
 
   crater(x, z, size) {
     const c = this.craters.find((k) => !k.mesh.visible) ?? this.craters.reduce((a, b) => (a.age > b.age ? a : b));
-    const pos = c.mesh.geometry.attributes.position, n = CRATER_GRID + 1;
+    Object.assign(c, { x, z, size });
+    this.drape(c);
+    c.age = 0;
+    c.mesh.visible = true;
+    c.mesh.material.opacity = CRATER_FADE;
+  }
+
+  // Lays a mark over the ground as it is now.
+  drape(c) {
+    const { x, z, size } = c, pos = c.mesh.geometry.attributes.position, n = CRATER_GRID + 1;
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const px = x + (i / CRATER_GRID - 0.5) * size * 2, pz = z + (j / CRATER_GRID - 0.5) * size * 2;
       pos.setXYZ(j * n + i, px, landHeight(px, pz) + 0.08, pz);
     }
     pos.needsUpdate = true;
-    c.age = 0;
-    c.mesh.visible = true;
-    c.mesh.material.opacity = 1;
+  }
+
+  // The land moved: any mark on it moves too, instead of hanging in the air.
+  settle(x, z, r) {
+    for (const c of this.craters) if (c.mesh.visible && Math.hypot(c.x - x, c.z - z) < c.size * 1.5 + r) this.drape(c);
   }
 
   // Heroes can hurt each other. One blow is capped, so a strong hero can't flatten a new one
@@ -445,7 +457,7 @@ export default class Melee {
     for (const c of this.craters) {
       if (!c.mesh.visible) continue;
       c.age += dt;
-      c.mesh.material.opacity = Math.min(1, (CRATER_LIFE - c.age) / 5);
+      c.mesh.material.opacity = Math.min(CRATER_FADE, (CRATER_LIFE - c.age) / 5);
       if (c.age > CRATER_LIFE) c.mesh.visible = false;
     }
   }

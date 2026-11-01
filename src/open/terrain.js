@@ -216,7 +216,7 @@ function baseHeight(x, z) {
 
 // Damage to the land: bowls pressed into the height function, saved with the world.
 // Each is [x, z, radius, depth]. A grid keeps the lookup cheap, since height() runs constantly.
-const DENT_CELL = 64, MAX_DENTS = 300;
+const DENT_CELL = 64, MAX_DENTS = 1500;
 export const dents = [];
 let dentGrid = new Map();
 const cellKey = (i, j) => i * 100000 + j;
@@ -234,15 +234,16 @@ function indexDent(d) {
 
 export const dentShape = (d, r) => (d >= r ? 0 : (1 - (d / r) ** 2) ** 2);
 
+// Returns the oldest dent if this one pushed it out, so what's on screen can fill it back in.
 export function addDent(x, z, r, depth) {
   const d = [x, z, r, depth];
   dents.push(d);
   indexDent(d);
-  if (dents.length > MAX_DENTS) {
-    dents.shift();
-    dentGrid = new Map();
-    dents.forEach(indexDent);
-  }
+  if (dents.length <= MAX_DENTS) return null;
+  const old = dents.shift();
+  dentGrid = new Map();
+  dents.forEach(indexDent);
+  return old;
 }
 
 // How far the land has been pushed down at a point.
