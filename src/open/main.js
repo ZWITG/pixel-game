@@ -36,6 +36,7 @@ const HILL_SAMPLES = 8;
 const WALL_SAMPLES = 12;
 const WALL_GAP = 0.8;      // how close it may pass a wall, in tiles
 const WALL_RISE = 5;       // tiles it rises when a wall forces it in
+const HIGH_UP = 22;        // tiles up, clear of every wall
 const HOP = 4;             // tiles up before the camera follows into the air
 const TELEPORT = 25;       // tiles moved in one frame that count as a jump
 const MAX_SHAKE = 0.45;
@@ -44,8 +45,10 @@ const MAX_HILL_LIFT = 9;   // tiles the camera may climb to see over ground behi
 const CAVE_LIGHT = 0.12;   // how much daylight reaches a cave
 const ROOM_CAMERA = 5.5;   // camera distance indoors
 const SPLIT_AT = 30, MERGE_AT = 20; // tiles apart; the gap keeps it from flickering at the edge
-const SPLIT_HEIGHT = 14;  // a big difference in height splits too
+const SPLIT_HEIGHT = 7;   // a big difference in height splits too
 const SPLIT_TIME = 0.6;   // seconds to slide between one view and two
+const SPLIT_RUSH = 3;     // how much quicker that is for a hero at top speed or in flight
+const SPLIT_SETTLE = 1;   // seconds before it can change back, so it never flickers
 const SHIFT = 0.25;       // how far each picture slides, as a share of the screen height
 const LEAVE_HOLD = 2;     // seconds P2 holds OPTIONS to leave
 
@@ -105,7 +108,7 @@ world.viewYaw = (p) => (world.together ? shared2.yaw : p.state.yaw);
 
 const views = [{ camera, post: new Post(renderer, scene, camera) }];
 const splitView = new SplitView();
-const split = { amount: 0, normal: new THREE.Vector2(0, -1) }; // 0 one picture, 1 fully split; P1 on top
+const split = { amount: 0, wait: 0, normal: new THREE.Vector2(0, -1) }; // 0 one picture, 1 fully split; P1 on top
 let extra = null; // the second player: kept when they leave, so their sprite and HUD are reused
 
 const p1 = new Player(0, world);
@@ -320,7 +323,7 @@ function personal(p, dt) {
   const rush = p.camRush = (p.camRush ?? 0) + ((s.pace ?? 0) - (p.camRush ?? 0)) * Math.min(1, dt * 4);
   p.camY = p.camY === undefined || Math.abs(p.camY - eyeY) > 30 ? eyeY : p.camY + (eyeY - p.camY) * Math.min(1, dt * (CAMERA_LIFT + rush * RUSH_TRACK));
   // A jump leaves the camera where it is; real flight takes it along.
-  p.camAir = (p.camAir ?? 0) + ((s.air > HOP ? s.air : 0) - (p.camAir ?? 0)) * Math.min(1, dt * 6);
+  p.camAir = (p.camAir ?? 0) + ((s.air > HOP ? s.air : 0) - (p.camAir ?? 0)) * Math.min(1, dt * 14);
   const lookY = p.camY + p.camAir + LOOK_HEIGHT * big, inside = !!p.rooms.house;
   // Eased, so starting and stopping don't bump the camera.
   p.camRun = (p.camRun ?? 0) + ((s.moving ? 1 : 0) - (p.camRun ?? 0)) * Math.min(1, dt * 2);
@@ -329,7 +332,7 @@ function personal(p, dt) {
   const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(s.pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
   const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz);
   // Backed against a wall, it moves in and rises to look down past the shoulder.
-  const open = inside ? 1 : solidStop(s.x, s.z, cx, cz), lift = Math.min(need, MAX_HILL_LIFT) + (1 - open) * WALL_RISE;
+  const open = inside || s.air > HIGH_UP ? 1 : solidStop(s.x, s.z, cx, cz), lift = Math.min(need, MAX_HILL_LIFT) + (1 - open) * WALL_RISE;
   // Quick to rise for a hill, slow to settle back, so it doesn't pump.
   p.camLift = (p.camLift ?? lift) + (lift - (p.camLift ?? lift)) * Math.min(1, dt * (lift > (p.camLift ?? lift) ? 10 - rush * 6 : 2));
   const want = Math.min(need > MAX_HILL_LIFT ? far * Math.max(0.45, MAX_HILL_LIFT / need) : far, far * Math.max(0.18, open));
@@ -364,18 +367,23 @@ function together(a, b, span, dt) {
 function updateSplit(dt) {
   const [a, b] = players;
   const span = Math.hypot(a.state.x - b.state.x, a.state.z - b.state.z);
-  const apart = a.rooms.house || b.rooms.house || Math.abs(a.state.y - b.state.y) > SPLIT_HEIGHT;
+  const high = (p) => Math.max(p.state.y, 0) + p.state.air;
+  const apart = a.rooms.house || b.rooms.house || Math.abs(high(a) - high(b)) > SPLIT_HEIGHT;
+  split.wait = Math.max(0, split.wait - dt);
   if (world.together && (apart || span > SPLIT_AT)) {
     world.together = false;
+    split.wait = SPLIT_SETTLE;
     a.state.yaw = b.state.yaw = shared2.yaw;
     a.state.pitch = b.state.pitch = shared2.pitch;
-  } else if (!world.together && !apart && span < MERGE_AT) {
+  } else if (!world.together && !apart && span < MERGE_AT && !split.wait) {
     world.together = true;
+    split.wait = SPLIT_SETTLE;
     shared2.yaw = a.state.yaw;
     shared2.pitch = a.state.pitch;
   }
   const goal = world.together ? 0 : 1;
-  split.amount += THREE.MathUtils.clamp(goal - split.amount, -dt / SPLIT_TIME, dt / SPLIT_TIME);
+  const quick = dt * (1 + Math.max(a.state.pace ?? 0, b.state.pace ?? 0, a.state.flying || b.state.flying ? 1 : 0) * SPLIT_RUSH) / SPLIT_TIME;
+  split.amount += THREE.MathUtils.clamp(goal - split.amount, -quick, quick);
 }
 
 function setLens(cam, fov) {
@@ -400,7 +408,7 @@ function aimCameras(dt) {
       v.camera.position.lerpVectors(sharedPos, p.camPos, k);
       // In a half-height picture the hero stands in the middle, not low in the frame.
       tmp.lerpVectors(sharedLook, p.camLook, k);
-      tmp.y += (p.state.y + 1.4 * p.body.heroScale - p.camLook.y) * k;
+      tmp.y += (p.camY + p.camAir + 1.4 * p.body.heroScale - p.camLook.y) * k;
       v.camera.lookAt(tmp);
       // Slide each picture so its hero stands in the middle of their half, not on the line.
       setLens(v.camera, FOV + (SPLIT_FOV - FOV) * k + p.camRush * RUSH_FOV);
