@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pixel RPG</title>
+    <style>@font-face { font-family: 'Press Start 2P'; font-display: swap; src: url(/fonts/press-start-2p-latin-400-normal.woff2) format('woff2'); }</style>
+    <script type="module" crossorigin src="/assets/main-DJRcnZjI.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/glyphs-BEQQiUSX.js">
+    <link rel="stylesheet" crossorigin href="/assets/main-3jYFWE3J.css">
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="hud">
+      <div id="flash"></div>
+      <div id="stats">
+        <div id="hearts"></div>
+        <div id="level"><span id="lv">Lv 1</span><div id="xpbar"><div id="xpfill"></div></div></div>
+      </div>
+      <div id="purse">
+        <div id="clock"></div>
+        <div id="coins"><span id="coin-icon"></span><span id="coin-count">0</span></div>
+        <div id="bag-info"></div>
+        <div id="satchel-info"></div>
+      </div>
+      <div id="hints"><div id="cam-hint"></div><div id="action-hint"></div></div>
+      <div id="banner"></div>
+      <div id="prompt"></div>
+      <div id="target"><div id="target-name"></div><div id="target-bar"><div id="target-fill"></div></div></div>
+      <div id="floats"></div>
+      <div id="dialogue" class="panel" hidden>
+        <div id="dlg-name"></div>
+        <div id="dlg-text"></div>
+        <div id="dlg-more">&#9660;</div>
+      </div>
+      <div id="shop" class="panel" hidden>
+        <div class="shop-head"><span id="shop-title"></span><span id="shop-coins"></span></div>
+        <div id="shop-tabs"></div>
+        <ul id="shop-list"></ul>
+        <div id="shop-desc"></div>
+        <div id="shop-msg"></div>
+        <div id="shop-hint" class="hint"></div>
+      </div>
+      <div id="controls" class="panel" hidden>
+        <div class="controls-head">Controls</div>
+        <div id="pad-map"></div>
+        <div id="key-map"></div>
+        <div id="controls-hint" class="hint"></div>
+      </div>
+      <div id="gameover" hidden>
+        <div class="big">You fell...</div>
+        <div id="gameover-loot"></div>
+        <div id="gameover-hint"></div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -66,4 +66,5 @@ It grows feature by feature with the user, who plays and tests with a controller
 - Keep everything original. Genre conventions are fine; don't copy characters, maps, names or assets from existing games.
 - After a feature change, update `FEATURES.md` (table, backlog, changelog), test in the browser, commit and push to GitHub.
 - Bump `version` in package.json for each playable milestone.
+- Every version stays playable: before committing a new version, run `node scripts/snapshot.mjs` on the last commit of the current one (the user asked for this on 2026-11-01). It builds into `versions/<number>/` and tags it; commit that folder and push tags. `Play Old Version.bat` runs any of them on its own port, so saves never mix.
 - The 2D Phaser version lives at git tag `v0.2.0-2d`.

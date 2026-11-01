@@ -20,6 +20,16 @@
         "5183"
       ],
       "port": 5183
+    },
+    {
+      "name": "old-version",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/old-version.mjs",
+        "0.9.0",
+        "quiet"
+      ],
+      "port": 5193
     }
   ]
 }
