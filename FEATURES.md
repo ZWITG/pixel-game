@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: split-screen is now horizontal, Player 1 on top and Player 2 below, each with their HUD in their own half
 - 2026-11-01 prototype: both heroes redrawn from an animated skeleton (taller anime proportions, six-frame walk, idle, punch and jump poses, wrapped fists, no sword). New camera: hero low in frame, eased following, climbs over hills, anything near the lens or between it and a hero dissolves, eases round when walking sideways
 - 2026-11-01 prototype: local co-op. A second controller joins with OPTIONS as a second hero with separate progress; shared camera when close, adaptive split-screen when apart; terrain streams around both
 - 2026-11-01 prototype: monsters roam the open world, tougher further out, with Elder versions; hero health; Mass grows with Strength, Endurance and fighting and multiplies destruction; Fighting skill; real terrain craters, torn-up grass, destructible houses; heavy heroes stomp when landing

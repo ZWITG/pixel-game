@@ -29,8 +29,7 @@ const ROOM_CAMERA = 5.5;   // camera distance indoors
 const SPLIT_AT = 30, MERGE_AT = 20; // tiles apart; the gap keeps it from flickering at the edge
 const SPLIT_HEIGHT = 14;  // a big difference in height splits too
 const SPLIT_TIME = 0.6;   // seconds to slide between one view and two
-const SHIFT = 0.22;       // how far each picture slides, as a share of the screen height
-const FLATTEN = 0.6;      // ahead-and-behind counts for less than side-to-side in the line's angle
+const SHIFT = 0.25;       // how far each picture slides, as a share of the screen height
 const LEAVE_HOLD = 2;     // seconds P2 holds OPTIONS to leave
 
 const TIMES = {
@@ -78,7 +77,7 @@ const world = { scene, renderer, chunks, work, monsters, marks, players, shared:
 
 const views = [{ camera, post: new Post(renderer, scene, camera) }];
 const splitView = new SplitView();
-const split = { amount: 0, normal: new THREE.Vector2(1, 0) }; // 0 one picture, 1 fully split
+const split = { amount: 0, normal: new THREE.Vector2(0, -1) }; // 0 one picture, 1 fully split; P1 on top
 let extra = null; // the second player: kept when they leave, so their sprite and HUD are reused
 
 const p1 = new Player(0, world);
@@ -312,13 +311,7 @@ function updateSplit(dt) {
   }
   const goal = world.together ? 0 : 1;
   split.amount += THREE.MathUtils.clamp(goal - split.amount, -dt / SPLIT_TIME, dt / SPLIT_TIME);
-  // The line lies across the direction from P1 to P2, as seen from P1's side.
-  const yaw = world.together ? shared2.yaw : a.state.yaw, dx = b.state.x - a.state.x, dz = b.state.z - a.state.z;
-  const sx = Math.cos(yaw) * dx - Math.sin(yaw) * dz, sy = (-Math.sin(yaw) * dx - Math.cos(yaw) * dz) * FLATTEN;
-  const len = Math.hypot(sx, sy);
-  if (len > 1) split.normal.lerp(tmpV.set(sx / len, sy / len), Math.min(1, dt * 2)).normalize();
 }
-const tmpV = new THREE.Vector2();
 
 function aimCameras(dt) {
   const [a, b] = players;
@@ -333,7 +326,10 @@ function aimCameras(dt) {
     views.forEach((v, i) => {
       const p = players[i];
       v.camera.position.lerpVectors(sharedPos, p.camPos, k);
-      v.camera.lookAt(tmp.lerpVectors(sharedLook, p.camLook, k));
+      // In a half-height picture the hero stands in the middle, not low in the frame.
+      tmp.lerpVectors(sharedLook, p.camLook, k);
+      tmp.y += (p.state.y + 1.4 * p.body.heroScale - p.camLook.y) * k;
+      v.camera.lookAt(tmp);
       // Slide each picture so its hero stands in the middle of their half, not on the line.
       const w = v.camera.aspect, side = (i ? 1 : -1) * k * SHIFT;
       if (k > 0) v.camera.setViewOffset(w, 1, -side * split.normal.x, side * split.normal.y, w, 1);

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
-// Puts two finished views on screen, either side of a line that points from one hero to the
-// other. Near the start of a split both views match, so the line appears without a jump.
+// Puts two finished views on screen, either side of a line across it. At the start of a
+// split both views match, so the line appears without a jump.
 export default class SplitView {
   constructor() {
     this.material = new THREE.ShaderMaterial({

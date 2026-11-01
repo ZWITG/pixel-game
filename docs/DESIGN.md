@@ -104,7 +104,7 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Destruction (built 2026-11-01):** the land takes real damage: dents sit on top of the height function (`addDent`, saved in `lumen.dents`), shown by editing live chunks in place. Heavy punches press craters, tear up grass, and can flood when dug below water level. Houses lean, then collapse into rubble and rebuild with the trees. The Spire, Ribs and Spirit Tree stay unbroken, with no craters right beside them, because their models sit at fixed heights.
 
-**Local co-op (built 2026-11-01):** a second controller joins with OPTIONS. Each player is a `Player` (`src/open/player.js`) with their own sprite, HUD, body, skills and bag; world, monsters and damage are shared. One camera frames both while they're close, then the screen splits along a line pointing from one hero to the other (`splitView.js`, `updateSplit` in main.js). Both views start identical, so the split has no pop. Terrain streams around both heroes.
+**Local co-op (built 2026-11-01):** a second controller joins with OPTIONS. Each player is a `Player` (`src/open/player.js`) with their own sprite, HUD, body, skills and bag; world, monsters and damage are shared. One camera frames both while they're close, then the screen splits horizontally, Player 1 on top and Player 2 below (`splitView.js`, `updateSplit` in main.js). Both views start identical, so the split has no pop. Terrain streams around both heroes.
 
 ## 7. UI direction (from the taste rules)
 
