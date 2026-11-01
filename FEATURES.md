@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 menu in play on Options: icon tabs for Map, Powers, Satchel, Controls and Settings, L1 and R1 change tab; a world map drawn from the real land with contours, town icons, heroes and a pin that shows on the compass; settings for graphics, button hints and compass, and a way back to the title
 - 2026-11-01 the game is now called Eradication; animated ZWITG studio intro plays while it loads (a button skips it)
 - 2026-11-01 open world: start menu over a live title shot at dusk: Continue returns to where you left off and the hour it was, New Game asks first and puts the old hero aside, Controls, Graphics (Auto, High, Balanced, Fast); works with controller, keyboard and mouse
 - 2026-11-01 v0.7.0 open world rebuilt for looks and speed: smooth HD renderer (no pixel grid or screen-wide dither), new terrain, water with shallows and foam, soft clouds, low fog, painted trees with far picture trees, tuft grass that fades out, stone walls; real 3D toon heroes with streaming scarves replace the sprites; land builds in background workers (worst frame while running 309 ms to 14 ms); resolution adapts to hold the frame rate; day cycle (16 minutes); compass with goals and towns, place names on arrival, button list hides itself, only the 3 nearest beams show

@@ -18,6 +18,7 @@ import SplitView from './splitView.js';
 import Sites from './sites.js';
 import Quake from './quake.js';
 import StartMenu, { loadSettings } from './startMenu.js';
+import GameMenu from './gameMenu.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -124,7 +125,7 @@ monsters.quake = world.quake;
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
 // fills its owner's half: the other hero plays on, and both can have theirs open.
 world.checkPause = () => {
-  world.paused = world.menu || players.some((p) => p.hud.mapOpen) || (players.length === 1 && p1.hud.packOpen);
+  world.paused = world.menu || world.gameMenu.isOpen || players.some((p) => p.hud.mapOpen) || (players.length === 1 && p1.hud.packOpen);
 };
 world.viewYaw = (p) => (world.together ? shared2.yaw : p.state.yaw);
 
@@ -277,7 +278,7 @@ function buttonRows(usePad) {
     [p('roll'), 'Roll'],
     [p('target'), 'Lock on'],
     [p('pack'), 'Satchel'],
-    [p('pause'), 'Spirit Tree'],
+    [p('pause'), 'Menu'],
   ];
 }
 
@@ -293,7 +294,7 @@ function renderPrompts() {
     stopWatch.quietAt = performance.now() + QUIET_AFTER;
   }
   const d = controls.device, key_ = `${d}${melee.stage}`;
-  document.body.classList.toggle('quiet', performance.now() > stopWatch.quietAt);
+  document.body.classList.toggle('quiet', settings.hints === 'off' || (settings.hints === 'auto' && performance.now() > stopWatch.quietAt));
   if (key_ === stopWatch.promptDevice) return;
   stopWatch.promptDevice = key_;
   stopWatch.quietAt = performance.now() + QUIET_AFTER;
@@ -336,6 +337,7 @@ function join() {
 }
 
 function leave() {
+  if (world.gameMenu.owner === extra) world.gameMenu.close();
   extra.hud.closeAll(extra);
   if (extra.rooms.house) extra.rooms.leave(extra.state);
   players.pop();
@@ -573,13 +575,14 @@ function step(dt) {
   windTime.value = shared.uTime.value;
   for (const p of players) p.controls.update(dt);
   const begin = world.menu ? menu.update(dt) : null;
+  if (world.gameMenu.isOpen) world.gameMenu.update(dt);
   joinOrLeave(dt);
   renderPrompts();
   world.checkPause();
   if (players.length > 1) updateSplit(dt);
   for (const p of players) {
     p.update(dt);
-    if (FEATURES.compass) p.compass.update(p, world.viewYaw(p), dt);
+    if (FEATURES.compass && settings.compass) p.compass.update(p, world.viewYaw(p), dt);
   }
   if (!world.paused && FEATURES.dayCycle) moveClock(dt);
 
@@ -688,6 +691,17 @@ world.menu = !fresh && !QUERY.has('play');
 document.getElementById('start').hidden = !world.menu;
 document.body.classList.toggle('title', world.menu);
 if (!world.menu) menu.hide();
+// Settings the title screen and the menu in play both change.
+function applySettings() {
+  setQuality(settings.quality);
+  document.body.classList.toggle('no-compass', !settings.compass);
+}
+function toTitle() {
+  saveSpot();
+  location.reload();
+}
+world.gameMenu = new GameMenu({ world, settings, applySettings, rows: buttonRows, toTitle });
+document.body.classList.toggle('no-compass', !settings.compass);
 addEventListener('pagehide', saveSpot);
 setTime(world.menu ? 'dusk' : 'morning');
 window.__world = { menu, players, world, split, views, join, leave, monsters, height, PUNCHES, work, marks, melee: p1.melee, bag: p1.bag, rooms: p1.rooms, body: p1.body, controls: p1.controls, skills: p1.skills, swim: p1.swim, hud: p1.hud, camera, step, goto, SHOTS, setTime, state, renderer, chunks };

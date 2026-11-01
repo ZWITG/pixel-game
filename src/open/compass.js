@@ -29,6 +29,7 @@ export default class Compass {
     this.winds = WINDS.map(([name, at]) => ({ el: add('wind', name), at }));
     this.towns = Array.from({ length: MAX_TOWNS }, () => add('town', ''));
     this.goal = add('goal-mark', '');
+    this.pin = add('pin-mark', '');
   }
 
   put(el, bearing, yaw) {
@@ -67,6 +68,12 @@ export default class Compass {
       if (goal.textContent !== text) goal.textContent = text;
       goal.style.color = site.cat.color;
       this.put(goal, bearing(site), yaw);
+    }
+    this.pin.style.display = p.pin ? '' : 'none';
+    if (p.pin) {
+      const text = `⚑ ${Math.round(Math.hypot(x - p.pin.x, z - p.pin.z))} m`;
+      if (this.pin.textContent !== text) this.pin.textContent = text;
+      this.put(this.pin, bearing(p.pin), yaw);
     }
     // Stepping into a named place brings its name up for a moment.
     const [d, place] = near.find(([dist, t]) => dist < t.r * TITLE_AT) ?? [];

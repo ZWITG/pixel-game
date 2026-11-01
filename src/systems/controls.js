@@ -38,6 +38,8 @@ export const ACTIONS = {
   pause: { keys: ['Escape', 'KeyP'], pad: ['OPTIONS'] },
   restart: { keys: ['KeyR'], pad: ['CROSS', 'OPTIONS'] },
   // Menus
+  menuLeft: { keys: ['KeyZ'], pad: ['L1'] },
+  menuRight: { keys: ['KeyX'], pad: ['R1'] },
   confirm: { keys: ['KeyE', 'Space', 'Enter'], pad: ['CROSS'] },
   back: { keys: ['Escape', 'KeyQ'], pad: ['CIRCLE'] },
   up: { keys: ['KeyW', 'ArrowUp'], pad: ['UP', 'STICK_UP'] },

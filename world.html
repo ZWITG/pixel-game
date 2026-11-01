@@ -133,6 +133,38 @@
       @keyframes edge { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: none; } }
       @keyframes bar { from { transform: scaleX(0); } to { transform: none; } }
       @keyframes mark { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+      body.no-compass .compass { display: none; }
+      .compass .pin-mark { color: #ffe15a; top: 24px; }
+      #menu { position: fixed; inset: 0; z-index: 6; pointer-events: none; color: #f7efdf; font-family: 'Zen Maru Gothic', sans-serif; }
+      #menu > * { pointer-events: auto; }
+      #menu-bar { position: absolute; left: 0; right: 0; top: 0; height: 72px; display: flex; align-items: center; justify-content: center; gap: 14px; background: linear-gradient(#10152cf8, #0c1024f8); box-shadow: 0 1px 0 #ffb54755, 0 6px 22px #05081299; }
+      #menu-tabs { display: flex; gap: 4px; }
+      #menu-tabs button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 88px; padding: 7px 0 6px; border: 0; border-radius: 10px; background: none; color: #a9a59f; font: 700 13px 'Zen Maru Gothic', sans-serif; cursor: pointer; transition: color 0.12s, background 0.12s, transform 0.12s; }
+      #menu-tabs button:hover { color: #f7efdf; }
+      #menu-tabs button.at { color: #ffd98a; background: linear-gradient(#ffb5472e, #ffb54708); transform: translateY(-1px); }
+      #menu-tabs button.at svg { filter: drop-shadow(0 0 7px #ffb547cc); }
+      #menu-tabs button.at::after { content: ''; position: absolute; left: 18px; right: 18px; bottom: -6px; height: 3px; border-radius: 2px; background: #ffc86f; box-shadow: 0 0 10px #ffb547; }
+      #menu-prev, #menu-next { min-width: 34px; text-align: center; }
+      #menu-map { position: absolute; inset: 72px 0 0; display: flex; background: #0c1024; }
+      #menu-canvas { flex: 1; min-width: 0; height: 100%; cursor: crosshair; }
+      #menu-side { width: 214px; padding: 16px 14px; box-sizing: border-box; background: #10152c; box-shadow: inset 1px 0 0 #ffb54733; font-size: 14px; font-weight: 500; }
+      #menu-side h3 { margin: 0 0 10px; font-size: 17px; color: #ffd98a; }
+      #menu-legend div { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+      #menu-legend i { display: flex; filter: drop-shadow(0 1px 1px #000); }
+      #menu-place { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); padding: 4px 14px; border-radius: 8px; color: #fff6e0; background: #10152ce0; font-size: 17px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+      #menu-place:empty { display: none; }
+      #menu-page { position: absolute; inset: 72px 0 0; padding: 34px clamp(20px, 12vw, 180px); box-sizing: border-box; overflow: auto; background: linear-gradient(135deg, #10152c, #0a0d20); }
+      #menu-page button { display: grid; grid-template-columns: 1fr auto; column-gap: 20px; width: 100%; margin-bottom: 8px; padding: 12px 18px; border: 0; border-radius: 10px; background: #ffffff0a; color: #d9d1c4; font: 500 19px 'Zen Maru Gothic', sans-serif; text-align: left; cursor: pointer; }
+      #menu-page button small { grid-row: 2; font-size: 13px; color: #a9a59f; }
+      #menu-page button em { grid-column: 2; grid-row: 1 / 3; align-self: center; font-style: normal; font-weight: 700; color: #ffd98a; }
+      #menu-page button.at { color: #fff6e0; background: linear-gradient(90deg, #ffb5472e, #ffb54708); box-shadow: inset 3px 0 0 #ffc86f; }
+      .menu-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+      .menu-rows div { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; background: #ffffff0a; font-size: 18px; font-weight: 500; }
+      .menu-rows span:last-child { color: #f7efdf; }
+      #menu-hints { position: absolute; left: 14px; bottom: 12px; padding: 4px 10px; border-radius: 8px; font-size: 14px; font-weight: 500; background: #10152cd0; }
+      #menu-hints:empty { display: none; }
+      body.in-menu #skills, body.in-menu #pack, body.in-menu #p2-pack { top: 72px; bottom: 0; border-top: 0; }
+      body.in-menu #help, body.in-menu #pad-status, body.in-menu .compass, body.in-menu #hp, body.in-menu #lv, body.in-menu #goal { visibility: hidden; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -210,6 +242,20 @@
         <div id="p2-pack-info" class="pack-info"></div>
         <div id="p2-pack-hints" class="pack-hints"></div>
       </div>
+    </div>
+    <div id="menu" hidden>
+      <div id="menu-bar">
+        <span id="menu-prev"></span>
+        <div id="menu-tabs"></div>
+        <span id="menu-next"></span>
+      </div>
+      <div id="menu-map" hidden>
+        <canvas id="menu-canvas"></canvas>
+        <div id="menu-side"><h3>Legend</h3><div id="menu-legend"></div></div>
+        <div id="menu-place"></div>
+      </div>
+      <div id="menu-page" hidden></div>
+      <div id="menu-hints"></div>
     </div>
     <script type="module" src="/src/open/main.js"></script>
   </body>

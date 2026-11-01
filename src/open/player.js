@@ -5,6 +5,9 @@ import { FEATURES } from '../config/features.js';
 import { height, SPAWN } from './terrain.js';
 import HeroModel, { LOOKS } from './hero3d.js';
 import Compass from './compass.js';
+import { reachPin } from './gameMenu.js';
+
+const SATCHEL_TAB = 2;
 import Skills from './skills.js';
 import Swim, { DEEP, SURFACE } from './swim.js';
 import WorldHud from './skillPage.js';
@@ -250,23 +253,19 @@ export default class Player {
     const { controls, hud, state, swim, body, skills, melee, rooms, world } = this, just = controls.just;
     // Together, both heroes steer from the one shared camera.
     const aim = world.together ? world.shared : state;
-    if (!this.frozen) {
+    if (!this.frozen && !world.gameMenu.isOpen) {
       if (!hud.open && just.recenter) aim.recenter = Math.atan2(-state.dir[0], -state.dir[1]);
       if (!hud.open && just.camera && !world.players.some((p) => p.rooms.house)) world.travel(this);
-      if (hud.packOpen ? just.back || just.pack || just.pause : !hud.open && just.pack) {
+      // In co-op the Satchel opens in this hero's own half, so the other can play on.
+      if (world.players.length > 1 && (hud.packOpen ? just.back || just.pack || just.pause : !hud.open && just.pack)) {
         hud.togglePack(this);
         world.checkPause();
-      } else if (hud.mapOpen ? just.back || just.pause : !hud.open && just.pause) {
-        hud.toggle(skills.all(), body);
-        world.checkPause();
-      } else if (hud.mapOpen) {
-        hud.map.handle(just);
-      } else if (hud.packOpen) {
-        hud.pack.handle(just);
-      }
-      if (hud.mapOpen) hud.map.update(dt);
+      } else if (!hud.open && just.pack) world.gameMenu.open(this, SATCHEL_TAB);
+      else if (!hud.open && just.pause) world.gameMenu.open(this);
+      else if (hud.packOpen) hud.pack.handle(just);
       if (hud.packOpen) hud.pack.update();
     }
+    if (!world.paused) reachPin(this);
     const used = this.act(just);
     const free = !hud.open && !this.frozen;
     if (FEATURES.jump && just.jump && !used && free && !state.air && !melee.active) {

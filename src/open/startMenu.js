@@ -10,12 +10,20 @@ const FADE = 0.4;          // seconds to fade to black on the way into the game
 const SETTINGS_KEY = 'lumen.settings', KEEP = 'lumen.old.';
 export const QUALITY = [['auto', 'Auto', 'Keeps the game smooth on its own'], ['high', 'High', 'Sharpest picture'], ['balanced', 'Balanced', 'A little softer, much faster'], ['fast', 'Fast', 'For an older computer']];
 
+const DEFAULTS = { quality: 'auto', hints: 'auto', compass: true };
+
 export function loadSettings() {
   try {
-    return { quality: 'auto', ...JSON.parse(localStorage.getItem(SETTINGS_KEY)) };
+    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY)) };
   } catch {
-    return { quality: 'auto' };
+    return { ...DEFAULTS };
   }
+}
+
+export function saveSettings(settings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch { /* it still applies for this visit */ }
 }
 
 function hasHero() {
@@ -86,9 +94,7 @@ export default class StartMenu {
 
   setQuality(id) {
     this.settings.quality = id;
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
-    } catch { /* it still applies for this visit */ }
+    saveSettings(this.settings);
     this.onQuality(id);
     this.draw();
   }

@@ -57,6 +57,7 @@ It grows feature by feature with the user, who plays and tests with a controller
 - `terrain.js`: pure height plus saved dents. `ground.js`: land, tree and grass data as plain arrays, run off the frame in `groundWorker.js`. `chunks.js`: streaming around every hero (near trees, far picture trees, per-chunk water), `deform()` edits live ground; dents go to the workers too. Use `chunks.settle()` after a teleport.
 - `post.js`: own picture pipeline (scene, glow, shafts, tone curve). `materials.js`: terrain, water, sky, `masonry()`, shared noise texture, fog chunks. `foliage.js`: leaf and grass cards. `compass.js`: compass strip and place names.
 - `startMenu.js`: the title screen (Continue, New Game, Controls, Graphics). `/world.html?play` skips it, which tests should use. Continue reads `lumen.spot`; New Game moves the save to `lumen.old.*`.
+- `gameMenu.js`: the menu in play (Options): tabs for Map, Powers (the Spirit Tree), Satchel, Controls, Settings; L1/R1 change tab. `mapWorker.js` surveys the chart once in the background.
 - Debug handle: `window.__world`. Testing while the user plays: use a separate pane tab, stub `Storage.prototype.setItem` and
   `navigator.getGamepads`, set `__world.world.skipRender = true`, and render only captured frames, or the save changes or the tab crashes.
 
