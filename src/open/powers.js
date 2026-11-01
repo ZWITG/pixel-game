@@ -422,7 +422,7 @@ export default class PowerSet {
       const a = base + (i - (n - 1) / 2) * (def.spread ?? 0), size = def.size ?? 0.8;
       const shell = this.fx.shell(this.element, this.element === 'ice' ? size * 1.2 : this.element === 'fire' ? size * 0.5 : size * 0.7);
       const glow = this.element === 'earth' || this.element === 'ice' ? null : this.fx.glow(state.x, 0, state.z, size * (this.element === 'void' ? 2.6 : 1.8), color, 99, 1);
-      this.bolts.push({ ...job, x: state.x, z: state.z, dx: Math.sin(a), dz: Math.cos(a), left: def.range, hit: new Set(), glow, shell, chain: (def.chain ?? 0) + (def.chain ? rank : 0) });
+      this.bolts.push({ ...job, x: state.x, z: state.z, dx: Math.sin(a), dz: Math.cos(a), left: def.range, hit: new Set(), glow, shell, chain: (def.chain ?? 0) + (def.chain ? rank + this.player.nature.chains : 0) });
     }
   }
 
@@ -535,14 +535,17 @@ export default class PowerSet {
   afflict(pid, e, def, rank) {
     const { melee: { monsters }, world: { work } } = this.player;
     if (e.dying) return;
-    const y = e.group.position.y + 1.5;
+    const y = e.group.position.y + 1.5, { nature } = this.player;
     if (def.status === 'burn') {
-      this.burns.set(e, { left: BURN_SECS * (1 + rank * 0.15), dps: this.player.body.might * BURN_SHARE * rankScale(rank) });
+      this.burns.set(e, { left: BURN_SECS * (1 + rank * 0.15), dps: this.player.body.might * BURN_SHARE * rankScale(rank) * nature.pyromancy });
+      nature.deed('pyromancy');
     } else if (def.status === 'freeze' && !e.boss) {
       stagger(e, (def.chill ?? 1) * (1 + rank * 0.12), monsters.time, true);
       this.fx.glow(e.x, y, e.z, 2.4, '#bfeaff', 0.5);
+      nature.deed('stillness');
     } else if (def.status === 'shock' && !e.boss) {
       stagger(e, SHOCK_SECS, monsters.time, true);
+      nature.deed('conductance');
     }
     if (STATUS_COLORS[def.status]) work.burst(e.x, y, e.z, STATUS_COLORS[def.status], 3, 3);
   }

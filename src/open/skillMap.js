@@ -53,6 +53,8 @@ export const ICONS = {
   wing: ['#........', '##.......', '###......', '#####....', '#######..', '.########', '...######', '.....###.', '.........'],
   cloud: ['.........', '...##....', '..####.#.', '.#######.', '#########', '#########', '.#######.', '.........', '.........'],
   comet: ['#.......#', '.#.....##', '..#...###', '...#.####', '....#####', '...######', '..#######', '.#.......', '.........'],
+  skull: ['..#####..', '.#######.', '#########', '#..###..#', '#..###..#', '#########', '.##.#.##.', '.#######.', '..#.#.#..'],
+  crystal: ['....#....', '...###...', '..#.#.#..', '.#..#..#.', '#########', '.#..#..#.', '..#.#.#..', '...###...', '....#....'],
   heart: ['.........', '.##...##.', '####.####', '#########', '#########', '.#######.', '..#####..', '...###...', '....#....'],
 };
 const DIGITS = ['###,#.#,#.#,#.#,###', '.#.,##.,.#.,.#.,###', '###,..#,###,#..,###', '###,..#,.##,..#,###', '#.#,#.#,###,..#,..#', '###,#..,###,..#,###', '###,#..,###,#.#,###', '###,..#,.#.,.#.,.#.', '###,#.#,###,#.#,###', '###,#.#,###,..#,###'].map((d) => d.split(','));
@@ -68,8 +70,9 @@ const FAN = ['running', 'superspeed', 'swimming', 'climbing', 'jumping', 'flight
 const FAN_FROM = 0.955, FAN_SPAN = 0.91;     // share of a half turn, left end and width
 const RINGS = [92, 117, 142, 167, 192];      // distance of each node from the hub
 const WIDE = 1.25, TALL = 0.88;              // the fan is an oval, to fill a wide map
-const BOUGHS = Object.fromEntries(FAN.map((id, i) => {
-  const a = Math.PI * (FAN_FROM - (FAN_SPAN * i) / (FAN.length - 1));
+const EVOLVED = { superspeed: 'superspeed', flight: 'flight', blow: 'blow' }; // only the Conquerors with this flag grow them
+const fanOf = (ids) => Object.fromEntries(ids.map((id, i) => {
+  const a = Math.PI * (FAN_FROM - (FAN_SPAN * i) / (ids.length - 1));
   // A slight sway keeps the spokes looking grown rather than ruled.
   const nodes = RINGS.map((r, k) => {
     const sway = Math.sin(k * 1.5 + i * 2) * 5 * (k / 4);
@@ -95,7 +98,7 @@ function disc(g, x, y, r) {
 }
 
 // The still part: sky, stars, the dark tree and its sealed buds.
-function paintBackdrop() {
+function paintBackdrop(boughs) {
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
@@ -126,7 +129,7 @@ function paintBackdrop() {
   g.fillStyle = '#3a2f55';
   TRUNK.slice(1).forEach((p, i) => line(g, [TRUNK[i][0] - 3, TRUNK[i][1]], [p[0] - 3, p[1]], 3));
   // Boughs: every one starts dark, sealed or not.
-  for (const { path } of Object.values(BOUGHS)) {
+  for (const { path } of Object.values(boughs)) {
     path.slice(1).forEach((p, i) => {
       g.fillStyle = '#2a2240';
       line(g, path[i], p, i < 2 ? 4 : 3);
@@ -150,7 +153,7 @@ export default class SkillMap {
     canvas.height = H;
     this.g = canvas.getContext('2d');
     this.tag = tag;
-    this.backdrop = paintBackdrop();
+    this.trees = {};
     this.bough = 0;
     this.focus = 0;
     this.age = 0;
@@ -158,7 +161,17 @@ export default class SkillMap {
   }
 
   open(skills, body) {
-    this.skills = FAN.map((id) => skills.find((s) => s.id === id)).map((s) => ({ ...s, nodes: BOUGHS[s.id].nodes }));
+    // Each Conqueror grows its own tree: the boughs it can use, under its own names, plus its discipline.
+    const { nature, conq } = body, own = nature?.own;
+    const key = conq ? conq.name : '';
+    const ids = FAN.filter((id) => !conq || !EVOLVED[id] || conq[EVOLVED[id]]).concat(own ? [own.discipline.id] : []);
+    const tree = this.trees[key] ??= (() => { const boughs = fanOf(ids); return { boughs, backdrop: paintBackdrop(boughs) }; })();
+    this.backdrop = tree.backdrop;
+    this.nature = nature;
+    this.skills = ids.map((id) => {
+      const s = skills.find((a) => a.id === id), shown = nature?.named(s) ?? s, mine = own && (own.boughs[id] || s.discipline);
+      return { ...shown, ...tree.boughs[id], color: mine ? conq.color : s.color };
+    });
     this.body = body;
     this.age = 0;
     this.pick(this.bough);
@@ -173,8 +186,9 @@ export default class SkillMap {
 
   showTag() {
     const s = this.skills[this.bough], node = s.levels[this.focus];
-    this.tag.textContent = this.focus < s.level ? `${s.name} · ${node.title}` : '?';
-    this.tag.style.color = this.focus < s.level ? s.color : '#7a84b0';
+    const twist = this.nature?.twistAt(s.id, this.focus), lit = this.focus < s.level;
+    this.tag.textContent = `${lit ? `${s.name} · ${node.title}` : twist ? s.name : '?'}${twist ? ` · ${lit ? 'Gift' : 'Opens'}: ${twist.text}` : ''}`;
+    this.tag.style.color = lit ? s.color : '#7a84b0';
   }
 
   // Left and right step across the fan; up and down travel out along a bough and back.
@@ -189,7 +203,7 @@ export default class SkillMap {
   }
 
   drawBough(s, index, t) {
-    const g = this.g, reveal = Math.min(1, t / REVEAL), lit = s.level, path = BOUGHS[s.id].path;
+    const g = this.g, reveal = Math.min(1, t / REVEAL), lit = s.level, { path } = s;
     const segs = path.length - 1, upto = (lit / s.levels.length) * reveal * segs;
 
     // Light runs out along the bough as far as you have learned.
@@ -227,6 +241,13 @@ export default class SkillMap {
       if (on) {
         g.fillStyle = INK;
         icon(g, s.levels[i].icon, x, y);
+      }
+      // A node that opens a twist wears a diamond, so it can be seen from the first day.
+      if (this.nature?.twistAt(s.id, i)) {
+        g.fillStyle = on ? '#ffe7a0' : '#6a78b8';
+        for (let d = 0; d < 13; d++) {
+          for (const [px, py] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) g.fillRect(x + px * d, y + py * (12 - d), 1, 1);
+        }
       }
       // The next node fills like a ring as you practise.
       if (i === lit && s.progress > 0) {

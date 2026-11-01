@@ -127,6 +127,7 @@ export default class Monsters {
 
   onEnemyKilled(e) {
     this.world.realm.slain(e);
+    this.work.actor?.nature.killed();
     // Evolved monsters teach more and drop more.
     this.work.skills.add('fighting', 3 * (1 + e.tier));
     const drops = {};
@@ -236,7 +237,7 @@ export default class Monsters {
   hit(e, force, x, z) {
     if (e.dying) return;
     if (e.heldBy) e.heldBy.melee.drop();
-    e.takeHit(Math.round(force * 10) / 10, x, z);
+    e.takeHit(Math.round(force * this.work.actor.nature.edge(e) * 10) / 10, x, z);
     e.recoil = 1;
     this.work.skills.add('fighting', 1);
     if (e.boss) {

@@ -298,6 +298,7 @@ export default class Work {
 
   // The tree comes down away from the hero, on its own copy so the forest needn't change.
   fell(o) {
+    if (this.actor?.nature.has('kindle')) this.actor.world.scars.mark('fire', o.x, o.z, 5, this.actor, 2);
     if (this.falling.length >= MAX_FALLING) {
       this.burst(o.x, o.y + 4, o.z, LEAVES[o.kind], 12, 6, true);
       return;

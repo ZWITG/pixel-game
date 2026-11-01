@@ -14,6 +14,7 @@ export default class Body {
     this.skills = skills;
     this.bag = null; // set once the bag exists: worn gear and potions add to the numbers below
     this.powers = null; // the hero's Conqueror: its nature and its active powers count here too
+    this.nature = null; // how that Conqueror bends the shared skills (nature.js)
   }
 
   get conq() {
@@ -38,7 +39,7 @@ export default class Body {
   // Every point of Endurance is 3% more breath.
   get breathScale() { return (1 + (this.endurance - 10) * 0.03) * (1 + this.bonus('breath')); }
   // Strength lets the hero haul up steeper ground.
-  get climbLimit() { return BASE_CLIMB + (this.strength - 10) * 0.03; }
+  get climbLimit() { return BASE_CLIMB + (this.strength - 10) * 0.03 + (this.nature?.climb ?? 0); }
   // Mass is how much hero there is. Compared to a beginner's 60: it multiplies every blow,
   // spreads shockwaves, softens hits and shrugs off knockback, and the hero visibly grows.
   get massScale() { return this.mass / 60; }

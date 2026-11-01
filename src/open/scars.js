@@ -208,7 +208,7 @@ export default class Scars {
       if (e.dying || e.cave) continue;
       const c = this.at(e.x, e.z);
       if (!c?.owner) continue;
-      const { powers, body } = c.owner, bite = body.might * c.force * TICK * BITE;
+      const { powers, body, nature } = c.owner, bite = body.might * c.force * TICK * BITE * (c.burn > 0 ? nature.pyromancy : 1);
       if (c.burn > 0) {
         powers.sting(e, bite * 0.8);
         powers.burns.set(e, { left: 2, dps: body.might * c.force * 0.12 });
@@ -234,7 +234,7 @@ export default class Scars {
     const { sites } = this.world;
     for (const c of this.cells.values()) {
       if (!c.owner) continue;
-      if (c.burn > 0 || c.rupture > 0) sites.scorch(c.x, c.z, c.owner.body.might * BURN_WORKS, c.owner);
+      if (c.burn > 0 || c.rupture > 0) sites.scorch(c.x, c.z, c.owner.body.might * BURN_WORKS * c.owner.nature.pyromancy, c.owner);
       else if (c.frost > 0.5) sites.chill(c.x, c.z);
     }
   }

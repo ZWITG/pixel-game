@@ -211,8 +211,9 @@ export default class Sites {
     if (this.sealed?.(s, p)) return;
     for (const w of standing(s)) {
       if (Math.hypot(w.x - x, w.z - z) > reach + w.def.size) continue;
-      const fell = strike(w, force, p, this.world.fx, this.work.burst.bind(this.work));
+      const fell = strike(w, force * p.nature.demolition, p, this.world.fx, this.work.burst.bind(this.work));
       if (!fell) continue;
+      p.nature.deed('demolition', w.def.hits);
       p.hud.message(`${w.def.name} destroyed. ${standing(s).length} left standing.`);
       this.work.shake = Math.max(this.work.shake, 0.35);
       this.work.shakeAt = p.state;

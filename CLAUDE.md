@@ -65,6 +65,7 @@ It grows feature by feature with the user, who plays and tests with a controller
 - `kit.js`: the toon shapes, ink and glow every figure uses. `figures.js`: people, one skeleton with an outfit per look (`OUTFITS`). `creatures.js`: monsters and bosses (`CREATURES`), replacing the old models through `MODELS` in monsters.js. `architecture.js`: buildings by nation (`STYLES`), each a painted sheet plus four house shapes, one draw call each, windows lit at night.
 - `fortress.js`: walls, round towers, gatehouses, citadels, ruins and tents as painted parts for one masonry mesh; `STONEWORK` is each nation's palette. Hero gear is `signature()` in hero3d.js; `STAGES` in player.js shows Mastery on the body through `ascend()`.
 - `raze.js`: destruction sites. `WORKS` are the structures, `LAYOUTS` what each site has; `sites.struck` feeds them from any blast, `scars` from fire and frost.
+- `nature.js`: per-Conqueror twists on shared skills, tree names and earned disciplines (`NATURES`); read with `player.nature`, shown on the Gifts tab and the Spirit Tree (`skillMap.js` builds one tree per Conqueror).
 - Debug handle: `window.__world`. Testing while the user plays: use a separate pane tab, stub `Storage.prototype.setItem` and
   `navigator.getGamepads`, set `__world.world.skipRender = true`, and render only captured frames, or the save changes or the tab crashes.
 

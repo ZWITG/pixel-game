@@ -32,7 +32,7 @@ export default class Swim {
   }
 
   speed(sprint) {
-    return SPEED[this.level] * this.body.moveScale * (this.tired ? TIRED : sprint ? SPRINT : 1);
+    return SPEED[this.level] * this.body.moveScale * (this.body.nature?.swim ?? 1) * (this.tired ? TIRED : sprint ? SPRINT : 1);
   }
 
   get maxBreath() {
@@ -63,7 +63,7 @@ export default class Swim {
       this.breath = Math.min(max, this.breath + (dt * max) / RECOVER);
       if (this.breath >= max * REST) this.tired = false;
     } else {
-      this.breath -= dt * (sprint ? 2 : 1);
+      this.breath -= dt * (sprint ? 2 : 1) * (this.body.nature?.breath ?? 1);
       if (this.breath <= 0) this.tire();
     }
     this.hud.setBreath(Math.max(0, this.breath) / max);

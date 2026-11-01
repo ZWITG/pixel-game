@@ -7,6 +7,7 @@ import HeroModel, { LOOKS } from './hero3d.js';
 import Compass from './compass.js';
 import { reachPin, SATCHEL_TAB } from './gameMenu.js';
 import PowerSet, { PowerBar } from './powers.js';
+import Nature from './nature.js';
 import { CONQUERORS } from './conquerors.js';
 import Skills from './skills.js';
 import Swim, { DEEP, SURFACE } from './swim.js';
@@ -70,12 +71,15 @@ export default class Player {
     this.controls = new Controls(world.renderer.domElement, { keyboard: index === 0 });
     this.controls.device = 'pad'; // PS5 prompts by default; pressing a key switches them to keyboard
     const hud = this.hud = new WorldHud(prefix);
-    this.skills = new Skills((skill, level) => {
-      const conq = this.powers?.def;
-      if (skill.power) hud.message(`${skill.name} reached rank ${level + 1}!`, true);
-      else if (skill.name === 'Jumping' && level === JUMP_MAX && conq?.flight) hud.message('Jumping has evolved into Flight! Jump and hold X to fly.', true, 5000);
-      else if (skill.name === 'Punching' && level === 5 && conq?.blow) hud.message('Punching has evolved into Destructive Blow! Hold Square, then let go.', true, 5000);
-      else if (skill.name === 'Running' && level === RUN_MAX && conq?.superspeed) hud.message('Running has evolved into Superspeed! While sprinting, press sprint again.', true, 5000);
+    this.skills = new Skills((raw, level) => {
+      const conq = this.powers?.def, skill = this.nature?.named(raw) ?? raw;
+      const twist = this.nature?.twistAt(skill.id, level - 1);
+      if (twist) hud.message(`${twist.name}! ${twist.text}`, true, 5000);
+      else if (skill.discipline) hud.message(`${skill.levels[level - 1].title}! See Gifts in the menu.`, true);
+      else if (skill.power) hud.message(`${skill.name} reached rank ${level + 1}!`, true);
+      else if (raw.id === 'jumping' && level === JUMP_MAX && conq?.flight) hud.message('Jumping has evolved into Flight! Jump and hold X to fly.', true, 5000);
+      else if (raw.id === 'punching' && level === 5 && conq?.blow) hud.message('Punching has evolved into Destructive Blow! Hold Square, then let go.', true, 5000);
+      else if (raw.id === 'running' && level === RUN_MAX && conq?.superspeed) hud.message('Running has evolved into Superspeed! While sprinting, press sprint again.', true, 5000);
       else if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
       else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
     }, (name, value) => hud.gain(ATTRIBUTES[name], value), `${save}skills`);
@@ -88,6 +92,7 @@ export default class Player {
     this.melee = new Melee(world.scene, this, world.work);
     this.melee.monsters = world.monsters;
     this.powers = new PowerSet(this, `${save}conqueror`);
+    this.nature = this.body.nature = new Nature(this);
     this.body.powers = this.powers;
     this.bar = new PowerBar(prefix);
     this.hero = new HeroModel(world.scene, this.powers.def?.look ?? LOOKS[index]);
@@ -253,6 +258,7 @@ export default class Player {
     state.dive = false;
     if (dived) this.melee.landDive(state);
     state.air = state.rise = state.peak = 0;
+    this.nature.landed(fell);
     this.landed = fell > 2 ? LANDING : 0;
     this.world.work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], fell > 2 ? 12 : 5, 2 + Math.min(4, fell * 0.2));
     if (!this.rooms.house) this.melee.stomp(state, fell);
@@ -281,7 +287,10 @@ export default class Player {
     if (free && !melee.active && this.powers.def) {
       for (let i = 0; i < 4; i++) if (just[`power${i}`]) this.powers.use(i);
     }
-    if (!world.paused) this.powers.update(dt);
+    if (!world.paused) {
+      this.powers.update(dt);
+      this.nature.update(dt);
+    }
     this.bar.update(this.powers, controls.device);
     if (this.powers.def) this.growForm();
     if (FEATURES.jump && just.jump && !used && free && !state.air && !melee.active) {
@@ -290,7 +299,8 @@ export default class Player {
       world.work.burst(state.x, state.y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], 4, 2);
       state.air = 0.01;
       skills.add('jumping', 1);
-    }
+      this.nature.jumpedOff();
+    } else if (FEATURES.jump && just.jump && !used && free && state.air > 0.3 && !melee.active) this.nature.airJump();
     const look = free ? controls.look() : { x: 0, y: 0 };
     aim.yaw -= look.x;
     this.looked = look.x || look.y ? 0 : this.looked + dt;
@@ -313,7 +323,7 @@ export default class Player {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
       // Walking sideways slowly brings the camera round behind the hero.
       if (!world.together && !rooms.house && this.looked > LOOK_RESPECT) aim.yaw -= m.x * TURN_WITH_MOVE * dt;
-      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale) * amount * (melee.charging || melee.guarding ? CHARGE_SLOW : melee.held ? HOLD_SLOW : 1);
+      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale * this.nature.stride()) * amount * (melee.charging || melee.guarding ? CHARGE_SLOW : melee.held ? HOLD_SLOW : 1);
       const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
       if (state.pace > 0) {
         // A hard turn at speed costs you: momentum has to go somewhere.

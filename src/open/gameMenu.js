@@ -5,6 +5,7 @@ import { svg, MAX_RANK } from './powers.js';
 import { NATIONS, nationAt, COUNTRY } from './nations.js';
 import { DOCTRINES } from './doctrines.js';
 import { TIERS, tierOf } from './settlements.js';
+import { SKILLS } from './skills.js';
 
 // The menu in play: one row of icon tabs over the map, the Spirit Tree, the Satchel, the
 // buttons and the settings. Add a tab by adding an entry to TABS and a case in `show`.
@@ -22,6 +23,7 @@ const SHAPES = {
   kingdom: 'M2 21V10l3 2 3-6 4 4 4-4 3 6 3-2v11zM12 13a2 2 0 0 0-2 2v6h4v-6a2 2 0 0 0-2-2z',
   town: 'M8 4 1 11h2v10h5v-5h2v5h3V11h1zM17 9l-3 3v9h9v-9h-1z',
   hamlet: 'M12 7l-8 7h2v7h12v-7h2z',
+  gifts: 'M12 2l2.6 6.6L22 9.4l-5.4 4.8 1.6 7.3L12 17.7l-6.2 3.8 1.6-7.3L2 9.4l7.4-.8z',
   fort: 'M3 21V9l2-4 2 4v2h2V9l3-5 3 5v2h2V9l2-4 2 4v12h-6v-5h-6v5z',
   village: 'M12 3 2 12h3v9h5v-6h4v6h5v-9h3z',
   bandit: 'M12 4 2 20h7l3-6 3 6h7z',
@@ -31,8 +33,8 @@ const SHAPES = {
   goal: 'M12 2 22 12 12 22 2 12z',
   pin: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6z',
 };
-const TABS = [['map', 'Map'], ['nations', 'Nations'], ['powers', 'Powers'], ['skills', 'Skills'], ['satchel', 'Satchel'], ['controls', 'Controls'], ['settings', 'Settings']];
-export const SATCHEL_TAB = 4;
+const TABS = [['map', 'Map'], ['nations', 'Nations'], ['powers', 'Powers'], ['gifts', 'Gifts'], ['skills', 'Skills'], ['satchel', 'Satchel'], ['controls', 'Controls'], ['settings', 'Settings']];
+export const SATCHEL_TAB = 5;
 const TERRITORY = 128;      // cells across the map's overlay of borders
 const POWER_COLS = 4, DIRS = ['up', 'right', 'down', 'left'], DIR_NAMES = ['Up', 'Right', 'Down', 'Left'];
 const KINDS = {
@@ -153,7 +155,7 @@ export default class GameMenu {
     this.device = p.controls.device;
     [...this.tabs.children].forEach((el, i) => el.classList.toggle('at', i === tab));
     this.mapBox.hidden = id !== 'map';
-    this.page.hidden = id !== 'controls' && id !== 'settings' && id !== 'powers' && id !== 'nations';
+    this.page.hidden = id !== 'controls' && id !== 'settings' && id !== 'powers' && id !== 'gifts' && id !== 'nations';
     this.assigning = false;
     if (id === 'skills') p.hud.toggle(p.skills.all(), p.body);
     if (id === 'satchel') {
@@ -224,6 +226,7 @@ export default class GameMenu {
       this.page.innerHTML = `<div class="menu-rows">${this.rows(pad).map(([key, label]) => `<div>${key}<span>${label}</span></div>`).join('')}</div>`;
     }
     if (id === 'powers') this.drawPowers();
+    if (id === 'gifts') this.drawGifts();
     if (id === 'nations') this.drawNations();
     if (id === 'settings') {
       this.page.innerHTML = this.options().map((o, i) => `<button data-at="${i}" class="${i === this.at ? 'at' : ''}"><b>${o.label}</b><small>${o.note}</small><em>${o.action ? o.value : `‹ ${o.value} ›`}</em></button>`).join('');
@@ -281,6 +284,25 @@ export default class GameMenu {
         <div class="power-grid">${cards}</div>
       </div>
       <div class="power-info"><b>${def.name}</b>${open ? `<span>Rank ${rank + 1} of ${MAX_RANK + 1}</span>` : `<span>Opens at Mastery ${def.mastery}. You are at ${set.mastery}.</span>`}<p>${def.text}</p>${open ? stats : ''}</div>
+    </div>`;
+  }
+
+  // What this Conqueror's nature has made of the shared skills, and the discipline only it earns.
+  drawGifts() {
+    const p = this.owner, c = p.powers.def, own = p.nature.own;
+    if (!own) {
+      this.page.innerHTML = '';
+      return;
+    }
+    const d = own.discipline, level = p.skills.level(d.id), skill = p.skills.all().find((s) => s.id === d.id);
+    const rows = own.twists.map((t) => {
+      const on = p.nature.has(t.id), need = p.nature.named(SKILLS[t.skill]);
+      return `<div class="gift ${on ? 'on' : ''}" style="--c:${c.color}"><b>${t.name}</b><span>${on ? need.name : `${need.name}: reach ${need.levels[t.at - 1].title}`}</span><p>${t.text}</p></div>`;
+    }).join('');
+    this.page.innerHTML = `<div class="powers-page">
+      <div class="powers-head" style="color:${c.color}">${svg(c.emblem, 34)}<div><b>${c.name}</b><span>What your nature does to your skills</span></div></div>
+      <div class="gifts">${rows}</div>
+      <div class="power-info"><b>${d.name}</b><span>${level ? `Level ${level} of ${skill.levels.length}` : 'Not yet earned'}. ${d.taught} to train it.</span><p>${d.text}</p><div class="power-bar"><i style="width:${Math.round(skill.progress * 100)}%;background:${c.color}"></i></div></div>
     </div>`;
   }
 
