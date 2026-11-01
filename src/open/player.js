@@ -17,7 +17,7 @@ import Rooms, { ROOM_Y } from './rooms.js';
 const RUN = 6, SPRINT = 16;
 const GRAVITY = 22;
 const CLIMB_START = 0.45; // slopes steeper than this count as climbing practice
-const TURN_WITH_MOVE = 0.75; // radians per second the camera eases round when walking sideways
+const TURN_WITH_MOVE = 0.4; // radians per second the camera eases round when walking sideways
 const LOOK_RESPECT = 1.2;    // seconds after the player steers the camera before it eases again
 const REGEN_DELAY = 6, REGEN = 2; // seconds out of a fight, then health per second
 const TIME_ORDER = ['morning', 'dusk', 'mist', 'night'];
@@ -124,10 +124,10 @@ export default class Player {
       if (!hud.open && just.camera) world.travel(this);
       if (hud.packOpen ? just.back || just.pack || just.pause : !hud.open && just.pack) {
         hud.togglePack(this);
-        world.paused = hud.open;
+        world.checkPause();
       } else if (hud.mapOpen ? just.back || just.pause : !hud.open && just.pause) {
         hud.toggle(skills.all(), body);
-        world.paused = hud.open;
+        world.checkPause();
       } else if (hud.mapOpen) {
         hud.map.handle(just);
       } else if (hud.packOpen) {

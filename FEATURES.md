@@ -88,6 +88,8 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: camera fixes: no longer passes through houses or landmarks, shared view climbs hills and avoids walls, no tunnel through the forest in split-screen, blows only shake nearby screens, shorter and capped shake, clean restart after travel, gentler sideways turn
+- 2026-11-01 prototype: in co-op each player's Satchel opens in their own half of the screen, both can be open, and the other hero keeps playing
 - 2026-11-01 prototype: players can hurt each other; hero level; monsters evolve through six visible forms, live, scaling with the heroes; ten location categories with their own goals, rewards and beams
 - 2026-11-01 prototype: Satchel page (Triangle) with inventory and crafting; five gear slots, three potions, ten recipes; gear and potions change force, health, armor, speed, carrying and Mass; gear is crafted in houses using bag and chest
 - 2026-11-01 prototype: split-screen is now horizontal, Player 1 on top and Player 2 below, each with their HUD in their own half

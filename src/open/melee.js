@@ -155,6 +155,7 @@ export default class Melee {
     if (!reach) return;
     this.blast(state.x, state.z, this.body.massScale * this.body.damageScale, reach, reach > 6 ? reach * 0.6 : 0, '#c9a0ff', null);
     this.work.shake = Math.max(this.work.shake, Math.min(0.6, reach * 0.06));
+    this.work.shakeAt = state;
   }
 
   // One blow going out from a point. Returns true if it met anything.
@@ -263,6 +264,7 @@ export default class Melee {
 
   update(dt, state) {
     this.work.actor = this.player;
+    const shook = this.work.shake;
     this.idle += dt;
     const a = this.active;
     if (a) {
@@ -284,6 +286,7 @@ export default class Melee {
     }
     for (const w of this.waves) this.updateWave(w, dt);
     this.waves = this.waves.filter((w) => w.queue.length);
+    if (this.work.shake > shook) this.work.shakeAt = state;
     for (const r of this.rings) {
       if (!r.ring.visible) continue;
       r.age += dt;

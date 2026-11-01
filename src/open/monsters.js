@@ -169,6 +169,7 @@ export default class Monsters {
     s.x += ((s.x - fromX) / d) * push;
     s.z += ((s.z - fromZ) / d) * push;
     this.work.shake = Math.max(this.work.shake, 0.2);
+    this.work.shakeAt = s;
     if (p.hp <= 0) p.down();
     p.hud.setHealth(p.hp / p.body.maxHealth);
   }

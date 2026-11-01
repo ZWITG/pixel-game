@@ -13,7 +13,7 @@ export default class WorldHud {
     this.mapOpen = false;
     this.packOpen = false;
     this.map = new SkillMap($('skill-map'), $('skill-tag'));
-    this.pack = new PackPage($('pack-page'), $('pack-tag'), $('pack-info'), $('pack-hints'));
+    this.pack = new PackPage(this.$('pack-page'), this.$('pack-tag'), this.$('pack-info'), this.$('pack-hints'));
     this.timer = null;
     this.point = new THREE.Vector3();
   }
@@ -105,7 +105,7 @@ export default class WorldHud {
 
   togglePack(player) {
     this.packOpen = !this.packOpen;
-    $('pack').hidden = !this.packOpen;
+    this.$('pack').hidden = !this.packOpen;
     if (this.packOpen) this.pack.open(player);
   }
 

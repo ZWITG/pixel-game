@@ -1,5 +1,6 @@
 import { ITEMS, RECIPES, SLOTS } from './items.js';
 import { icon, number, ICONS } from './skillMap.js';
+import { prompt } from '../ui/glyphs.js';
 
 // The Satchel: a pixel page with two tabs. Bag shows what you carry and wear; Craft shows what
 // you can make, with each ingredient's count. Names and effects sit below it as plain text.
@@ -29,6 +30,8 @@ export default class PackPage {
     this.player = player;
     this.tab = 0;
     this.at = 0;
+    const p = (action) => prompt(action, player.controls.device);
+    this.hints.innerHTML = `${p('confirm')} Use, wear or craft&nbsp;&nbsp; ${p('punch')} Drop&nbsp;&nbsp; ${p('packTab')} Bag or Craft&nbsp;&nbsp; ${p('back')} Close`;
   }
 
   get entries() {

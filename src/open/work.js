@@ -375,7 +375,7 @@ export default class Work {
   }
 
   update(dt) {
-    this.shake = Math.max(0, this.shake - dt * 0.8);
+    this.shake = Math.max(0, this.shake - dt * 2.5);
     if (this.shaking) {
       const s = this.shaking;
       s.t += dt;

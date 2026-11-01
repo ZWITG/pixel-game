@@ -149,7 +149,7 @@ export function makeTreeMeshes(scene, max) {
     stump.count = 0;
     scene.add(stump);
     const map = leafTexture(LEAVES[kind]);
-    const mat = fadeNear(addWind(new THREE.MeshLambertMaterial({ map, alphaTest: 0.5 }), { from: 5, amount: 0.018 }), 4, 12);
+    const mat = fadeNear(addWind(new THREE.MeshLambertMaterial({ map, alphaTest: 0.5 }), { from: 5, amount: 0.018 }), 3, 8);
     const crownMesh = new THREE.InstancedMesh(crown(kind), mat, max);
     crownMesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5 });
     const trunkMesh = new THREE.InstancedMesh(trunkGeometry(), fadeNear(trunkMaterial(kind), 2, 5), max);

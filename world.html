@@ -57,12 +57,18 @@
       #blink { position: fixed; inset: 0; background: #141a28; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
       #blink.on { opacity: 1; transition: none; }
       #skills { position: fixed; inset: 0; background: #0a0f22; }
-      #pack { position: fixed; inset: 0; background: #120d14; }
-      #pack-page { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
-      #pack-tag, #pack-info { position: fixed; left: 54%; right: 4%; text-align: center; color: #f3ead8; text-shadow: 0 2px 0 #120d14; }
-      #pack-tag { top: 11%; font: 700 26px 'Zen Maru Gothic', sans-serif; color: #ffb547; }
-      #pack-info { top: 18%; font: 500 16px 'Zen Maru Gothic', sans-serif; }
-      #pack-hints { position: fixed; bottom: 10px; right: 14px; color: #f3ead8; font: 500 14px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; }
+      .pack { position: fixed; inset: 0; background: #120d14; display: flex; align-items: center; justify-content: center; }
+      body.two #pack { bottom: 50%; }
+      body.two #p2-pack { top: 50%; border-top: 3px solid #f3ead8; }
+      /* The page keeps its shape, and its words are sized from it, so a half-screen panel still reads. */
+      .pack-box { position: relative; aspect-ratio: 16 / 9; height: 100%; max-width: 100%; container-type: size; }
+      .pack-box canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+      .pack-tag, .pack-info, .pack-hints { position: absolute; color: #f3ead8; text-shadow: 0 2px 0 #120d14; }
+      .pack-tag, .pack-info { left: 54%; right: 4%; text-align: center; }
+      .pack-tag { top: 11%; font: 700 6.4cqh 'Zen Maru Gothic', sans-serif; color: #ffb547; }
+      .pack-info { top: 21.5%; font: 500 4.4cqh 'Zen Maru Gothic', sans-serif; }
+      .pack-hints { bottom: 2.5%; right: 2.5%; font: 500 3.2cqh 'Zen Maru Gothic', sans-serif; white-space: nowrap; }
+      #toast, #p2-toast, #gains, #p2-gains { z-index: 5; }
       #skill-map { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
       #skill-tag { position: fixed; left: 0; right: 0; bottom: 5%; text-align: center; font: 700 26px 'Zen Maru Gothic', sans-serif; text-shadow: 0 2px 0 #0a0f22; }
       [hidden] { display: none !important; }
@@ -95,11 +101,21 @@
       <div id="skill-tag"></div>
       <div id="map-hints"></div>
     </div>
-    <div id="pack" hidden>
-      <canvas id="pack-page"></canvas>
-      <div id="pack-tag"></div>
-      <div id="pack-info"></div>
-      <div id="pack-hints"></div>
+    <div id="pack" class="pack" hidden>
+      <div class="pack-box">
+        <canvas id="pack-page"></canvas>
+        <div id="pack-tag" class="pack-tag"></div>
+        <div id="pack-info" class="pack-info"></div>
+        <div id="pack-hints" class="pack-hints"></div>
+      </div>
+    </div>
+    <div id="p2-pack" class="pack" hidden>
+      <div class="pack-box">
+        <canvas id="p2-pack-page"></canvas>
+        <div id="p2-pack-tag" class="pack-tag"></div>
+        <div id="p2-pack-info" class="pack-info"></div>
+        <div id="p2-pack-hints" class="pack-hints"></div>
+      </div>
     </div>
     <script type="module" src="/src/open/main.js"></script>
   </body>

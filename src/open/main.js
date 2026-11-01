@@ -25,6 +25,12 @@ const CAMERA_LIFT = 7;     // how fast the camera follows the ground up and down
 const LOOK_HEIGHT = 1.9;   // the point followed, above the feet
 const AIM_ABOVE = 1.3;     // the camera aims this far over that, so the hero stands low in frame
 const HILL_SAMPLES = 8;
+const WALL_SAMPLES = 12;
+const WALL_GAP = 0.8;      // how close it may pass a wall, in tiles
+const WALL_RISE = 5;       // tiles it rises when a wall forces it in
+const TELEPORT = 25;       // tiles moved in one frame that count as a jump
+const MAX_SHAKE = 0.45;
+const SHAKE_REACH = 70;
 const MAX_HILL_LIFT = 9;   // tiles the camera may climb to see over ground behind the hero
 const ROOM_CAMERA = 5.5;   // camera distance indoors
 const SPLIT_AT = 30, MERGE_AT = 20; // tiles apart; the gap keeps it from flickering at the edge
@@ -77,6 +83,11 @@ const shared2 = { yaw: 0, pitch: 0.2, recenter: null }; // the camera both heroe
 const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'dusk', setTime, travel, splash };
 
 world.sites = new Sites(scene, monsters, work, players);
+// The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
+// fills its owner's half: the other hero plays on, and both can have theirs open.
+world.checkPause = () => {
+  world.paused = players.some((p) => p.hud.mapOpen) || (players.length === 1 && p1.hud.packOpen);
+};
 world.viewYaw = (p) => (world.together ? shared2.yaw : p.state.yaw);
 
 const views = [{ camera, post: new Post(renderer, scene, camera) }];
@@ -176,7 +187,6 @@ function renderPrompts() {
     [p('pause'), 'Spirit Tree'],
   ].map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');
   document.getElementById('map-hints').innerHTML = `${usePad ? btn('D-pad') : `${key('KeyA')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
-  document.getElementById('pack-hints').innerHTML = `${p('confirm')} Use, wear or craft&nbsp;&nbsp; ${p('punch')} Drop&nbsp;&nbsp; ${p('packTab')} Bag or Craft&nbsp;&nbsp; ${p('back')} Close`;
 }
 
 // Touchpad: both heroes go together.
@@ -214,9 +224,9 @@ function join() {
 
 function leave() {
   extra.hud.closeAll(extra);
-  world.paused = false;
   if (extra.rooms.house) extra.rooms.leave(extra.state);
   players.pop();
+  world.checkPause();
   extra.hero.mesh.visible = false;
   extra.controls.padIndex = null;
   p1.controls.avoid = null;
@@ -267,35 +277,60 @@ function clearance(ax, ay, az, bx, by, bz) {
   return lift;
 }
 
+// How far along the line from a to b the camera can go before a wall or landmark, 0..1.
+function solidStop(ax, az, bx, bz) {
+  for (let i = 1; i <= WALL_SAMPLES; i++) {
+    const t = i / WALL_SAMPLES, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+    for (const s of marks.solids) {
+      if (s.off) continue;
+      const inside = s.r ? Math.hypot(x - s.x, z - s.z) < s.r + WALL_GAP
+        : x > s.x0 - WALL_GAP && x < s.x1 + WALL_GAP && z > s.z0 - WALL_GAP && z < s.z1 + WALL_GAP;
+      if (inside) return (i - 1) / WALL_SAMPLES;
+    }
+  }
+  return 1;
+}
+
 // One hero's own camera: behind and above, looking past them so they stand low in the frame
 // rather than hiding the way ahead. It eases after the hero, and climbs over hills behind them,
 // only moving in if it can't get high enough.
 function personal(p, dt) {
   const s = p.state, big = p.body.heroScale, cp = Math.cos(s.pitch), eyeY = Math.max(s.y, -0.3);
+  // A long jump in position (travel, waking up, doors) starts the camera fresh, not catching up.
+  if (Math.hypot(s.x - (p.camX ?? s.x), s.z - (p.camZ ?? s.z)) > TELEPORT) p.camY = p.camLift = p.camDist = undefined;
+  p.camX = s.x;
+  p.camZ = s.z;
   p.camY = p.camY === undefined || Math.abs(p.camY - eyeY) > 30 ? eyeY : p.camY + (eyeY - p.camY) * Math.min(1, dt * CAMERA_LIFT);
   const lookY = p.camY + LOOK_HEIGHT * big, inside = !!p.rooms.house;
   const far = inside ? ROOM_CAMERA : CAMERA_DIST + (big - 1) * CAMERA_GROWTH;
   const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(s.pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
-  const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz), lift = Math.min(need, MAX_HILL_LIFT);
+  const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz);
+  // Backed against a wall, it moves in and rises to look down past the shoulder.
+  const open = inside ? 1 : solidStop(s.x, s.z, cx, cz), lift = Math.min(need, MAX_HILL_LIFT) + (1 - open) * WALL_RISE;
   // Quick to rise for a hill, slow to settle back, so it doesn't pump.
   p.camLift = (p.camLift ?? lift) + (lift - (p.camLift ?? lift)) * Math.min(1, dt * (lift > (p.camLift ?? lift) ? 10 : 2));
-  const want = need > lift ? far * Math.max(0.45, lift / need) : far;
+  const want = Math.min(need > MAX_HILL_LIFT ? far * Math.max(0.45, MAX_HILL_LIFT / need) : far, far * Math.max(0.18, open));
   p.camDist = (p.camDist ?? want) + (want - (p.camDist ?? want)) * Math.min(1, dt * (want < (p.camDist ?? want) ? 10 : 2.5));
   const d = p.camDist;
   tmp.set(s.x + Math.sin(s.yaw) * cp * d, lookY + Math.sin(s.pitch) * d + p.camLift, s.z + Math.cos(s.yaw) * cp * d);
   if (inside) p.rooms.clampCamera(tmp, s.x, s.z);
   else tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
   p.camPos.copy(tmp);
-  p.camLook.set(s.x, lookY + AIM_ABOVE * Math.min(1, d / CAMERA_DIST), s.z);
+  p.camLook.set(s.x, lookY + AIM_ABOVE * Math.min(1, d / CAMERA_DIST) + s.air * 0.5, s.z);
 }
 
 // One camera behind both heroes, pulling back as they drift apart.
 const sharedPos = new THREE.Vector3(), sharedLook = new THREE.Vector3();
-function together(a, b, span) {
-  const { yaw, pitch } = shared2, dist = CAMERA_DIST + span * 0.8, cp = Math.cos(pitch);
+function together(a, b, span, dt) {
+  const { yaw, pitch } = shared2, far = CAMERA_DIST + span * 0.8, cp = Math.cos(pitch);
   const x = (a.state.x + b.state.x) / 2, z = (a.state.z + b.state.z) / 2, eye = (a.camY + b.camY) / 2 + LOOK_HEIGHT;
+  const reachX = x + Math.sin(yaw) * cp * far, reachZ = z + Math.cos(yaw) * cp * far;
+  const dist = far * Math.max(0.4, solidStop(x, z, reachX, reachZ));
   sharedPos.set(x + Math.sin(yaw) * cp * dist, eye + Math.sin(pitch) * dist, z + Math.cos(yaw) * cp * dist);
-  sharedPos.y = Math.max(sharedPos.y, height(sharedPos.x, sharedPos.z) + 0.8, 0.8);
+  // The shared view climbs over hills the same way a hero's own does.
+  const lift = Math.min(MAX_HILL_LIFT, clearance(x, eye, z, sharedPos.x, sharedPos.y, sharedPos.z));
+  shared2.lift = (shared2.lift ?? lift) + (lift - (shared2.lift ?? lift)) * Math.min(1, dt * (lift > (shared2.lift ?? lift) ? 10 : 2));
+  sharedPos.y = Math.max(sharedPos.y + shared2.lift, height(sharedPos.x, sharedPos.z) + 0.8, 0.8);
   sharedLook.set(x, eye + AIM_ABOVE, z);
 }
 
@@ -325,7 +360,7 @@ function aimCameras(dt) {
     camera.lookAt(a.camLook);
   } else {
     personal(b, dt);
-    together(a, b, Math.hypot(a.state.x - b.state.x, a.state.z - b.state.z));
+    together(a, b, Math.hypot(a.state.x - b.state.x, a.state.z - b.state.z), dt);
     const k = split.amount * split.amount * (3 - 2 * split.amount);
     views.forEach((v, i) => {
       const p = players[i];
@@ -340,9 +375,14 @@ function aimCameras(dt) {
       else v.camera.clearViewOffset();
     });
   }
-  for (const v of views) {
-    if (work.shake) v.camera.position.addScaledVector(tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), work.shake);
-  }
+  // A blow shakes the screens near it, not a partner on the far side of the world.
+  const source = work.shakeAt ?? a.state;
+  views.forEach((v, i) => {
+    const s = (players[i] ?? a).state;
+    if (work.shake && Math.hypot(s.x - source.x, s.z - source.z) < SHAKE_REACH) {
+      v.camera.position.addScaledVector(tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), Math.min(MAX_SHAKE, work.shake));
+    }
+  });
   if (state.drone) {
     // Preview only: a raised camera aimed at a landmark.
     const [up, lx, ly, lz] = state.drone;
@@ -354,8 +394,10 @@ function aimCameras(dt) {
 function renderView(v, p, dir) {
   const time = shared.uTime.value;
   for (const hero of players) hero.pose(v.camera, time);
+  // Sharing a view, both heroes stay visible. Split, only this view's hero matters; clearing a
+  // sight line to a partner far away would carve a tunnel through the forest.
   for (const [i, u] of [focus.uFocus, focus.uFocus2].entries()) {
-    const s = (players[i] ?? p).state;
+    const s = (split.amount > 0 ? p : players[i] ?? p).state;
     u.value.set(s.x, s.y + 1.4 + s.air, s.z);
   }
   sun.target.position.set(p.state.x, p.state.y, p.state.z);
@@ -379,7 +421,7 @@ function step(dt) {
   for (const p of players) p.controls.update(dt);
   joinOrLeave(dt);
   renderPrompts();
-  world.paused = players.some((p) => p.hud.open);
+  world.checkPause();
   if (players.length > 1) updateSplit(dt);
   for (const p of players) p.update(dt);
 
