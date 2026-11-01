@@ -3,7 +3,7 @@
 // the game is open; a new version takes effect the next time the page is loaded.
 import { spawnSync, exec } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -12,7 +12,7 @@ const GAME = join(HOME, 'game');
 const NEXT = join(HOME, 'next');
 const STAMP = join(HOME, 'version.txt');
 const SAVE = join(HOME, 'save-import.json');
-const PORT = Number(process.env.PLAY_PORT ?? 5180); // the dev server's port, so saves are shared
+const PORT = Number(process.env.PLAY_PORT ?? 5181); // its own port: browsers keep saves per port, so this one never changes
 const OPEN = !process.env.PLAY_NO_OPEN;
 const CHECK_EVERY = 10 * 60 * 1000;      // ms between update checks while playing
 const NET_TIMEOUT = 15000;               // ms before GitHub counts as unreachable
@@ -31,13 +31,27 @@ function run(command) {
   return spawnSync(command, { cwd: ROOT, env: ENV, shell: true, stdio: 'inherit' }).status === 0;
 }
 
+// Windows and antivirus hold fresh folders for a moment, so a rename may need a few tries.
+function swapIn() {
+  rmSync(GAME, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  for (let i = 0; i < 10; i++) {
+    try {
+      renameSync(NEXT, GAME);
+      return;
+    } catch {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+    }
+  }
+  cpSync(NEXT, GAME, { recursive: true });
+  rmSync(NEXT, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+}
+
 // Builds beside the running copy and swaps it in, so a player never gets half a game.
 function build() {
   console.log('Building the game...');
   rmSync(NEXT, { recursive: true, force: true });
   if (!run(`npx vite build --outDir "${NEXT}" --emptyOutDir`)) return false;
-  rmSync(GAME, { recursive: true, force: true });
-  renameSync(NEXT, GAME);
+  swapIn();
   writeFileSync(STAMP, git('rev-parse', 'HEAD') ?? '');
   return true;
 }
