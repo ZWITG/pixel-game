@@ -19,6 +19,10 @@ const SHAPES = {
   controls: 'M7 6.500h10a5 5 0 0 1 5 4.800l.8 6.400a3 3 0 0 1-5.300 2.200L16 18H8l-1.500 1.900a3 3 0 0 1-5.300-2.200l.8-6.400a5 5 0 0 1 5-4.800zM6.500 9v2h-2v2h2v2h2v-2h2v-2h-2V9zM16 12.500a1.300 1.300 0 1 0 0 2.600 1.300 1.300 0 0 0 0-2.600zm2.500-3a1.300 1.300 0 1 0 0 2.600 1.300 1.300 0 0 0 0-2.600z',
   settings: 'M10.300 2h3.400l.5 2.600 1.900.8 2.200-1.500 2.400 2.400-1.500 2.200.8 1.900 2.600.5v3.400l-2.600.5-.8 1.900 1.500 2.200-2.400 2.400-2.200-1.500-1.900.8-.5 2.600h-3.400l-.5-2.600-1.900-.8-2.200 1.500-2.400-2.400 1.500-2.200-.8-1.900L1.400 13.700v-3.400L4 9.800l.8-1.900L3.300 5.700l2.400-2.400 2.200 1.500 1.900-.8zM12 8.500a3.500 3.500 0 1 0 0 7 3.500 3.500 0 0 0 0-7z',
   city: 'M3 21V8h3v3h3V8h6v3h3V8h3v13h-7v-5a2 2 0 0 0-4 0v5z',
+  kingdom: 'M2 21V10l3 2 3-6 4 4 4-4 3 6 3-2v11zM12 13a2 2 0 0 0-2 2v6h4v-6a2 2 0 0 0-2-2z',
+  town: 'M8 4 1 11h2v10h5v-5h2v5h3V11h1zM17 9l-3 3v9h9v-9h-1z',
+  hamlet: 'M12 7l-8 7h2v7h12v-7h2z',
+  fort: 'M3 21V9l2-4 2 4v2h2V9l3-5 3 5v2h2V9l2-4 2 4v12h-6v-5h-6v5z',
   village: 'M12 3 2 12h3v9h5v-6h4v6h5v-9h3z',
   bandit: 'M12 4 2 20h7l3-6 3 6h7z',
   keep: 'M7 21V9L5 7V3h3v2h2V3h4v2h2V3h3v4l-2 2v12z',
@@ -31,7 +35,14 @@ const TABS = [['map', 'Map'], ['nations', 'Nations'], ['powers', 'Powers'], ['sk
 export const SATCHEL_TAB = 4;
 const TERRITORY = 128;      // cells across the map's overlay of borders
 const POWER_COLS = 4, DIRS = ['up', 'right', 'down', 'left'], DIR_NAMES = ['Up', 'Right', 'Down', 'Left'];
-const KINDS = { city: ['#ffe7b0', 'City'], village: ['#ffd9a0', 'Village'], bandit: ['#ff8f7f', 'Bandit camp'], keep: ['#d8d0c8', 'Ruined keep'], lair: ['#ff4a6a', 'Lair'], landmark: ['#9fe8ff', 'Landmark'], goal: ['#ffffff', 'Place you have found'], pin: ['#ffe15a', 'Your pin'] };
+const KINDS = {
+  crown: ['#ffd98a', 'Seat of a nation'], kingdom: ['#ffe7b0', 'Kingdom'], city: ['#ffe7b0', 'City'], town: ['#ffd9a0', 'Town'], village: ['#ffd9a0', 'Village'], hamlet: ['#e8ddc8', 'Hamlet or homestead'],
+  fort: ['#ff8f7f', 'Fort'], bandit: ['#ff8f7f', 'Bandit camp'], keep: ['#d8d0c8', 'Ruined keep'], lair: ['#ff4a6a', 'Lair'], landmark: ['#9fe8ff', 'Landmark'], goal: ['#ffffff', 'Place you have found'], pin: ['#ffe15a', 'Your pin'],
+};
+// The icon and size for each tier of a settlement, from homestead to kingdom.
+const TIER_ICONS = [['hamlet', 0.72], ['hamlet', 0.84], ['village', 1], ['town', 1.1], ['city', 1.26], ['kingdom', 1.5]];
+const SCAR_COLORS = [['burn', '#ff7a2a', 'Burning'], ['char', '#1a1412', 'Ash'], ['frost', '#dff4ff', 'Frost and ice'], ['rot', '#7a2ac8', 'Rot']];
+const YOURS = '#f7efdf';
 const HINTS = [['Auto', 'auto'], ['Always', 'always'], ['Off', 'off']];
 const ZOOMS = [1, 2.4, 5];
 const CURSOR_SPEED = 0.55;  // screens per second
@@ -70,7 +81,9 @@ export default class GameMenu {
       const at = e.target.closest('[data-tab]');
       if (at) this.show(Number(at.dataset.tab));
     });
-    document.getElementById('menu-legend').innerHTML = Object.entries(KINDS).map(([k, [color, label]]) => `<div><i style="color:${color}">${SVG(SHAPES[k], 20)}</i>${label}</div>`).join('');
+    document.getElementById('menu-legend').innerHTML = Object.entries(KINDS).map(([k, [color, label]]) => `<div><i style="color:${color}">${SVG(SHAPES[k], 18)}</i>${label}</div>`).join('')
+      + `<p class="legend-note">Colors show who holds a place. Pale is yours.</p>`
+      + SCAR_COLORS.map(([, color, label]) => `<div><u style="background:${color}"></u>${label}</div>`).join('');
     this.canvas.addEventListener('click', (e) => {
       const r = this.canvas.getBoundingClientRect(), k = this.canvas.width / r.width, [ox, oy, s] = this.view();
       this.cursor = { x: (((e.clientX - r.left) * k - ox) / s) * WORLD, z: (((e.clientY - r.top) * k - oy) / s) * WORLD };
@@ -344,19 +357,43 @@ export default class GameMenu {
     return [place(this.cursor.x / WORLD, w), place(this.cursor.z / WORLD, h), s];
   }
 
+  // Everything on the map, read fresh from the living world each time it's drawn.
   marks() {
-    const out = [...TOWNS.map((t) => ({ ...t, icon: t.kind, color: t.boss && this.world.nations.isFallen(nationAt(t.x, t.z)) ? '#8a8690' : undefined })), ...LANDMARKS.map((t) => ({ ...t, icon: 'landmark' }))];
-    for (const s of this.world.sites.list) {
-      if (!s.done && s.seen && !TOWNS.some((t) => t.name === s.cat.name)) out.push({ x: s.x, z: s.z, name: s.cat.name, icon: 'goal', color: s.cat.color });
+    const { nations, realm, sites } = this.world, out = [], nameOf = (id) => (id === 'hero' ? 'yours' : id === 'free' ? 'free folk' : NATIONS.find((n) => n.id === id).name);
+    for (const t of TOWNS) {
+      if (t.kind === 'bandit' || t.kind === 'keep') out.push({ ...t, icon: t.kind, info: `${t.name}, ${t.kind === 'keep' ? 'a ruined keep' : 'a bandit camp'}` });
     }
-    for (const s of this.world.realm.settlements) {
-      if (s.fixed) continue;
-      const tier = tierOf(s.pop), owner = NATIONS.find((n) => n.id === s.owner);
-      out.push({ x: s.x, z: s.z, name: `${s.name}, ${TIERS[tier].name}`, icon: tier >= 4 ? 'city' : 'village', color: owner?.color ?? '#f7efdf' });
+    for (const t of LANDMARKS) out.push({ ...t, icon: 'landmark' });
+    for (const s of sites.list) {
+      if (!s.done && s.seen && !TOWNS.some((t) => t.name === s.cat.name) && s.key !== 'fort') out.push({ x: s.x, z: s.z, name: s.cat.name, icon: 'goal', color: s.cat.color });
     }
-    for (const o of this.world.realm.outposts) if (!o.done) out.push({ x: o.x, z: o.z, name: o.name, icon: 'keep', color: NATIONS.find((n) => n.id === o.nation).color });
+    // Every settlement as it is today: its size, and whose it is.
+    for (const s of realm.settlements) {
+      const tier = tierOf(s.pop), owner = NATIONS.find((n) => n.id === s.owner), [icon, size] = TIER_ICONS[tier];
+      out.push({ x: s.x, z: s.z, name: s.name, icon, size, color: owner?.color ?? (s.owner === 'hero' ? YOURS : KINDS[icon][0]), info: `${s.name}, ${TIERS[tier].name.toLowerCase()} of ${Math.round(s.pop)}, ${nameOf(s.owner)}` });
+    }
+    for (const o of realm.outposts) {
+      if (!o.done) out.push({ x: o.x, z: o.z, name: o.name, icon: 'fort', color: NATIONS.find((n) => n.id === o.nation).color, info: `${o.name}, held by ${nameOf(o.nation)}` });
+    }
+    // The seats come last, so they're always on top: the ruler, and how close they are to falling.
+    for (const n of NATIONS) {
+      const r = nations.report(n), lair = TOWNS.find((t) => t.name === n.seat).kind === 'lair';
+      if (r.fallen) out.push({ x: n.x, z: n.z, name: n.seat, icon: lair ? 'lair' : 'crown', color: '#8a8690', size: 1.2, info: `${n.seat}, conquered` });
+      else out.push({ x: n.x, z: n.z, name: n.seat, icon: 'crown', color: n.color, size: 1.5, open: r.open, info: `${n.ruler}, ${n.seat}: ${r.open ? 'exposed' : `${r.done} of ${r.need} strongholds broken`}` });
+    }
     if (this.owner.pin) out.push({ ...this.owner.pin, name: 'Your pin', icon: 'pin' });
     return out;
+  }
+
+  // Ash, frost and rot where powers have marked the land near the heroes.
+  drawScars(ox, oy, s) {
+    const { g } = this, size = Math.max(2, (3 / WORLD) * s);
+    for (const c of this.world.scars.cells.values()) {
+      const scar = c.burn > 0 ? 0 : c.frost > 0.2 ? 2 : c.rot > 0.2 ? 3 : c.char > 0.2 ? 1 : -1;
+      if (scar < 0) continue;
+      g.fillStyle = SCAR_COLORS[scar][1];
+      g.fillRect(ox + (c.x / WORLD) * s - size / 2, oy + (c.z / WORLD) * s - size / 2, size, size);
+    }
   }
 
   updateMap(dt, just) {
@@ -414,22 +451,21 @@ export default class GameMenu {
     }
     this.drawLands();
     g.drawImage(this.lands, ox, oy, s, s);
-    g.textAlign = 'center';
-    g.font = `700 ${15 * scale}px 'Zen Maru Gothic', sans-serif`;
-    g.lineWidth = 4 * scale;
-    g.strokeStyle = '#141a28';
-    for (const n of NATIONS) {
-      const x = ox + to(n.x), y = oy + to(n.z) - 18 * scale, fallen = this.world.nations.isFallen(n);
-      g.fillStyle = fallen ? '#f7efdf' : n.color;
-      g.strokeText(n.name, x, y);
-      g.fillText(n.name, x, y);
-    }
+    this.drawScars(ox, oy, s);
     const marks = this.marks(), c = this.cursor, cx = ox + to(c.x), cy = oy + to(c.z);
     let nearest = null, best = NEAR_PX * scale;
     for (const t of marks) {
       const x = ox + to(t.x), y = oy + to(t.z);
       if (x < -30 || y < -30 || x > w + 30 || y > h + 30) continue;
-      this.icon(t.icon, x, y, t.color ?? KINDS[t.icon][0], t.kind === 'city' ? ICON * 1.25 : ICON);
+      // A ruler who can be reached burns brighter, ringed and pulsing.
+      if (t.open) {
+        g.strokeStyle = t.color;
+        g.lineWidth = 2.5 * scale;
+        g.beginPath();
+        g.arc(x, y, (19 + Math.sin(performance.now() * 0.006) * 4) * scale, 0, 6.3);
+        g.stroke();
+      }
+      this.icon(t.icon, x, y, t.color ?? KINDS[t.icon][0], ICON * (t.size ?? 1));
       const d = Math.hypot(x - cx, y - cy);
       if (d < best) {
         best = d;
@@ -447,6 +483,16 @@ export default class GameMenu {
         g.strokeText(t.name, x, y);
         g.fillText(t.name, x, y);
       }
+    }
+    g.textAlign = 'center';
+    g.font = `700 ${15 * scale}px 'Zen Maru Gothic', sans-serif`;
+    g.lineWidth = 4 * scale;
+    g.strokeStyle = '#141a28';
+    for (const n of NATIONS) {
+      const x = ox + to(n.x), y = oy + to(n.z) - 18 * scale, fallen = this.world.nations.isFallen(n);
+      g.fillStyle = fallen ? '#f7efdf' : n.color;
+      g.strokeText(n.name, x, y);
+      g.fillText(n.name, x, y);
     }
     // Every hero, as an arrow pointing the way they face.
     this.world.players.forEach((p, i) => {
@@ -478,7 +524,7 @@ export default class GameMenu {
     g.stroke();
     const here = nearest ?? { name: this.charted < this.chart.height ? 'Charting the world…' : '' };
     const away = nearest ? Math.round(Math.hypot(nearest.x - owner.state.x, nearest.z - owner.state.z)) : 0;
-    const text = here.name ? `${here.name}${nearest ? ` · ${away} m` : ''}` : '';
+    const text = here.name ? `${here.info ?? here.name}${nearest ? ` · ${away} m` : ''}` : '';
     if (text !== this.label) document.getElementById('menu-place').textContent = this.label = text;
   }
 }

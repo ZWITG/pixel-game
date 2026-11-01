@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { toonSteps, inkMaterial, paint, ball as sphere, limb, spike, aimed } from './kit.js';
+import { toonSteps, inkMaterial, paint, ball as sphere, limb, spike, aimed, block, rock } from './kit.js';
 
 // The heroes as jointed 3D figures in a clean anime style: toon-shaded, with a thin ink outline,
 // a scarf that streams behind them, and one set of named poses for everything they can do.
@@ -207,6 +207,7 @@ export default class HeroModel {
   shine(bone, parts) {
     const mesh = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(2.4, 2.4, 2.4), fog: false }));
     bone.add(mesh);
+    return mesh;
   }
 
   skin(bone, parts) {
@@ -283,6 +284,9 @@ export default class HeroModel {
     if (C.crest) {
       this.armor(chest, head);
       this[C.crest](chest, head);
+      this.dress();
+      this.signature(chest);
+      this.ascension(chest);
     }
   }
 
@@ -334,6 +338,102 @@ export default class HeroModel {
       this.shine(B[`fore${i}`], [paint(new THREE.TorusGeometry(0.083, 0.012, 6, 14).rotateX(Math.PI / 2).translate(0, -0.3, 0), C.glow)]);
       this.skin(B[`shin${i}`], [paint(aimed(spike(0.05, 0.2), 0, -0.05, 0.08, 0, 1, 0.5), C.trim)]);
     }
+  }
+
+  // Plate and straps over the bare limbs, so close up a Conqueror looks made, not poured.
+  dress() {
+    const C = this.look, B = this.bones;
+    for (const i of [0, 1]) {
+      const s = i ? -1 : 1;
+      if (B[`thigh${i}`].visible) {
+        this.skin(B[`thigh${i}`], [paint(ball(0.13, 1.02, 1.2, 0.56).translate(0, -0.26, 0.09), C.coatDark), paint(limb(0.13, 0.12, 0.05).translate(0, -0.42, 0), C.trim)]);
+        this.skin(B[`shin${i}`], [paint(ball(0.11, 1, 0.9, 0.7).translate(0, 0, 0.06), C.coatDark), paint(ball(0.1, 0.72, 2.1, 0.46).translate(0, -0.24, 0.08), C.coatDark)]);
+      }
+      this.skin(B[`arm${i}`], [paint(limb(0.106, 0.1, 0.05).translate(0, -0.2, 0), C.trim), paint(limb(0.092, 0.086, 0.04).translate(0, -0.3, 0), C.trim)]);
+    }
+    this.skin(this.bones.spine, [
+      ...[-1, 1].map((s) => paint(block(0.12, 0.14, 0.09).translate(s * 0.17, 0.0, 0.16), C.coatDark)),
+      paint(block(0.3, 0.26, 0.05).translate(0, -0.2, 0.19), C.coatDark),
+    ]);
+  }
+
+  // The thing that each one carries, that nobody else in the world has.
+  signature(chest) {
+    const C = this.look, B = this.bones;
+    const worn = this.bone('worn', chest, 0, 0.3, -0.26);
+    if (C.crest === 'horns') {
+      // Earthbreaker: a slab of living rock on its back, and fists like boulders.
+      this.skin(worn, [paint(block(0.72, 1.3, 0.2).translate(0, 0.08, -0.08), '#5a4e44'), paint(rock(0.22).translate(0.2, 0.68, -0.1), '#6e625a'), paint(rock(0.17).translate(-0.28, 0.6, -0.08), '#6e625a')]);
+      this.shine(worn, [paint(block(0.05, 0.8, 0.02).translate(0, 0.08, 0.03), C.glow), paint(block(0.4, 0.05, 0.02).translate(0, 0.26, 0.03), C.glow), paint(block(0.3, 0.05, 0.02).translate(0, -0.12, 0.03), C.glow)]);
+      for (const i of [0, 1]) this.skin(B[`hand${i}`], [paint(rock(0.2).scale(1, 0.9, 1.1), '#6e625a'), paint(rock(0.09).translate(0.1, -0.13, 0.1), '#8a7c70')]);
+    } else if (C.crest === 'bolt') {
+      // Two spears of captive lightning hang in the air behind the shoulders.
+      for (const s of [-1, 1]) this.shine(worn, [paint(aimed(spike(0.05, 1.5, 4), s * 0.46, -0.5, 0, s * 0.18, 1, 0), C.glow), paint(block(0.2, 0.03, 0.03).translate(s * 0.52, 0.08, 0), C.iris), paint(aimed(spike(0.03, 0.24, 4), s * 0.46, -0.5, 0, 0, -1, 0), C.iris)]);
+    } else if (C.crest === 'hood') {
+      // The Reaper's blade floats over one shoulder, longer than it is tall.
+      const blade = [];
+      for (let i = 0; i < 9; i++) {
+        const t = i / 8, a = 0.6 + t * 2.1;
+        blade.push(paint(block(0.2 - t * 0.14, 0.26, 0.024).rotateZ(a).translate(Math.cos(a) * 0.64 - 0.1, 1.1 + Math.sin(a) * 0.44, 0), i % 2 ? C.gold : C.hairHi));
+      }
+      this.skin(worn, [paint(limb(0.03, 0.03, 2.3).rotateZ(-0.28).translate(0.3, 1.14, -0.04), '#2a1c3a'), ...blade]);
+      this.shine(worn, [paint(new THREE.OctahedronGeometry(0.08).translate(0.38, 1.2, -0.03), C.glow)]);
+    } else if (C.crest === 'flame') {
+      // A sword of black iron across the back, still burning from the forge.
+      const sword = [paint(block(0.2, 1.8, 0.05).translate(0, 0.1, 0), '#14100e'), paint(aimed(spike(0.1, 0.34, 4), 0, 1, 0, 0, 1, 0).scale(1, 1, 0.25), '#14100e'), paint(block(0.56, 0.08, 0.09).translate(0, -0.8, 0), C.gold), paint(limb(0.04, 0.04, 0.34).translate(0, -0.84, 0), '#2a1c14')];
+      sword.forEach((g) => g.rotateZ(0.78));
+      this.skin(worn, sword);
+      this.shine(worn, [paint(block(0.04, 1.7, 0.06).translate(0, 0.1, 0).rotateZ(0.78), C.glow)]);
+    } else {
+      // A great shield of ice on the arm, and a crystal longsword at the back.
+      this.shine(B.fore1, [paint(new THREE.OctahedronGeometry(0.42).scale(0.9, 1.3, 0.12).translate(-0.12, -0.3, 0.09), C.glow)]);
+      this.skin(B.fore1, [paint(new THREE.TorusGeometry(0.34, 0.03, 5, 4).scale(0.82, 1.24, 1).rotateZ(Math.PI / 4).translate(-0.12, -0.3, 0.1), C.coatDark)]);
+      this.skin(worn, [paint(aimed(spike(0.1, 1.4, 4), 0, -0.1, 0, 0.18, 1, 0).scale(1, 1, 0.3), C.hairHi), paint(block(0.36, 0.06, 0.08).translate(0, -0.12, 0), C.coatDark)]);
+    }
+  }
+
+  // Mastery shows on the body. These are all built now, and shown as a hero earns them.
+  ascension(chest) {
+    const C = this.look, B = this.bones;
+    this.forms = [];
+    // First, light gets in under the skin.
+    const veins = new THREE.Group();
+    for (const i of [0, 1]) {
+      this.shine(this.bones[`arm${i}`], [paint(block(0.016, 0.3, 0.016).translate(0, -0.2, 0.09), C.glow)]).visible = false;
+      this.forms.push([1, this.bones[`arm${i}`].children.at(-1)]);
+      if (B[`thigh${i}`].visible) {
+        this.shine(B[`thigh${i}`], [paint(block(0.018, 0.4, 0.018).translate(0, -0.3, 0.145), C.glow)]).visible = false;
+        this.forms.push([1, B[`thigh${i}`].children.at(-1)]);
+      }
+    }
+    this.shine(chest, [0.2, -0.2].map((x) => paint(block(0.014, 0.42, 0.014).translate(x, 0.56, 0.17), C.glow))).visible = false;
+    this.forms.push([1, chest.children.at(-1)]);
+    chest.add(veins);
+    // Then shards of its power start to circle it.
+    const orbit = this.bone('orbit', this.body, 0, 0.5, 0);
+    this.shine(orbit, Array.from({ length: 3 }, (_, i) => {
+      const a = (i / 3) * 6.283;
+      return paint(new THREE.OctahedronGeometry(0.09).scale(0.7, 1.6, 0.7).translate(Math.cos(a) * 0.86, Math.sin(i * 2) * 0.16, Math.sin(a) * 0.86), i % 2 ? C.gold : C.glow);
+    }));
+    orbit.visible = false;
+    this.forms.push([2, orbit]);
+    // At the last, the ground itself takes its mark.
+    const rune = this.bone('rune', this.mesh, 0, 0.06, 0);
+    const lines = [paint(new THREE.TorusGeometry(1.32, 0.022, 4, 48).rotateX(Math.PI / 2), C.glow), paint(new THREE.TorusGeometry(1.02, 0.014, 4, 48).rotateX(Math.PI / 2), C.gold)];
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * 6.283;
+      lines.push(paint(block(0.56, 0.01, 0.024).rotateY(-a).translate(Math.cos(a) * 1.16, 0, Math.sin(a) * 1.16), C.glow));
+      lines.push(paint(new THREE.OctahedronGeometry(0.07).scale(1, 0.2, 1).translate(Math.cos(a + 0.5) * 1.17, 0, Math.sin(a + 0.5) * 1.17), C.gold));
+    }
+    this.shine(rune, lines);
+    rune.visible = false;
+    this.forms.push([3, rune]);
+  }
+
+  // Shows the stage a hero has reached. 0 is the Conqueror as they begin.
+  ascend(stage) {
+    for (const [from, part] of this.forms ?? []) part.visible = stage >= from;
+    this.mesh.userData.stage = stage;
   }
 
   // Each Conqueror is its own creature. These set the build and add what no other one has.
@@ -523,6 +623,8 @@ export default class HeroModel {
     this.body.position.y = HIP_Y - (full - stand) * (1 - p.air) * (float ? 0.2 : 1) + float;
     if (B.spin) B.spin.rotation[B.fan ? 'z' : 'y'] = time * (B.fan ? 0.9 : 1.3);
     if (B.fan) B.fan.scale.set(1 + Math.sin(time * 9) * 0.05, 1 + Math.sin(time * 7) * 0.04, 1);
+    if (B.orbit) B.orbit.rotation.y = time * 1.9;
+    if (B.rune) B.rune.rotation.y = -time * 0.5;
     if (B.spin2) B.spin2.position.y = 0.5 + Math.sin(time * 1.4) * 0.05;
     if (B.wing0) for (const [i, s] of [[0, 1], [1, -1]]) B[`wing${i}`].rotation.y = s * (Math.sin(time * 1.6) * 0.08 + (name === 'idle' ? 0.3 : -0.25));
     const rise = 1 - Math.exp(-dt * TURN);

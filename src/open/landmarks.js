@@ -3,6 +3,8 @@ import { VoxelBuilder, vmat } from '../render/voxel.js';
 import { makeSpiritTree } from '../render/models.js';
 import { PLACES, height } from './terrain.js';
 import { masonry } from './materials.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { tower as roundTower } from './fortress.js';
 import { makeBuilding } from './architecture.js';
 import { nationAt } from './nations.js';
 
@@ -14,27 +16,26 @@ const HOUSE = { x: 3.1, z: 2.95, door: 3.8 }; // half size and door distance at 
 function spire() {
   const b = new VoxelBuilder();
   const stone = ['#b79a98', '#a58a90', '#c7aca4'];
-  const tower = (x, z, w, h, base = 0) => {
-    b.box(x, base + h / 2, z, w, h, w, stone[Math.abs(Math.round(x + z)) % 3], 0.05);
-    b.box(x, base + h + 1, z, w * 1.25, 2, w * 1.25, '#8e7480', 0.05);
-    let r = w, y = base + h + 2;
-    while (r > 1.2) {
-      b.box(x, y + 1.5, z, r, 3.2, r, '#6a4a6e', 0.04);
-      r *= 0.72;
-      y += 3;
-    }
-    b.box(x, y + 2, z, 0.5, 5, 0.5, '#e8d8c0');
+  const round = [];
+  const P = { stone: stone[0], dark: '#8e7480', roof: '#6a4a6e', trim: '#e8d8c0' };
+  const spire = (x, z, w, h, base = 0) => {
+    const at = round.length;
+    roundTower(round, P, x, z, w / 2, h, { flag: h > 100 });
+    if (base) for (let i = at; i < round.length; i++) round[i].translate(0, base, 0);
   };
   b.box(0, 8, 0, 150, 16, 110, '#9c8486', 0.04);
   b.box(0, 26, 0, 96, 22, 74, '#ab9094', 0.04);
-  for (const [x, z] of [[-75, -55], [75, -55], [-75, 55], [75, 55], [0, 55]]) tower(x, z, 15, 44);
-  for (const [x, z, h] of [[-40, -30, 76], [40, -30, 84], [-46, 26, 66], [44, 28, 60], [0, -38, 92]]) tower(x, z, 19, h, 8);
-  tower(0, 0, 30, 118, 8);
+  for (const [x, z] of [[-75, -55], [75, -55], [-75, 55], [75, 55], [0, 55]]) spire(x, z, 15, 44);
+  for (const [x, z, h] of [[-40, -30, 76], [40, -30, 84], [-46, 26, 66], [44, 28, 60], [0, -38, 92]]) spire(x, z, 19, h, 8);
+  spire(0, 0, 30, 118, 8);
   for (let i = 0; i < 9; i++) b.box(-60 + i * 15, 46, 37.5, 4, 9, 1, '#ffd98a', 0);
   const mesh = new THREE.Mesh(b.build(), masonry());
   mesh.castShadow = true;
   const g = new THREE.Group();
   g.add(mesh);
+  const towers = new THREE.Mesh(mergeGeometries(round.map((x) => (x.index ? x.toNonIndexed() : x))), mesh.material);
+  towers.castShadow = true;
+  g.add(towers);
   const lamp = new THREE.Mesh(new THREE.IcosahedronGeometry(7, 0), new THREE.MeshBasicMaterial({ color: '#ffcc73', fog: false }));
   lamp.position.y = 176;
   g.add(lamp);

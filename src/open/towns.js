@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { VoxelBuilder } from '../render/voxel.js';
 import { masonry } from './materials.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { STONEWORK, wall, tower, gatehouse, citadel, broken, brokenTower, tent } from './fortress.js';
+import { paint, rock, spike, aimed, block, shine } from './kit.js';
+import { nationAt } from './nations.js';
 import { walkPose } from '../render/models.js';
 import { makeFigure } from './figures.js';
 import { LOOKS } from '../art/looks.js';
@@ -57,33 +61,27 @@ function village(T, b, add, rand) {
 }
 
 function city(T, b, add, rand) {
-  const H = Math.round(T.r * 0.62), gate = 11, tall = 18, thick = 6;
+  const H = Math.round(T.r * 0.62), gate = 11, tall = 18, thick = 6, P = add.P;
   b.box(0, 0.05, 0, H * 2, 0.1, H * 2, '#9c8e7a', 0.03);
   for (const z of [-1, 1]) b.box(0, 0.12, z * 1, H * 2, 0.1, 22, PAVE, 0.03);
   b.box(0, 0.13, 0, 22, 0.1, H * 2, PAVE, 0.03);
-  // Four walls, each with a gate in the middle.
+  // Four walls with a gate in each, a great tower at every corner, the citadel in the middle.
   for (const side of [-1, 1]) {
     for (const part of [-1, 1]) {
-      const mid = part * (H + gate) / 2, len = H - gate;
-      b.box(mid, tall / 2, side * H, len, tall, thick, STONE, 0.05).box(side * H, tall / 2, mid, thick, tall, len, STONE, 0.05);
+      const mid = part * (H + gate) / 2, len = H - gate, from = part * gate, to = part * H;
+      wall(add.stone, P, from, side * H, to, side * H, tall, thick);
+      wall(add.stone, P, side * H, from, side * H, to, tall, thick);
       add.rect(mid - len / 2, mid + len / 2, side * H - thick / 2, side * H + thick / 2);
       add.rect(side * H - thick / 2, side * H + thick / 2, mid - len / 2, mid + len / 2);
-      for (let i = -3; i <= 3; i++) {
-        b.box(mid + (i / 7) * len, tall + 0.9, side * H, 2.4, 1.8, thick + 0.4, STONE_DARK, 0.04);
-        b.box(side * H, tall + 0.9, mid + (i / 7) * len, thick + 0.4, 1.8, 2.4, STONE_DARK, 0.04);
-      }
     }
     for (const c of [-1, 1]) {
-      b.box(side * H, 13, c * H, 15, 26, 15, STONE_DARK, 0.05).box(side * H, 28, c * H, 18, 3, 18, STONE, 0.05);
+      tower(add.stone, P, side * H, c * H, 7.6, tall + 12, { flag: true });
       add.rect(side * H - 7.5, side * H + 7.5, c * H - 7.5, c * H + 7.5);
-      // Towers either side of each gate.
-      b.box(side * H, 12, c * (gate + 3), 9, 24, 9, STONE, 0.05).box(c * (gate + 3), 12, side * H, 9, 24, 9, STONE, 0.05);
     }
+    gatehouse(add.stone, P, 0, side * H, gate, tall, thick, true);
+    gatehouse(add.stone, P, side * H, 0, gate, tall, thick, false);
   }
-  // The keep at the heart of the city.
-  b.box(0, 12, 0, 54, 24, 54, STONE, 0.05).box(0, 34, 0, 34, 22, 34, STONE_DARK, 0.05).box(0, 56, 0, 14, 24, 14, STONE, 0.05);
-  for (const [x, z] of [[-27, -27], [27, -27], [-27, 27], [27, 27]]) b.box(x, 22, z, 11, 44, 11, STONE_DARK, 0.05).box(x, 47, z, 13, 6, 13, '#6a4a6e', 0.04);
-  b.box(0, 72, 0, 6, 8, 6, '#6a4a6e', 0.04).box(0, 8, 27.3, 10, 16, 1, WOOD_DARK);
+  citadel(add.stone, P, 27, 9);
   add.rect(-32, 32, -32, 32);
   // Streets of houses, leaving the two avenues clear.
   const step = 40;
@@ -108,12 +106,13 @@ function city(T, b, add, rand) {
 function bandit(T, b, add, rand) {
   const R = 40;
   b.box(0, 0.05, 0, R * 2, 0.1, R * 2, '#6a5a44', 0.08);
-  // Sharpened stakes all round, with the way in to the south.
-  for (let i = 0; i < 64; i++) {
-    const a = (i / 64) * 6.28, x = Math.cos(a) * R, z = Math.sin(a) * R;
+  // Sharpened logs all round, leaning out, with the way in to the south.
+  for (let i = 0; i < 74; i++) {
+    const a = (i / 74) * 6.28, x = Math.cos(a) * R, z = Math.sin(a) * R;
     if (z > R * 0.9 && Math.abs(x) < 9) continue;
-    const h = 5 + rand() * 1.6;
-    b.box(x, h / 2, z, 1.5, h, 1.5, i % 3 ? WOOD : WOOD_DARK, 0.08).box(x, h + 0.3, z, 0.7, 0.8, 0.7, '#c9b89e');
+    const h = 5.5 + rand() * 2, lean = 0.14;
+    add.stone.push(paint(aimed(new THREE.CylinderGeometry(0.62, 0.72, h, 7).translate(0, h / 2, 0), 0, 0, 0, Math.cos(a) * lean, 1, Math.sin(a) * lean), i % 3 ? WOOD : WOOD_DARK).translate(x, 0, z));
+    add.stone.push(paint(aimed(spike(0.62, 1.5), 0, 0, 0, Math.cos(a) * lean, 1, Math.sin(a) * lean), '#c9b89e').translate(x + Math.cos(a) * lean * h, h, z + Math.sin(a) * lean * h));
   }
   add.rect(-R, -9, R - 2, R + 2);
   add.rect(9, R, R - 2, R + 2);
@@ -122,7 +121,7 @@ function bandit(T, b, add, rand) {
   add.rect(R - 2, R + 2, -R, R);
   // Tents.
   for (const [x, z, c] of [[-20, -16, '#8e2036'], [18, -20, '#5a4a38'], [-22, 14, '#5a4a38'], [22, 12, '#8e2036']]) {
-    b.box(x, 1.4, z, 9, 2.8, 7, c, 0.06).box(x, 3.4, z, 6.5, 1.4, 7, c, 0.06).box(x, 4.6, z, 3, 1, 7, c, 0.06);
+    tent(add.stone, x, z, 9, 7, c, rand);
     add.rect(x - 4.5, x + 4.5, z - 3.5, z + 3.5);
   }
   // Fire, watchtower, loot.
@@ -136,21 +135,25 @@ function keep(T, b, add, rand) {
   const R = 44;
   b.box(0, 0.05, 0, R * 2, 0.1, R * 2, '#7a7070', 0.08);
   // Walls that have mostly fallen: each stretch stands to a different height, or not at all.
+  const P = add.P;
   for (let i = 0; i < 44; i++) {
-    const a = (i / 44) * 6.28, x = Math.cos(a) * R, z = Math.sin(a) * R, h = rand() < 0.28 ? 0 : 3 + rand() * 13;
+    const a = (i / 44) * 6.28, x = Math.cos(a) * R, z = Math.sin(a) * R, h = rand() < 0.28 ? 0 : 5 + rand() * 13;
     if (!h) {
-      b.box(x, 0.7, z, 4, 1.4, 4, STONE_DARK, 0.1);
+      add.stone.push(paint(rock(2 + rand()), P.dark).translate(x, 0.8, z));
       continue;
     }
-    b.box(x, h / 2, z, 6.4, h, 6.4, i % 2 ? STONE : STONE_DARK, 0.08);
+    broken(add.stone, P, x, z, h, a + 1.57, rand);
     add.circle(x, z, 3.4);
   }
-  b.box(0, 13, 0, 26, 26, 26, STONE_DARK, 0.06).box(-7, 31, -7, 12, 10, 12, STONE, 0.08).box(8, 29, 8, 10, 6, 10, STONE, 0.08);
-  b.box(0, 5, 13.3, 8, 10, 0.6, '#2a2030');
+  // The old keep, its roof gone and its towers split open.
+  add.stone.push(paint(block(26, 19, 26).translate(0, 9.5, 0), P.dark), paint(block(23, 1, 23).translate(0, 19.4, 0), '#3a2c30'));
+  for (const [x, z] of [[-13, -13], [13, 13], [13, -13], [-13, 13]]) brokenTower(add.stone, P, x, z, 5, x === z ? 36 : 26, rand);
+  for (let i = 0; i < 16; i++) add.stone.push(paint(block(2.4, 1.6 + rand() * 7, 2).translate(-11 + i * 1.5, 19 + rand() * 2.2, 12), P.stone), paint(block(2, 1.6 + rand() * 5, 2.4).translate(-12, 19 + rand() * 2.2, 11 - i * 1.5), P.stone));
+  add.stone.push(paint(block(8, 10, 0.6).translate(0, 5, 13.3), '#141014'));
   add.rect(-13, 13, -13, 13);
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 22; i++) {
     const a = rand() * 6.28, d = 18 + rand() * 20;
-    b.box(Math.cos(a) * d, 0.6, Math.sin(a) * d, 1 + rand() * 2.6, 1.2, 1 + rand() * 2.6, STONE, 0.1);
+    add.stone.push(paint(rock(0.7 + rand() * 1.5), P.stone).translate(Math.cos(a) * d, 0.5, Math.sin(a) * d));
   }
 }
 
@@ -158,9 +161,12 @@ function keep(T, b, add, rand) {
 function lair(T, b, add, rand) {
   const R = 92;
   b.box(0, 0.06, 0, R * 2, 0.12, R * 2, '#4a3e44', 0.08);
+  // Black fangs of rock lean in over the floor, with the ruler's mark burning in each.
   for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * 6.28, x = Math.cos(a) * R, z = Math.sin(a) * R, h = 12 + rand() * 12;
-    b.box(x, h / 2, z, 6, h, 6, STONE_DARK, 0.08).box(x, h + 1, z, 7.6, 2, 7.6, STONE, 0.08);
+    const a = (i / 16) * 6.28, x = Math.cos(a) * R, z = Math.sin(a) * R, h = 18 + rand() * 18;
+    add.stone.push(paint(aimed(spike(5.4, h, 6), 0, 0, 0, -Math.cos(a) * 0.2, 1, -Math.sin(a) * 0.2), STONE_DARK).translate(x, -1, z));
+    add.stone.push(paint(rock(3 + rand() * 2), '#3a3036').translate(x + Math.cos(a) * 3, 0.8, z + Math.sin(a) * 3));
+    add.glow.push(paint(new THREE.OctahedronGeometry(1).scale(0.6, 2.2, 0.3).rotateY(-a + 1.57), add.P.trim).translate(x - Math.cos(a) * (3.4 + h * 0.03), h * 0.34, z - Math.sin(a) * (3.4 + h * 0.03)));
     add.circle(x, z, 3.6);
   }
 }
@@ -169,9 +175,10 @@ const BUILD = { village, city, bandit, keep, lair };
 
 export function addTowns(scene, marks) {
   for (const T of TOWNS) {
-    const b = new VoxelBuilder(), rand = seeded(T.name);
+    const b = new VoxelBuilder(), rand = seeded(T.name), stone = [], glow = [];
     let n = 0;
     BUILD[T.kind](T, b, {
+      stone, glow, P: STONEWORK[nationAt(T.x, T.z)?.id ?? 'free'],
       house: (x, z, rot, roof) => placeHouse(scene, marks, `${T.name}${n++}`, T.x + x, T.z + z, rot, roof),
       rect: (x0, x1, z0, z1) => marks.solids.push({ x0: T.x + x0, x1: T.x + x1, z0: T.z + z0, z1: T.z + z1 }),
       circle: (x, z, r) => marks.solids.push({ x: T.x + x, z: T.z + z, r }),
@@ -181,6 +188,19 @@ export function addTowns(scene, marks) {
     mesh.receiveShadow = true;
     mesh.position.set(T.x, T.y, T.z);
     scene.add(mesh);
+    if (stone.length) {
+      const work = new THREE.Mesh(mergeGeometries(stone.map((g) => (g.index ? g.toNonIndexed() : g))), mesh.material);
+      work.castShadow = true;
+      work.receiveShadow = true;
+      work.position.copy(mesh.position);
+      scene.add(work);
+    }
+    if (glow.length) {
+      const lit = new THREE.Group();
+      lit.position.copy(mesh.position);
+      shine(lit, glow);
+      scene.add(lit);
+    }
   }
 }
 

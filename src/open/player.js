@@ -55,6 +55,8 @@ const FLINCH = 0.28;         // seconds of recoil from a hit
 const DUST_EVERY = 0.13;     // seconds between puffs under a sprinter
 const TAP = 0.16;            // holding the button this long turns a jump into flight
 const GLIDE = 0.35;          // gravity while falling, once you have wings
+const STAGES = [5, 12, 20];   // Mastery at which a Conqueror's body changes
+const STAGE_WORDS = ['Power runs under your skin.', 'Your power has begun to circle you.', 'The ground itself bears your mark.'];
 const WAKE_RINGS = [55, 80, 110, 150, 220, 320]; // tiles from where a hero fell
 const WAKE_TRIES = 12;
 const WAKE_CLEAR = 28;       // tiles a waking hero is kept from any enemy
@@ -281,6 +283,7 @@ export default class Player {
     }
     if (!world.paused) this.powers.update(dt);
     this.bar.update(this.powers, controls.device);
+    if (this.powers.def) this.growForm();
     if (FEATURES.jump && just.jump && !used && free && !state.air && !melee.active) {
       // A kick up out of the water is weaker than a jump off the ground, but it gets you out.
       state.rise = body.jumpSpeed * (swim.inWater ? WATER_JUMP : 1);
@@ -399,10 +402,26 @@ export default class Player {
     }
   }
 
+  // Mastery shows on the body; reaching a new stage is an event, and everyone near can see it.
+  growForm() {
+    const stage = STAGES.reduce((n, at, i) => (this.powers.mastery >= at ? i + 1 : n), 0);
+    if (stage === this.stage) return;
+    const risen = this.stage !== undefined && stage > this.stage;
+    this.stage = stage;
+    this.hero.ascend(stage);
+    if (!risen) return;
+    const { state, powers, world } = this;
+    this.hud.message(STAGE_WORDS[stage - 1], true, 3000);
+    world.fx.impact(powers.element, state.x, Math.max(state.y, 0), state.z, 7);
+    world.work.shake = 0.4;
+    world.work.shakeAt = state;
+  }
+
   // Stands a Conqueror's figure in the hero's place, for the choosing screen or for good.
   showAs(id) {
     this.hero.dispose();
     this.hero = new HeroModel(this.world.scene, CONQUERORS[id].look);
+    this.stage = undefined;
   }
 
   becomeConqueror(id) {
