@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
-import { makeSpiritTree, makeHouse } from '../render/models.js';
+import { makeSpiritTree } from '../render/models.js';
 import { PLACES, height } from './terrain.js';
 import { masonry } from './materials.js';
-
-const houseWalls = masonry();
+import { makeBuilding } from './architecture.js';
+import { nationAt } from './nations.js';
 
 const HOUSE = { x: 3.1, z: 2.95, door: 3.8 }; // half size and door distance at the scale used here
 
@@ -98,12 +98,12 @@ function rubble(scene, x, z, seed) {
 
 // A house you can enter and wreck. Turned by quarter turns; its door faces `rot`.
 export function placeHouse(scene, out, id, hx, hz, rot, roof) {
-  const house = makeHouse(...roof);
+  // Whoever holds this land builds the way they build.
+  const seed = [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7);
+  const house = makeBuilding(nationAt(hx, hz)?.id ?? 'free', seed);
   house.position.set(hx, height(hx, hz), hz);
   house.scale.setScalar(3.4);
   house.rotation.y = rot;
-  house.castShadow = true;
-  house.traverse((o) => { if (o.isMesh) o.material = houseWalls; });
   scene.add(house);
   const ox = Math.sin(rot), oz = Math.cos(rot), turned = Math.abs(Math.round(rot / (Math.PI / 2))) % 2 === 1;
   const sx = turned ? HOUSE.z : HOUSE.x, sz = turned ? HOUSE.x : HOUSE.z;

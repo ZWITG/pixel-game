@@ -12,7 +12,8 @@ const WARD_PUSH = 3;       // tiles/s that village wards push monsters out
 const FLASH = new THREE.Color(1, 1, 1);
 const WINDUP_GLOW = new THREE.Color(0.7, 0.12, 0);
 
-const MODELS = {
+// The open world replaces these with its own (see open/monsters.js).
+export const MODELS = {
   slime: (def) => makeSlime(SLIME_COLORS[def.colors]),
   boar: () => makeBoar(),
   wisp: () => makeWisp(),
@@ -152,6 +153,7 @@ export default class Enemy {
 
   animate(dt) {
     const m = this.model, t = this.game.time, moving = this.vel.lengthSq() > 0.01;
+    m.tick?.(t, moving);
     if (this.def.model === 'boar') {
       this.phase += dt * (moving ? 16 : 3);
       const swing = moving ? Math.sin(this.phase) * 0.7 : 0;

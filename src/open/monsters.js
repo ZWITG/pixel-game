@@ -1,10 +1,12 @@
-import Enemy from '../entities/Enemy.js';
+import Enemy, { MODELS } from '../entities/Enemy.js';
 import { ENEMIES } from '../data/enemies.js';
 import { makeOrb } from '../render/models.js';
 import { height, biome, region, PLACES, SPAWN, TOWNS } from './terrain.js';
 import { CAVE_FLOOR } from './cave.js';
 import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts } from './evolve.js';
 import { nationAt } from './nations.js';
+import { makeFigure } from './figures.js';
+import { makeCreature } from './creatures.js';
 import { machineMesh, DOCTRINES } from './doctrines.js';
 import { arm, stagger, standDown, TURN_TAKERS, PARRIED } from './foes.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
@@ -30,6 +32,12 @@ const GROUPS = [
   ['boar', 'fireSlime', 'wolf', 'puffcap'], // autumn wood
   ['puffcap', 'wolf', 'wolf', 'wisp'],      // pine wood
 ];
+// Everything that walks the open world wears its new body. The old slime, boar, wisp and
+// mushroom models are read as beast shapes here, so one animation drives them all.
+MODELS.human = (def) => makeFigure(def.figure ?? def.look, { sword: !!def.sword });
+MODELS.beast = (def) => makeCreature(def.shape ?? def.was, def);
+
+const OLD_SHAPES = ['slime', 'boar', 'wisp', 'mushroom'];
 const PATROLS = 0.25, PATROL_SIZE = 3; // the chance a spawn on hostile land is a patrol, and its size
 const BADLANDS = ['scorpion', 'scorpion', 'golem', 'fireSlime'];
 const MARSH = ['lurker', 'lurker', 'puffcap', 'wisp'];
@@ -42,6 +50,7 @@ function fit(def, danger, elder) {
   const grow = elder ? 2 : 1;
   return {
     ...def,
+    ...(OLD_SHAPES.includes(def.model) ? { model: 'beast', was: def.model } : {}),
     name: elder ? `Elder ${def.name}` : def.name,
     scale: (def.scale ?? 1) * SIZE * grow,
     radius: def.radius * SIZE * grow,

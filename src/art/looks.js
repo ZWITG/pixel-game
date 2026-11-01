@@ -22,6 +22,8 @@ export const LOOKS = {
   smith: { ...base, skin: '#e0a878', hair: '#2b2f45', hairShine: '#566c86', tunic: '#5a3a22', tunicShade: '#3a2a1f', pants: '#333c57', belt: '#94b0c2', apron: '#3a2a1f', beard: '#2b2f45', scale: 1.08 },
   bandit: { ...base, skin: '#d8a078', hair: '#2b2f45', hairShine: '#566c86', tunic: '#5a4a38', tunicShade: '#3a2c30', pants: '#3a2a1f', belt: '#b13e53', hat: '#8e2036' },
   chief: { ...base, skin: '#d8a078', hair: '#7a2a3e', hairShine: '#b13e53', tunic: '#8e2036', tunicShade: '#5a1a26', pants: '#2b2f45', belt: '#ffcd75', beard: '#7a2a3e', scale: 1.15 },
+  ruler: { ...base, skin: '#d8a078', hair: '#2b2f45', hairShine: '#566c86', tunic: '#a8201e', tunicShade: '#6e1414', pants: '#33263a', belt: '#e8c050', boots: '#3a2a1f' },
+  thornqueen: { ...base, skin: '#c8d8b8', hair: '#141a14', hairShine: '#2a3a2a', tunic: '#1e3020', tunicShade: '#2a4a2c', pants: '#141a14', belt: '#5fae62' },
   legion: { ...base, hair: '#3a3028', hairShine: '#5a4a38', tunic: '#a8201e', tunicShade: '#6e1414', pants: '#33263a', belt: '#e8c050', helmet: true, pauldron: '#e8c050' },
   assassin: { ...base, skin: '#b89878', hair: '#141a14', hairShine: '#2a3a2a', tunic: '#2a3a24', tunicShade: '#1a2616', pants: '#141a14', belt: '#5fae62', hat: '#1a2616' },
   rime: { ...base, skin: '#a8c8d8', hair: '#dff4ff', hairShine: '#ffffff', tunic: '#4a7a9c', tunicShade: '#2a5070', pants: '#1a3048', belt: '#dff4ff', helmet: true, pauldron: '#8fe0ff' },

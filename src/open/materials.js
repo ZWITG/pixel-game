@@ -122,12 +122,23 @@ export function terrainMaterial({ far = false } = {}) {
       // the roads: packed earth, cobbled where you can see the stones
       float road=smoothstep(4.6,3.2,vR+(mid-.5)*2.2);
       if(road>0.){
-        vec3 way=mix(vec3(.44,.34,.23),vec3(.58,.48,.34),mid);
-        if(detail>0.){
-          vec2 q=vP.xz*1.5; q.x+=step(1.,mod(floor(q.y),2.))*.5;
-          vec2 f=fract(q)-.5; float id=h21(floor(q));
-          float stone=smoothstep(.5,.33,length(f*vec2(1.,1.1)));
-          way=mix(way,mix(vec3(.46,.42,.37),vec3(.68,.62,.52),id),stone*smoothstep(3.6,2.2,vR)*detail);
+        // Packed earth, rutted by wheels, then laid stone down the crown of the road.
+        vec3 way=mix(vec3(.37,.28,.19),vec3(.54,.43,.3),mid)*(.84+fine*.3);
+        way*=1.-.3*smoothstep(.55,.1,abs(vR-1.9+(mid-.5)*.5));
+        if(detail>.02){
+          vec2 q=vP.xz*.95, id=floor(q), f=fract(q); float near=9.,next=9.,tone=0.;
+          for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){
+            vec2 c=vec2(float(i),float(j)), o=vec2(h21(id+c),h21(id+c+4.7));
+            float d=length(c+o-f);
+            if(d<near){ next=near; near=d; tone=o.x; } else if(d<next) next=d;
+          }
+          float laid=smoothstep(1.5,.9,vR+(fine-.5)*.8)*detail;
+          float cobble=smoothstep(.03,.14,next-near);
+          vec3 stone=mix(vec3(.38,.35,.31),vec3(.66,.6,.5),tone)*(.8+smoothstep(.5,.0,near)*.3);
+          way=mix(way,mix(vec3(.17,.14,.12),stone,cobble),laid);
+          // Kerb stones here and there, and gravel thrown to the side.
+          way=mix(way,vec3(.5,.46,.4),smoothstep(.34,.2,abs(vR-3.05))*step(.56,vn(vP.xz*.5))*detail);
+          way*=1.+(speck-.5)*.3;
         }
         col=mix(col,way,road);
       }
@@ -180,15 +191,20 @@ export function masonry() {
       /* glsl */`#include <color_fragment>
       {
         vec3 c=diffuseColor.rgb, n=abs(vWN);
-        float grey=1.-smoothstep(.06,.34,(max(c.r,max(c.g,c.b))-min(c.r,min(c.g,c.b)))/max(c.g,.02));
+        float grey=1.-smoothstep(.34,.62,(max(c.r,max(c.g,c.b))-min(c.r,min(c.g,c.b)))/max(c.g,.02));
         float along=n.x>n.z?vW.z:vW.x, near=1.-smoothstep(120.,520.,length(vW-cameraPosition));
-        vec2 q=n.y>.7?vW.xz*.42:vec2(along*.42,vW.y*.8);
-        q.x+=step(1.,mod(floor(q.y),2.))*.5;
+        vec2 q=n.y>.7?vW.xz*.3:vec2(along*.3,vW.y*.62);
+        q.x+=step(1.,mod(floor(q.y),2.))*.5+h21(vec2(floor(q.y),3.))*.4;
         vec2 f=fract(q); float id=h21(floor(q));
-        float seam=smoothstep(0.,.05,min(f.x,1.-f.x))*smoothstep(0.,.08,min(f.y,1.-f.y));
-        float stone=(.68+.32*seam)*(.84+id*.26)*(.88+vn(vW.xz*.3+vW.y*.4)*.24);
+        float seam=smoothstep(0.,.045,min(f.x,1.-f.x))*smoothstep(0.,.08,min(f.y,1.-f.y));
+        float weather=vn(vW.xz*.11+vW.y*.17);
+        float stone=(.55+.45*seam)*(.76+id*.4)*(.74+weather*.5);
+        // chipped corners, and damp creeping up from the ground
+        stone*=1.-.25*step(.82,h21(floor(q)+7.))*smoothstep(.3,.0,min(f.x,f.y));
         float boards=.9+.1*smoothstep(0.,.08,abs(fract(along*1.5)-.5))+(vn(vec2(along*1.5,vW.y*.15))-.5)*.14;
         diffuseColor.rgb=c*mix(1.,mix(boards,stone,grey),near);
+        float moss=grey*smoothstep(.56,.7,vn(vW.xz*.2+vW.y*.09))*(1.-n.y*.5)*near;
+        diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(.62,.82,.5),moss);
       }`,
     );
   };

@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { toonSteps, inkMaterial, paint, ball as sphere, limb, spike, aimed } from './kit.js';
 
 // The heroes as jointed 3D figures in a clean anime style: toon-shaded, with a thin ink outline,
 // a scarf that streams behind them, and one set of named poses for everything they can do.
 const UPPER_LEG = 0.6, LOWER_LEG = 0.62, HIP_Y = 1.27, UPPER_ARM = 0.42, LOWER_ARM = 0.42;
 const OUTLINE = 0.016;      // ink width, in model units
+const ball = (r, sx, sy, sz) => sphere(r, sx, sy, sz);
 const EASE = 16, EASE_FAST = 42; // how quickly a joint reaches its pose
 const TURN = 16;            // how quickly the body turns to face the way it's going
 const GHOSTS = 12;          // afterimages behind a Superspeed runner
@@ -23,43 +25,6 @@ export const LOOKS = [
     scarf: '#f0b13c', pants: '#3a2f45', boot: '#2b2f45', wrap: '#ded6ee', gold: '#9fe8ff', glow: '#e8fbff', tail: true,
   },
 ];
-
-const toonSteps = (() => {
-  const t = new THREE.DataTexture(new Uint8Array([120, 120, 120, 255, 185, 185, 185, 255, 255, 255, 255, 255, 255, 255, 255, 255]), 4, 1);
-  t.magFilter = t.minFilter = THREE.NearestFilter;
-  t.needsUpdate = true;
-  return t;
-})();
-
-// Ink: the same shape pushed out along its normals, drawn inside out.
-const inkMaterial = (() => {
-  const m = new THREE.MeshBasicMaterial({ color: '#14162a', side: THREE.BackSide, fog: true });
-  m.onBeforeCompile = (s) => {
-    s.vertexShader = s.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = position + normal * ${OUTLINE.toFixed(3)};`);
-  };
-  return m;
-})();
-
-// Parts painted one color each, merged per bone so the whole figure stays a few draw calls.
-function paint(geometry, color) {
-  const g = geometry.index ? geometry : mergeReady(geometry), c = new THREE.Color(color), n = g.attributes.position.count;
-  const out = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) c.toArray(out, i * 3);
-  g.setAttribute('color', new THREE.BufferAttribute(out, 3));
-  g.deleteAttribute('uv');
-  return g;
-}
-function mergeReady(g) {
-  const n = g.attributes.position.count;
-  g.setIndex(Array.from({ length: n }, (_, i) => i));
-  return g;
-}
-
-const ball = (r, sx = 1, sy = 1, sz = 1) => new THREE.SphereGeometry(r, 16, 12).scale(sx, sy, sz);
-const limb = (top, bottom, length, depth = 1) => new THREE.CylinderGeometry(top, bottom, length, 12, 1).scale(1, 1, depth).translate(0, -length / 2, 0);
-const spike = (r, length) => new THREE.ConeGeometry(r, length, 8).translate(0, length / 2, 0);
-const up = new THREE.Vector3(0, 1, 0);
-const aimed = (g, x, y, z, dx, dy, dz) => g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, new THREE.Vector3(dx, dy, dz).normalize())).translate(x, y, z);
 
 // A strip of cloth or hair: a chain of points hanging from a moving anchor.
 class Ribbon {
@@ -247,7 +212,7 @@ export default class HeroModel {
   skin(bone, parts) {
     const mesh = new THREE.Mesh(mergeGeometries(parts), this.material);
     mesh.castShadow = true;
-    const ink = new THREE.Mesh(mesh.geometry, inkMaterial);
+    const ink = new THREE.Mesh(mesh.geometry, inkMaterial(OUTLINE));
     bone.add(mesh, ink);
   }
 

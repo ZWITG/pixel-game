@@ -128,8 +128,8 @@ export const ENEMIES = {
   },
   // The armies of the nations, and the two rulers who hold cities.
   soldier: { name: 'Soldier', model: 'human', look: 'guard', plain: true, sword: true, scale: 0.95, ai: 'chase', hp: 8, damage: 2, speed: 2.2, chaseSpeed: 3.8, aggro: 10, radius: 0.36, xp: 10, spawns: false, drops: [{ item: 'iron', chance: 0.4 }, { item: 'hide', chance: 0.2 }] },
-  marshal: { name: 'High Marshal Verane', boss: true, plain: true, model: 'human', look: 'chief', sword: true, scale: 3, ai: 'chase', hp: 44, damage: 4, speed: 1.6, chaseSpeed: 2.6, aggro: 60, radius: 1.3, xp: 200, spawns: false, drops: [] },
-  thornqueen: { name: 'Sable, the Thorn Queen', boss: true, plain: true, model: 'human', look: 'bard', sword: true, scale: 3, ai: 'chase', hp: 40, damage: 4, speed: 1.8, chaseSpeed: 3, aggro: 60, radius: 1.2, xp: 200, spawns: false, drops: [] },
+  marshal: { name: 'High Marshal Verane', boss: true, plain: true, model: 'human', look: 'chief', figure: 'ruler', sword: true, scale: 3, ai: 'chase', hp: 44, damage: 4, speed: 1.6, chaseSpeed: 2.6, aggro: 60, radius: 1.3, xp: 200, spawns: false, drops: [] },
+  thornqueen: { name: 'Sable, the Thorn Queen', boss: true, plain: true, model: 'human', look: 'bard', figure: 'thornqueen', sword: false, scale: 3, ai: 'chase', hp: 40, damage: 4, speed: 1.8, chaseSpeed: 3, aggro: 60, radius: 1.2, xp: 200, spawns: false, drops: [] },
   // Each nation's own fighters.
   legionary: { name: 'Legionary', model: 'human', look: 'legion', plain: true, sword: true, scale: 1, ai: 'chase', hp: 11, damage: 2, speed: 2, chaseSpeed: 3.2, aggro: 11, radius: 0.38, xp: 12, spawns: false, drops: [{ item: 'iron', chance: 0.5 }] },
   assassin: { name: 'Thorn Assassin', model: 'human', look: 'assassin', plain: true, sword: true, scale: 0.92, ai: 'chase', hp: 5, damage: 3, speed: 3, chaseSpeed: 5.6, aggro: 13, radius: 0.34, xp: 12, spawns: false, drops: [{ item: 'hide', chance: 0.5 }] },

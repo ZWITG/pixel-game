@@ -25,6 +25,7 @@ import { CONQUERORS } from './conquerors.js';
 import Nations from './nations.js';
 import Scars from './scars.js';
 import Realm from './realm.js';
+import { lightWindows } from './architecture.js';
 import Towns from './settlements.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
@@ -216,6 +217,7 @@ function applySky(t) {
   hemi.color.set(t.mid);
   for (const v of views) v.post.setTime(t);
   world.light = t;
+  lightWindows(t.night);
   monsters.nightfall = t.night > 0.6;
 }
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { VoxelBuilder } from '../render/voxel.js';
-import { makeHumanoid, walkPose } from '../render/models.js';
+import { walkPose } from '../render/models.js';
+import { makeFigure } from './figures.js';
 import { LOOKS } from '../art/looks.js';
 import { height } from './terrain.js';
 import { placeHouse } from './landmarks.js';
@@ -114,7 +115,7 @@ export default class Towns {
   crew(s) {
     if (s.crew.length) return;
     for (let i = 0; i < BUILDERS; i++) {
-      const who = makeHumanoid(WORK[(i + s.name.length) % WORK.length]);
+      const who = makeFigure(WORK[(i + s.name.length) % WORK.length]);
       who.group.scale.setScalar(1.6);
       this.scene.add(who.group);
       s.crew.push(who);

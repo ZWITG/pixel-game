@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { VoxelBuilder } from '../render/voxel.js';
 import { masonry } from './materials.js';
-import { makeHumanoid, walkPose } from '../render/models.js';
+import { walkPose } from '../render/models.js';
+import { makeFigure } from './figures.js';
 import { LOOKS } from '../art/looks.js';
 import { TOWNS } from './terrain.js';
 import { placeHouse } from './landmarks.js';
@@ -195,7 +196,7 @@ export class People {
     this.live.add(T);
     const rand = seeded(`${T.name}folk`), spread = T.kind === 'city' ? T.r * 0.5 : 26;
     for (let i = 0; i < CROWD[T.kind]; i++) {
-      const model = makeHumanoid(FOLK[i % FOLK.length]);
+      const model = makeFigure(FOLK[i % FOLK.length]);
       const job = i === 0 ? 'healer' : i === 1 ? 'trader' : 'folk';
       const x = T.x + (rand() - 0.5) * spread * 2, z = T.z + (rand() - 0.5) * spread * 2;
       model.group.position.set(x, T.y, z);
