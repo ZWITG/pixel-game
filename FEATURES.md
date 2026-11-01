@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: combat rebuilt: enemy tells, moves, turn-taking, stagger; roll, guard, parry, counter, grab, throw, slam, air dive, lock-on, enemy health bar
 - 2026-11-01 prototype: ground fixes: no walls around pits, oldest craters fill back in cleanly and up to 1500 are kept, props and crack marks settle with the land, no gaps in the ground at speed, nothing placed on cliff faces, softer crack marks
 - 2026-11-01 prototype: world generation: four rivers with fords, roads to every town, red terraced badlands, pooled swamp, stone fields, giant trees
 - 2026-11-01 prototype: fixed long freezes when loading new areas; terrain builds in small slices; monsters stop at walls and no longer shrink when hit; skill progress saves on close; chopped-object save stays small; start area stays dry; beds heal; door and charge edge cases

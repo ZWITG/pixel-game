@@ -139,7 +139,7 @@ export function setTier(e, tier, hero) {
   e.def.speed = base.speed * t.pace;
   e.def.chaseSpeed = base.chaseSpeed * t.pace;
   e.radius = base.radius * t.size;
-  e.hp = base.hp * s.hp * t.hp;
+  e.hp = e.maxHp = base.hp * s.hp * t.hp;
   e.group.scale.setScalar(base.scale * t.size);
   dress(e, tier);
 }

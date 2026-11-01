@@ -33,6 +33,24 @@ const BLOW_MOST = 110;
 const BLOW_PIT = 26;         // how deep the land can be driven by these
 const BLOW_HOLD = 0.35;      // seconds of holding punch before it starts to charge
 const BLOW_COLOR = '#ffb020';
+const ROLL_TIME = 0.42;      // seconds of a dodge roll
+const ROLL_SAFE = 0.3;       // of which nothing can touch you
+const ROLL_GAP = 0.2;        // seconds before you can roll again
+const PARRY = 0.22;          // seconds after raising your guard that a hit is turned aside
+const BLOCKED = 0.2;         // share of a hit that gets past a guard
+const CRUSHED = 0.6;         // share of a heavy one, which also knocks the guard down
+const GUARD_DOWN = 0.9;      // seconds a broken guard stays down
+const COUNTER = 1.8;         // seconds after a parry that your next punch is a counter
+const COUNTER_FORCE = 3;
+const GRAB_REACH = 4.5;
+const GRAB_HOLD = 3.5;       // seconds before a held monster squirms free
+const THROW = 34;            // tiles per second
+const THROW_FORCE = 1.5;     // of a punch, where it lands
+const SLAM_FORCE = 2.5;
+const THROW_BLAST = 7;       // tiles
+const DIVE = 46;             // tiles per second straight down
+const LOCK_FAR = 70;
+const BAR_TIME = 3;          // seconds an enemy's health bar stays up after a hit
 const WHITE = new THREE.Color('#ffffff');
 const HARD_LANDING = 10;      // tiles fallen before a stomp breaks the ground
 const HOP_STOMP = 0.25;      // an ordinary jump's landing reaches this share of a hard one
@@ -120,6 +138,22 @@ export default class Melee {
     this.heldFor = 0;
     this.slam = 0;
     this.lift = 0;
+    this.rolling = 0;
+    this.rollWait = 0;
+    this.rollDir = [0, 1];
+    this.guarding = false;
+    this.guardAt = -9;
+    this.guardDown = 0;
+    this.countering = 0;
+    this.held = null;
+    this.heldFor2 = 0;
+    this.lock = null;
+    this.struck = null;
+    this.barFor = 0;
+    this.clock = 0;
+    this.lockRing = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: 0.8, depthWrite: false, depthTest: false }));
+    this.lockRing.visible = false;
+    scene.add(this.lockRing);
     this.orb = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshBasicMaterial({ color: BLOW_COLOR, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.orb.visible = false;
     this.orbAge = 9;
@@ -135,16 +169,175 @@ export default class Melee {
       this.queued = true; // remembered, so mashing Square keeps the chain going
       return;
     }
-    const target = this.monsters.target(state) ?? (this.player.rooms.house ? null : this.work.target(state));
+    if (this.held) return this.pileDrive(state);
+    const target = this.lock ?? this.monsters.target(state) ?? (this.player.rooms.house ? null : this.work.target(state));
     if (target) state.dir = [target.x - state.x, target.z - state.z];
     const len = Math.hypot(...state.dir) || 1;
     this.chain = this.idle < CHAIN_WINDOW ? (this.chain + 1) % CHAIN.length : 0;
+    this.guarding = false;
     this.active = { target, t: 0, time: this.body.punchTime * (this.chain === 2 ? 1.3 : 1), fx: state.dir[0] / len, fz: state.dir[1] / len, landed: false, chain: this.chain };
   }
 
   // A blow from this hero at their current punch, before the combo adds to it.
   get force() {
     return PUNCHES[this.stage].power * this.body.damageScale * this.body.massScale;
+  }
+
+  // Rolls toward (x, z) in world terms, or the way the hero is facing.
+  roll(state, x, z) {
+    if (this.rolling > 0 || this.rollWait > 0 || state.air || this.active || this.held || this.charging) return;
+    const len = Math.hypot(x, z);
+    this.rollDir = len > 0.05 ? [x / len, z / len] : (() => {
+      const f = Math.hypot(...state.dir) || 1;
+      return [state.dir[0] / f, state.dir[1] / f];
+    })();
+    state.dir = [...this.rollDir];
+    this.rolling = ROLL_TIME;
+    this.work.burst(state.x, state.y + 0.2, state.z, ['#c9bcc4', '#a89a8c'], 6, 3);
+  }
+
+  get rollSafe() {
+    return this.rolling > ROLL_TIME - ROLL_SAFE;
+  }
+
+  // An attack reaches this hero: does it land, and how hard? Roll past it, parry it, or block it.
+  defend(amount, x, z, heavy) {
+    const { hud, state } = this.player;
+    const say = (text, color) => hud.float(text, state.x, state.y + 3.4, state.z, color);
+    if (this.rolling > 0 && this.rollSafe) {
+      say('Dodged!', '#9fe8ff');
+      this.work.stop = 0.1;
+      return { avoided: true };
+    }
+    const facing = Math.hypot(...state.dir) || 1, dx = x - state.x, dz = z - state.z, d = Math.hypot(dx, dz) || 1;
+    const front = (dx * state.dir[0] + dz * state.dir[1]) / (d * facing) > 0;
+    if (!this.guarding || !front) return { amount };
+    if (this.clock - this.guardAt < PARRY) {
+      say('Parry!', '#ffd24a');
+      this.work.stop = 0.14;
+      this.work.shake = Math.max(this.work.shake, 0.2);
+      this.work.burst(state.x, state.y + 1.6, state.z, ['#ffd24a', '#ffffff'], 18, 7);
+      this.countering = COUNTER;
+      return { avoided: true, parried: true };
+    }
+    this.work.burst(state.x, state.y + 1.6, state.z, ['#c9d4e2', '#ffffff'], 8, 4);
+    if (!heavy) return { amount: amount * BLOCKED };
+    say('Guard broken!', '#ff7a6a');
+    this.guarding = false;
+    this.guardDown = GUARD_DOWN;
+    return { amount: amount * CRUSHED };
+  }
+
+  setGuard(on) {
+    const up = on && this.guardDown <= 0 && !this.active && !this.held && this.rolling <= 0 && !this.charging;
+    if (up && !this.guarding) this.guardAt = this.clock;
+    this.guarding = up;
+  }
+
+  // The grab button: takes hold of what's in front, or throws what's held.
+  grab(state) {
+    if (this.held) return this.toss(state);
+    if ((this.active && !this.active.landed) || this.rolling > 0 || state.air) return undefined; // the follow-through can be cut short
+    const e = this.monsters.within(state.x, state.z, GRAB_REACH).sort((a, b) => Math.hypot(a.x - state.x, a.z - state.z) - Math.hypot(b.x - state.x, b.z - state.z))[0];
+    if (!e) return undefined;
+    // Big ones must be dazed first, unless you outweigh them.
+    if ((e.def.name.startsWith('Elder') || e.tier >= 4) && e.mode !== 'reeling' && this.body.massScale < 4) {
+      this.hud.float('Too heavy!', e.x, e.group.position.y + 4, e.z, '#ff7a6a');
+      return undefined;
+    }
+    this.active = null;
+    this.held = e;
+    this.heldFor2 = GRAB_HOLD;
+    e.heldBy = this.player;
+    e.mode = 'held';
+    e.turn = false;
+    e.vel.set(0, 0);
+    this.skills.add('fighting', 0.5);
+    this.work.shake = Math.max(this.work.shake, 0.12);
+    return undefined;
+  }
+
+  // Lets go, for when a held monster dies, wriggles free or is hit.
+  drop() {
+    const e = this.held;
+    if (!e) return;
+    this.held = null;
+    e.heldBy = null;
+    e.mode = 'reeling';
+    e.until = this.monsters.time + 0.4;
+  }
+
+  carry(e) {
+    const s = this.player.state, len = Math.hypot(...s.dir) || 1;
+    e.group.position.set(s.x + (s.dir[0] / len) * 0.8, s.y + s.air + 3.1, s.z + (s.dir[1] / len) * 0.8);
+    e.vel.set(0, 0);
+    e.knockUntil = this.monsters.time + 0.1;
+  }
+
+  toss(state) {
+    const e = this.held, len = Math.hypot(...state.dir) || 1;
+    this.drop();
+    if (!e) return;
+    e.vel.set(state.dir[0] / len, state.dir[1] / len).multiplyScalar(THROW);
+    e.knockUntil = this.monsters.time + 1.2;
+    e.rise = 12;
+    e.air = 3;
+    e.thrown = this.player;
+    e.until = this.monsters.time + 1.4;
+    this.slam = 0.25;
+  }
+
+  // Slams what's held into the ground in front of you.
+  pileDrive(state) {
+    const e = this.held;
+    this.drop();
+    if (!e) return;
+    this.slam = 0.3;
+    e.air = 0;
+    this.blast(e.x, e.z, this.force * SLAM_FORCE, THROW_BLAST, 0, '#ff8a4c', e);
+    this.work.shake = Math.max(this.work.shake, 0.35);
+    this.work.stop = 0.08;
+  }
+
+  landed(e) {
+    this.work.actor = this.player;
+    this.blast(e.x, e.z, this.force * THROW_FORCE, THROW_BLAST, 0, '#ff8a4c', e);
+    this.work.shakeAt = this.player.state;
+    this.work.shake = Math.max(this.work.shake, 0.2);
+  }
+
+  // Square in the air: straight down, and whatever's under you pays for it.
+  dive(state) {
+    if (state.dive || state.air < 0.8) return;
+    state.dive = true;
+    state.rise = -DIVE;
+  }
+
+  landDive(state) {
+    this.blast(state.x, state.z, this.force * 1.5, 6 + this.stage, 0, '#ffb547', null);
+    this.work.shake = Math.max(this.work.shake, 0.25);
+    this.work.shakeAt = state;
+    this.slam = 0.22;
+  }
+
+  // Locks on to the nearest enemy, or lets go if already locked.
+  aim(state) {
+    if (this.lock) {
+      this.lock = null;
+      return;
+    }
+    let best = null, d = LOCK_FAR;
+    for (const e of this.monsters.within(state.x, state.z, LOCK_FAR)) {
+      const k = Math.hypot(e.x - state.x, e.z - state.z);
+      if (k < d) { d = k; best = e; }
+    }
+    this.lock = best;
+  }
+
+  // Moves the lock to the next enemy over.
+  shiftAim(state, way) {
+    const list = this.monsters.within(state.x, state.z, LOCK_FAR).sort((a, b) => Math.atan2(a.x - state.x, a.z - state.z) - Math.atan2(b.x - state.x, b.z - state.z));
+    if (list.length) this.lock = list[(list.indexOf(this.lock) + way + list.length) % list.length];
   }
 
   get blowReady() {
@@ -264,7 +457,12 @@ export default class Melee {
 
   land(a, state) {
     const p = PUNCHES[this.stage], finisher = a.chain === 2, heavy = this.body.massScale, spread = Math.sqrt(heavy);
-    const force = this.force * CHAIN[a.chain];
+    let force = this.force * CHAIN[a.chain];
+    if (this.countering > 0) {
+      force *= COUNTER_FORCE;
+      this.countering = 0;
+      this.hud.float('Counter!', state.x, state.y + 3.4, state.z, '#ffd24a');
+    }
     const t = a.target && !a.target.dying && !this.work.chunks.gone.has(a.target.id) ? a.target : null;
     const r = t ? (t.r ?? t.radius) : 0;
     const x = t ? t.x - a.fx * r : state.x + a.fx * 1.2, z = t ? t.z - a.fz * r : state.z + a.fz * 1.2;
@@ -409,6 +607,33 @@ export default class Melee {
       this.work.give(w.drops);
       this.work.saveGone();
     }
+  }
+
+  // Timers, the lock, and the enemy's health bar.
+  updateMoves(dt, state) {
+    this.clock += dt;
+    this.guardDown = Math.max(0, this.guardDown - dt);
+    this.countering = Math.max(0, this.countering - dt);
+    this.rollWait = Math.max(0, this.rollWait - dt);
+    if (this.rolling > 0) {
+      this.rolling -= dt;
+      if (this.rolling <= 0) this.rollWait = ROLL_GAP;
+    }
+    if (this.held && (this.heldFor2 -= dt) <= 0) this.drop();
+    if (this.lock && (this.lock.dying || !this.monsters.list.includes(this.lock) || Math.hypot(this.lock.x - state.x, this.lock.z - state.z) > LOCK_FAR)) this.lock = null;
+    this.lockRing.visible = !!this.lock;
+    if (this.lock) {
+      this.lockRing.position.set(this.lock.x, this.lock.group.position.y + 0.3, this.lock.z);
+      this.lockRing.scale.setScalar(this.lock.radius + 1 + Math.sin(this.clock * 6) * 0.15);
+    }
+    if (this.struck) {
+      this.barOn = this.struck;
+      this.barFor = BAR_TIME;
+      this.struck = null;
+    }
+    this.barFor -= dt;
+    const foe = this.lock ?? (this.barFor > 0 ? this.barOn : null);
+    this.hud.setFoe(foe && !foe.dying ? foe.def.name : '', foe ? Math.max(0, foe.hp) / (foe.maxHp || 1) : 0);
   }
 
   update(dt, state) {

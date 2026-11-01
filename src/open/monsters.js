@@ -4,6 +4,7 @@ import { makeOrb } from '../render/models.js';
 import { height, biome, PLACES, SPAWN, TOWNS } from './terrain.js';
 import { CAVE_FLOOR } from './cave.js';
 import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts } from './evolve.js';
+import { arm, stagger, standDown, TURN_TAKERS, PARRIED } from './foes.js';
 
 // Monsters in the open world. They use the game's own Enemy class; this file is the small
 // `game` it expects, plus spawning around the hero and the hero's health.
@@ -111,7 +112,28 @@ export default class Monsters {
     if (e.def.splitInto) for (const side of [-1, 1]) this.add(e.def.splitInto, e.x + side * 2, e.z, this.danger(e.x, e.z), false);
   }
 
+  // Is there room for one more to attack this monster's hero?
+  takeTurn(e) {
+    return this.list.filter((m) => m.turn && m.foe === e.foe).length < TURN_TAKERS;
+  }
+
+  // The warning before an attack: a mark over its head, and a ring on the ground for an area.
+  warn(e, move) {
+    const hero = e.foe;
+    if (!hero) return;
+    hero.hud.float('!', e.x, e.group.position.y + 4 * e.group.scale.x * 0.4 + 2, e.z, move.heavy ? '#ff4a3a' : '#ffd24a');
+    if (move.area) hero.melee.ring(e.x, e.group.position.y, e.z, move.area + e.radius, '#ff6a4a');
+  }
+
+  quakeAt(e, area) {
+    const y = e.group.position.y;
+    this.work.burst(e.x, y + 0.5, e.z, ['#ff6a4a', '#c9bcc4'], 14, 4 + area * 0.4);
+    if (e.foe) e.foe.melee.ring(e.x, y, e.z, area + e.radius, '#ffb28a');
+  }
+
   removeEnemy(e) {
+    if (e.heldBy) e.heldBy.melee.drop();
+    standDown(e);
     this.list.splice(this.list.indexOf(e), 1);
     e.remove();
   }
@@ -126,6 +148,7 @@ export default class Monsters {
     e.air = 0;
     e.rise = 0;
     e.cave = cave;
+    arm(e, type, this);
     e.rootScale = e.model.root.scale.x;
     e.group.position.y = cave ? CAVE_FLOOR : height(x, z);
     const hero = this.nearest(e) ?? this.players[0];
@@ -163,6 +186,7 @@ export default class Monsters {
   // A blow on a monster: heavier blows send it further and throw it into the air.
   hit(e, force, x, z) {
     if (e.dying) return;
+    if (e.heldBy) e.heldBy.melee.drop();
     e.takeHit(Math.round(force * 10) / 10, x, z);
     e.recoil = 1;
     this.work.skills.add('fighting', 1);
@@ -171,13 +195,22 @@ export default class Monsters {
     e.knockUntil = this.time + 0.2 + Math.min(0.8, force * 0.02);
     e.rise = Math.min(30, force * 1.2);
     e.air = Math.max(e.air, 0.01);
+    if (!e.dying) stagger(e, 0.55, this.time);
+    this.work.actor.melee.struck = e;
     // A fight it survives can push it over the edge.
     if (!e.dying && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
   }
 
-  hurt(p, amount, fromX, fromZ) {
+  // `from` is the monster striking, if any; `heavy` attacks can't simply be blocked.
+  hurt(p, amount, fromX, fromZ, { heavy: crushing = false, from = null } = {}) {
     const s = p.state;
     if (p.guard > 0 || (p.rooms.house && !p.rooms.house.hostile)) return;
+    const answer = p.melee.defend(amount, fromX, fromZ, crushing);
+    if (answer.avoided) {
+      if (answer.parried && from) stagger(from, PARRIED, this.time, true);
+      return;
+    }
+    amount = answer.amount;
     const heavy = p.body.massScale, taken = Math.max(0.5, (amount * (1 - p.body.guard)) / Math.sqrt(heavy));
     p.hp -= taken;
     p.flinch = 0.28;
@@ -244,6 +277,7 @@ export default class Monsters {
       }
       // Enemy reads one `player`, so it's pointed at whoever this monster is nearest.
       this.player.dead = !hero;
+      e.foe = hero;
       if (hero) {
         this.player.x = hero.state.x;
         this.player.z = hero.state.z;
@@ -269,7 +303,12 @@ export default class Monsters {
         if (!e.air) e.rise = 0;
       }
       e.group.position.y = (e.cave ? CAVE_FLOOR : height(e.x, e.z)) + e.air;
-      if (hero && !e.dying && e.air < 1 && hero.state.air < 3 && far < e.radius + 0.7) this.hurt(hero, e.def.damage, e.x, e.z);
+      if (e.heldBy) e.heldBy.melee.carry(e);
+      // A thrown monster hits the ground like a bomb.
+      if (e.thrown && !e.air && e.thrown.melee) {
+        e.thrown.melee.landed(e);
+        e.thrown = null;
+      }
     }
     for (const o of this.orbs) {
       o.life -= dt;

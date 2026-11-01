@@ -194,8 +194,10 @@ function renderPrompts() {
     [usePad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
     [p('jump'), 'Jump'],
     [p('punch'), PUNCHES[melee.stage].name],
-    [p('recenter'), 'Recenter'],
-    [p('camera'), 'Travel'],
+    [p('grab'), 'Grab'],
+    [p('guard'), 'Guard'],
+    [p('roll'), 'Roll'],
+    [p('target'), 'Lock on'],
     [p('pack'), 'Satchel'],
     [p('pause'), 'Spirit Tree'],
   ].map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');

@@ -124,6 +124,8 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **World generation (improved 2026-11-01):** four rivers run down to the lake and sea, a road network reaches every town with fords where it crosses water, and two new lands join the three forests: red terraced badlands in the east and low pooled swamp in the southwest (`region()` in terrain.js). Stones gather in fields and old giant trees stand among the rest. Grass is made only near a hero, from a coarse land grid, and terrain builds in timed slices, so moving fast doesn't stall.
 
+**Combat (rebuilt 2026-11-01):** monsters no longer hurt by touch. Each has moves (`src/open/foes.js`): a tell, a strike, a recovery; areas warn on the ground and heavy moves break guards. Only two attack a hero at once; the rest circle. Blows interrupt them until the Ancient form. The hero has Roll (Circle, invincible at the start), Guard (L2, tap just before a hit to Parry, then a Counter punch does triple force), Grab (R1, then R1 throws and Square slams), Lock-on (R3) and an air Dive (Square while airborne). All of it lives in `melee.js`.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

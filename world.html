@@ -59,6 +59,10 @@
       @keyframes float { to { opacity: 0; margin-top: -30px; } }
       #breath, #p2-breath { position: fixed; left: 50%; bottom: 44px; width: 220px; height: 10px; transform: translateX(-50%); background: #141a28; }
       #breath-fill, #p2-breath-fill { height: 100%; width: 100%; background: #9fe8ff; }
+      #foe, #p2-foe { position: fixed; left: 50%; top: 42px; width: 300px; transform: translateX(-50%); text-align: center; color: #f3ead8; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
+      body.two #p2-foe { top: calc(50% + 12px); }
+      #foe-bar, #p2-foe-bar { height: 8px; margin-top: 3px; background: #141a28; }
+      #foe-fill, #p2-foe-fill { height: 100%; width: 100%; background: #ff5a5a; }
       #flash { position: fixed; inset: 0; background: #fff4d0; opacity: 0; pointer-events: none; z-index: 4; }
       #blink { position: fixed; inset: 0; background: #141a28; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
       #blink.on { opacity: 1; transition: none; }
@@ -83,6 +87,8 @@
   <body>
     <div id="game"></div>
     <div id="where"></div>
+    <div id="foe" hidden><div id="foe-name"></div><div id="foe-bar"><div id="foe-fill"></div></div></div>
+    <div id="p2-foe" hidden><div id="p2-foe-name"></div><div id="p2-foe-bar"><div id="p2-foe-fill"></div></div></div>
     <div id="lv"></div>
     <div id="goal"></div>
     <div id="p2-hp" class="p2"><div id="p2-hp-fill"></div></div>

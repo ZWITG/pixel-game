@@ -62,6 +62,16 @@ export default class WorldHud {
     });
   }
 
+  // The name and health of the enemy being fought.
+  setFoe(name, amount) {
+    if (name !== this.foeName) {
+      this.foeName = name;
+      this.$('foe').hidden = !name;
+      this.$('foe-name').textContent = name;
+    }
+    if (name) this.$('foe-fill').style.width = `${amount * 100}%`;
+  }
+
   setHealth(amount) {
     this.$('hp-fill').style.width = `${Math.max(0, amount) * 100}%`;
   }

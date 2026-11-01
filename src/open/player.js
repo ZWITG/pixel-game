@@ -43,6 +43,8 @@ const WATER_RUN = 3;         // from this level, fast enough to stay on top of w
 const FULL_SPRINT = 0.5;     // seconds of sprinting before you're at full tilt
 const SPRINT_AGAIN = 0.35;   // seconds to let go of sprint and press it again
 const CHARGE_SLOW = 0.35;    // walking speed while gathering a Destructive Blow
+const HOLD_SLOW = 0.55;      // walking speed while carrying something
+const ROLL_SPEED = 19;       // tiles per second
 const RAM_EVERY = 0.15;      // seconds between hits on whatever you barrel into
 const LANDING = 0.16;        // seconds of crouch after a real drop
 const FLINCH = 0.28;         // seconds of recoil from a hit
@@ -137,7 +139,19 @@ export default class Player {
     const door = !rooms.house && !swim.inWater && world.work.door(state);
     const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.people.spot(this);
     // With Destructive Blow, the button waits to see if it's a tap or a hold (see updateCharge).
-    if (FEATURES.punching && just.punch && !melee.blowReady && !state.air && (!rooms.house || rooms.house.hostile)) melee.punch(state);
+    const fights = !rooms.house || rooms.house.hostile;
+    if (fights && !swim.inWater) {
+      if (just.roll) {
+        const m = this.controls.move(), yaw = world.viewYaw(this), sy = Math.sin(yaw), cy = Math.cos(yaw);
+        melee.roll(state, cy * m.x + sy * m.y, -sy * m.x + cy * m.y);
+      }
+      if (just.grab) melee.grab(state);
+      if (just.target) melee.aim(state);
+      if (melee.lock && just.targetLeft) melee.shiftAim(state, -1);
+      if (melee.lock && just.targetRight) melee.shiftAim(state, 1);
+      if (just.punch && state.air > 0.8) melee.dive(state);
+    }
+    if (FEATURES.punching && just.punch && !melee.blowReady && !state.air && fights) melee.punch(state);
     if (!spot) {
       hud.setAction('');
       return false;
@@ -220,7 +234,9 @@ export default class Player {
     state.air += state.rise * dt;
     state.peak = Math.max(state.peak ?? 0, state.air);
     if (state.air > 0) return;
-    const fell = state.peak;
+    const fell = state.peak, dived = state.dive;
+    state.dive = false;
+    if (dived) this.melee.landDive(state);
     state.air = state.rise = state.peak = 0;
     this.landed = fell > 2 ? LANDING : 0;
     this.world.work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], fell > 2 ? 12 : 5, 2 + Math.min(4, fell * 0.2));
@@ -269,16 +285,18 @@ export default class Player {
     }
     aim.pitch = THREE.MathUtils.clamp(aim.pitch + look.y, -0.25, 1.2);
 
-    const m = !free || melee.active ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
+    const m = !free || melee.active || melee.rolling > 0 ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
     if (!world.paused) {
       this.updateSuper(dt, !!(controls.held.has('ShiftLeft') || controls.padHeld.R2), amount > 0.05 && free);
-      melee.updateCharge(dt, state, !!(controls.held.has('KeyJ') || controls.padHeld.SQUARE), free);
+      melee.updateMoves(dt, state);
+      melee.setGuard(free && !!(controls.held.has('KeyG') || controls.padHeld.L2));
+      melee.updateCharge(dt, state, !melee.held && !!(controls.held.has('KeyJ') || controls.padHeld.SQUARE), free);
     }
     if (amount > 0.05) {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
       // Walking sideways slowly brings the camera round behind the hero.
       if (!world.together && !rooms.house && this.looked > LOOK_RESPECT) aim.yaw -= m.x * TURN_WITH_MOVE * dt;
-      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale) * amount * (melee.charging ? CHARGE_SLOW : 1);
+      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale) * amount * (melee.charging || melee.guarding ? CHARGE_SLOW : melee.held ? HOLD_SLOW : 1);
       const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
       if (state.pace > 0) {
         // A hard turn at speed costs you: momentum has to go somewhere.
@@ -312,6 +330,17 @@ export default class Player {
       state.phase += dt * (sprint ? 16 : 10);
     }
     state.moving = amount > 0.05;
+    if (melee.rolling > 0) {
+      const scale = Math.sqrt(body.moveScale);
+      state.x += melee.rollDir[0] * ROLL_SPEED * scale * dt;
+      state.z += melee.rollDir[1] * ROLL_SPEED * scale * dt;
+    }
+    // Locked on, the camera keeps the enemy in view.
+    if (melee.lock && !world.together) {
+      const want = Math.atan2(state.x - melee.lock.x, state.z - melee.lock.z), diff = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
+      state.yaw += diff * Math.min(1, dt * 7);
+      if (!state.moving && melee.rolling <= 0) state.dir = [melee.lock.x - state.x, melee.lock.z - state.z];
+    }
     if (rooms.house) rooms.collide(state);
     else if (FEATURES.worldWork) world.work.collide(state);
     const y = rooms.house ? rooms.floor : height(state.x, state.z);
@@ -411,7 +440,10 @@ export default class Player {
     const { state, swim, melee } = this, pace = state.pace ?? 0;
     if (this.flinch) return [FRAME.hurt, -0.15];
     if (pose) return [FRAME.punch(pose.t, pose.chain), 0];
-    if (melee.slam > 0) return [FRAME.slam, 0.25];
+    if (melee.rolling > 0) return [FRAME.roll(1 - melee.rolling / 0.42), (1 - melee.rolling / 0.42) * Math.PI * 2];
+    if (melee.held) return [FRAME.hold, 0];
+    if (melee.slam > 0) return [state.moving ? FRAME.throw : FRAME.slam, 0.25];
+    if (melee.guarding) return [FRAME.guard, 0.05];
     if (melee.charging) return [FRAME.charge(time, melee.charge), 0.08 - melee.charge * 0.18];
     if (state.flying) return [FRAME.fly(time), state.moving ? 1.25 : 0.2];
     if (state.air > 0.4) {
