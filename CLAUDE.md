@@ -4,6 +4,7 @@ An original anime-fantasy action RPG in 3D voxel style, rendered in HD (the user
 It grows feature by feature with the user, who plays and tests with a controller.
 
 ## Run
+- Offline: double-click `Play Pixel RPG.bat` (`scripts/play.mjs`). It serves a finished build from `.play/` on port 5180 with no internet, and pulls from GitHub when it can. Every commit pushed to `main` reaches it, so always push.
 - `npm install`, then `npm run dev` → http://localhost:5180
 - If the dev server serves stale modules after a dependency change, restart it with `npx vite --port 5180 --force`.
 - `npm run build` must pass before committing.

@@ -4,10 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lumen World Prototype</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet" />
+    <script>
+      // A browser with no save takes the one the offline launcher keeps, if there is one.
+      try {
+        if (!localStorage.getItem('lumen.skills')) {
+          const x = new XMLHttpRequest();
+          x.open('GET', '/save-import.json', false);
+          x.send();
+          if (x.status === 200) for (const [k, v] of Object.entries(JSON.parse(x.responseText))) localStorage.setItem(k, v);
+        }
+      } catch { /* no launcher here */ }
+    </script>
     <style>
+      @font-face { font-family: 'Zen Maru Gothic'; font-weight: 500; font-display: swap; src: url(/fonts/zen-maru-gothic-latin-500-normal.woff2) format('woff2'); }
+      @font-face { font-family: 'Zen Maru Gothic'; font-weight: 700; font-display: swap; src: url(/fonts/zen-maru-gothic-latin-700-normal.woff2) format('woff2'); }
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0e17; }
       #game { position: fixed; inset: 0; }
       #where { position: fixed; left: 12px; top: 10px; color: #f3ead8; font: 13px monospace; text-shadow: 1px 1px 0 #141a28; pointer-events: none; }

@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 offline launcher: Play Pixel RPG.bat runs the game with no internet and updates from GitHub when online; fonts now ship with the game
 - 2026-11-01 prototype: swimming rebuilt for free movement: faster, sprint with R2, no more being sent back to shore (tiring just slows you), jump and punch in water, swim up any bank, take off in flight from water
 - 2026-11-01 prototype: Jumping skill, which evolves into a Flight skill at its top level; jump and hold X to fly, glide when released, more time, height and speed as Flight levels
 - 2026-11-01 prototype: split-screen shows more: wider lens, camera further back, extra room while moving
