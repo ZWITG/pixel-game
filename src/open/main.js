@@ -194,7 +194,7 @@ function renderPrompts() {
     [p('pack'), 'Satchel'],
     [p('pause'), 'Spirit Tree'],
   ].map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');
-  document.getElementById('map-hints').innerHTML = `${usePad ? btn('D-pad') : `${key('KeyA')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
+  document.getElementById('map-hints').innerHTML = `${usePad ? btn('D-pad') : `${key('KeyW')}${key('KeyA')}${key('KeyS')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
 }
 
 // Touchpad: both heroes go together.

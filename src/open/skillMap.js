@@ -2,7 +2,7 @@
 // light up as levels are reached. Undiscovered boughs stay dark, with only their buds showing.
 import { ATTRIBUTES } from './body.js';
 
-const W = 320, H = 180;
+const W = 520, H = 292;
 const INK = '#0a0f22';
 const REVEAL = 1.1; // seconds for the light to run out along a bough when the map opens
 
@@ -60,19 +60,23 @@ const ATTR_ORDER = ['strength', 'speed', 'endurance', 'mass'];
 const ATTR_FULL = 100; // gauges fill at this value, for now
 
 // Bough paths on the 320 x 180 map. `out`: which way left/right moves toward the tip.
-const TRUNK = [[160, 182], [158, 150], [162, 122], [160, 100]];
-const BOUGHS = {
-  swimming: { path: [[160, 108], [132, 100], [104, 84], [78, 80], [56, 58], [36, 54], [24, 30]], out: -1 },
-  climbing: { path: [[161, 106], [190, 96], [216, 78], [244, 74], [268, 52], [292, 46], [302, 26]], out: 1 },
-  running: { path: [[159, 118], [124, 128], [92, 114], [60, 122], [28, 104], [14, 84]], out: -1 },
-  punching: { path: [[161, 132], [190, 142], [222, 138], [252, 146], [284, 136], [308, 124]], out: 1 },
-  fighting: { path: [[159, 132], [128, 144], [98, 138], [68, 148], [38, 136], [14, 128]], out: -1 },
-  jumping: { path: [[140, 82], [124, 62], [110, 46], [94, 32], [78, 18], [62, 10]], out: -1 },
-  flight: { path: [[170, 68], [194, 50], [214, 32], [238, 22], [262, 14], [286, 8]], out: 1 },
-  woodcutting: { path: [[160, 102], [146, 84], [172, 68], [146, 50], [172, 34], [158, 14]], out: 1 },
-  mining: { path: [[160, 118], [196, 124], [226, 112], [258, 118], [288, 100], [304, 84]], out: 1 },
-};
-const SEALED = []; // boughs not yet in the game
+const HUB = [260, 190];
+const TRUNK = [[260, 296], [256, 250], [264, 215], HUB];
+// The boughs fan out evenly from the top of the trunk, left to right; Flight grows beside the
+// Jumping it evolved from. Each is its own spoke, so nodes never crowd one another.
+const FAN = ['running', 'swimming', 'climbing', 'jumping', 'flight', 'punching', 'fighting', 'mining', 'woodcutting'];
+const FAN_FROM = 0.955, FAN_SPAN = 0.91;     // share of a half turn, left end and width
+const RINGS = [84, 111, 138, 165, 192];      // distance of each node from the hub
+const WIDE = 1.25, TALL = 0.88;              // the fan is an oval, to fill a wide map
+const BOUGHS = Object.fromEntries(FAN.map((id, i) => {
+  const a = Math.PI * (FAN_FROM - (FAN_SPAN * i) / (FAN.length - 1));
+  // A slight sway keeps the spokes looking grown rather than ruled.
+  const nodes = RINGS.map((r, k) => {
+    const sway = Math.sin(k * 1.5 + i * 2) * 5 * (k / 4);
+    return [Math.round(HUB[0] + Math.cos(a) * r * WIDE - Math.sin(a) * sway), Math.round(HUB[1] - Math.sin(a) * r * TALL - Math.cos(a) * sway)];
+  });
+  return [id, { path: [HUB, ...nodes], nodes }];
+}));
 
 function rng(seed) {
   return () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -90,18 +94,6 @@ function disc(g, x, y, r) {
   }
 }
 
-// Points evenly spaced along a path; `count` nodes, skipping the path's start.
-function along(path, count) {
-  const lens = path.slice(1).map((p, i) => Math.hypot(p[0] - path[i][0], p[1] - path[i][1]));
-  const total = lens.reduce((a, b) => a + b, 0);
-  return Array.from({ length: count }, (_, k) => {
-    let d = (total * (k + 1)) / count, i = 0;
-    while (i < lens.length - 1 && d > lens[i]) d -= lens[i++];
-    const t = d / lens[i];
-    return [Math.round(path[i][0] + (path[i + 1][0] - path[i][0]) * t), Math.round(path[i][1] + (path[i + 1][1] - path[i][1]) * t)];
-  });
-}
-
 // The still part: sky, stars, the dark tree and its sealed buds.
 function paintBackdrop() {
   const c = document.createElement('canvas');
@@ -115,38 +107,30 @@ function paintBackdrop() {
   });
   const r = rng(77);
   g.fillStyle = '#c9d4ff';
-  for (let i = 0; i < 110; i++) g.fillRect(Math.floor(r() * W), Math.floor(r() * H * 0.8), 1, 1);
+  for (let i = 0; i < 240; i++) g.fillRect(Math.floor(r() * W), Math.floor(r() * H * 0.8), 1, 1);
   // Canopy: soft dark clouds of leaves behind the boughs.
   g.fillStyle = '#121c3a';
-  for (let i = 0; i < 60; i++) disc(g, Math.floor(20 + r() * 280), Math.floor(14 + r() * 100), 8 + Math.floor(r() * 14));
+  for (let i = 0; i < 130; i++) disc(g, Math.floor(20 + r() * (W - 40)), Math.floor(14 + r() * 170), 8 + Math.floor(r() * 18));
   g.fillStyle = '#17234a';
-  for (let i = 0; i < 26; i++) disc(g, Math.floor(30 + r() * 260), Math.floor(14 + r() * 80), 5 + Math.floor(r() * 9));
+  for (let i = 0; i < 60; i++) disc(g, Math.floor(30 + r() * (W - 60)), Math.floor(14 + r() * 140), 5 + Math.floor(r() * 11));
   // Hill, trunk and roots.
   g.fillStyle = '#0c1228';
   for (let x = 0; x < W; x++) {
-    const y = 164 + Math.sin(x * 0.03) * 4 + Math.abs(x - 160) * 0.05;
+    const y = H - 28 + Math.sin(x * 0.03) * 4 + Math.abs(x - W / 2) * 0.03;
     g.fillRect(x, Math.floor(y), 1, H);
   }
   g.fillStyle = '#2a2240';
-  TRUNK.slice(1).forEach((p, i) => line(g, TRUNK[i], p, 16 - i * 3));
-  line(g, [160, 172], [120, 180], 5);
-  line(g, [160, 172], [204, 180], 5);
+  TRUNK.slice(1).forEach((p, i) => line(g, TRUNK[i], p, 20 - i * 4));
+  line(g, [260, 276], [210, H], 6);
+  line(g, [260, 276], [312, H], 6);
   g.fillStyle = '#3a2f55';
   TRUNK.slice(1).forEach((p, i) => line(g, [TRUNK[i][0] - 3, TRUNK[i][1]], [p[0] - 3, p[1]], 3));
   // Boughs: every one starts dark, sealed or not.
-  for (const path of [...Object.values(BOUGHS).map((b) => b.path), ...SEALED]) {
+  for (const { path } of Object.values(BOUGHS)) {
     path.slice(1).forEach((p, i) => {
       g.fillStyle = '#2a2240';
       line(g, path[i], p, i < 2 ? 4 : 3);
     });
-  }
-  for (const path of SEALED) {
-    for (const [x, y] of along(path, path.length - 1)) {
-      g.fillStyle = '#0a0f22';
-      disc(g, x, y, 6);
-      g.fillStyle = '#242a4c';
-      disc(g, x, y, 4);
-    }
   }
   return c;
 }
@@ -174,7 +158,7 @@ export default class SkillMap {
   }
 
   open(skills, body) {
-    this.skills = skills.map((s) => ({ ...s, nodes: along(BOUGHS[s.id].path, s.levels.length) }));
+    this.skills = FAN.map((id) => skills.find((s) => s.id === id)).map((s) => ({ ...s, nodes: BOUGHS[s.id].nodes }));
     this.body = body;
     this.age = 0;
     this.pick(this.bough);
@@ -193,13 +177,15 @@ export default class SkillMap {
     this.tag.style.color = this.focus < s.level ? s.color : '#7a84b0';
   }
 
+  // Left and right step across the fan; up and down travel out along a bough and back.
   handle(just) {
-    if (just.up) return this.pick(this.bough - 1);
-    if (just.down) return this.pick(this.bough + 1);
-    const s = this.skills[this.bough], out = BOUGHS[s.id].out, before = this.focus;
-    if (out < 0 ? just.left : just.right) this.focus = Math.min(s.levels.length - 1, this.focus + 1);
-    if (out < 0 ? just.right : just.left) this.focus = Math.max(0, this.focus - 1);
+    if (just.left) return this.pick(this.bough - 1);
+    if (just.right) return this.pick(this.bough + 1);
+    const s = this.skills[this.bough], before = this.focus;
+    if (just.up) this.focus = Math.min(s.levels.length - 1, this.focus + 1);
+    if (just.down) this.focus = Math.max(0, this.focus - 1);
     if (this.focus !== before) this.showTag();
+    return undefined;
   }
 
   drawBough(s, index, t) {
@@ -267,7 +253,7 @@ export default class SkillMap {
   drawBody() {
     const g = this.g, reveal = Math.min(1, this.age / REVEAL);
     ATTR_ORDER.forEach((name, i) => {
-      const a = ATTRIBUTES[name], value = this.body[name], x = 70 + i * 48, y = 170;
+      const a = ATTRIBUTES[name], value = this.body[name], x = W / 2 - 96 + i * 48, y = H - 10;
       g.fillStyle = INK;
       g.fillRect(x - 7, y - 7, 46, 14);
       g.fillStyle = a.color;
