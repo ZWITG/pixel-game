@@ -94,19 +94,19 @@ export const SKILLS = {
 export const ATTRIBUTE_START = 10;
 // Mass isn't trained directly: it builds on a stronger, tougher body and on time spent fighting.
 const MASS = { start: 60, strength: 1.5, endurance: 1.2, fighting: 0.3 };
-const SAVE_KEY = 'lumen.skills';
 const SAVE_EVERY = 2000; // ms; practice ticks every frame
 
 export default class Skills {
   // onLevel(skill, level) when a level is reached; onGain(attribute, value) when an attribute
   // reaches a new whole number.
-  constructor(onLevel, onGain) {
+  constructor(onLevel, onGain, saveKey) {
+    this.saveKey = saveKey;
     this.onLevel = onLevel;
     this.onGain = onGain;
     this.practice = {};
     this.savedAt = 0;
     try {
-      this.practice = JSON.parse(localStorage.getItem(SAVE_KEY)) ?? {};
+      this.practice = JSON.parse(localStorage.getItem(saveKey)) ?? {};
     } catch { /* no saved skills: start fresh */ }
   }
 
@@ -142,7 +142,7 @@ export default class Skills {
   save() {
     this.savedAt = performance.now();
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(this.practice));
+      localStorage.setItem(this.saveKey, JSON.stringify(this.practice));
     } catch { /* private window: skills last this session only */ }
   }
 

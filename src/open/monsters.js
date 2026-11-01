@@ -15,7 +15,6 @@ const WARD = 200;            // tiles around the Hollow's center that monsters w
 const DANGER_SPAN = 1500;    // monsters get one level tougher this many tiles from the start
 const ELDER_CHANCE = 0.08;
 const HURT_GUARD = 0.7;      // seconds of safety after being hit
-const REGEN_DELAY = 6, REGEN = 2; // seconds out of a fight, then health per second
 const KNOCK_LIMIT = 45;
 const GROUPS = [
   ['slime', 'slime', 'boar', 'fireSlime'],  // meadow
@@ -42,18 +41,13 @@ function fit(def, danger, elder) {
 }
 
 export default class Monsters {
-  constructor(scene, ctx) {
-    Object.assign(this, ctx); // work, skills, body, hud, onDown
-    this.scene = scene;
+  constructor(scene, work, players) {
+    Object.assign(this, { scene, work, players });
+    this.nightfall = false;
     this.list = [];
     this.orbs = [];
     this.time = 0;
     this.spawnIn = 0;
-    this.guard = 0;
-    this.calm = 0;
-    this.hp = this.body.maxHealth;
-    this.state = null;
-    this.hidden = false;
     this.player = { x: 0, z: 0, dead: false };
     this.collision = {
       // Land only, so nothing wades in after a swimmer.
@@ -64,10 +58,13 @@ export default class Monsters {
         e.group.position.z = z;
       },
     };
-    this.hud.setHealth(1);
   }
 
-  // The rest of what Enemy asks of its game.
+  // The rest of what Enemy asks of its game. Damage numbers show on the striker's screen.
+  get hud() {
+    return (this.work.actor ?? this.players[0]).hud;
+  }
+
   inVillage(x, z) {
     return Math.hypot(x - PLACES.hollow.x, z - PLACES.hollow.z) < WARD;
   }
@@ -85,7 +82,7 @@ export default class Monsters {
   }
 
   onEnemyKilled(e) {
-    this.skills.add('fighting', 3);
+    this.work.skills.add('fighting', 3);
     const drops = {};
     for (const { item, chance } of e.def.drops) if (Math.random() < chance) drops[item] = 1;
     this.work.give(drops);
@@ -117,7 +114,7 @@ export default class Monsters {
     const x = hero.x + Math.cos(a) * d, z = hero.z + Math.sin(a) * d;
     if (height(x, z) < 2 || this.inVillage(x, z)) return;
     const b = biome(x, z), kind = b.indexOf(Math.max(...b.slice(0, 3)));
-    const group = GROUPS[kind], type = hero.time === 'night' ? 'wisp' : group[Math.floor(Math.random() * group.length)];
+    const group = GROUPS[kind], type = this.nightfall ? 'wisp' : group[Math.floor(Math.random() * group.length)];
     this.add(type, x, z, this.danger(x, z), Math.random() < ELDER_CHANCE);
   }
 
@@ -140,7 +137,7 @@ export default class Monsters {
   hit(e, force, x, z) {
     if (e.dying) return;
     e.takeHit(Math.round(force * 10) / 10, x, z);
-    this.skills.add('fighting', 1);
+    this.work.skills.add('fighting', 1);
     const fling = Math.min(KNOCK_LIMIT, 7 + force * 1.5);
     e.vel.normalize().multiplyScalar(fling);
     e.knockUntil = this.time + 0.2 + Math.min(0.8, force * 0.02);
@@ -148,46 +145,52 @@ export default class Monsters {
     e.air = Math.max(e.air, 0.01);
   }
 
-  hurt(amount, fromX, fromZ) {
-    const s = this.state;
-    if (this.guard > 0 || !s || this.hidden) return;
-    const heavy = this.body.massScale, taken = Math.max(0.5, amount / Math.sqrt(heavy));
-    this.hp -= taken;
-    this.guard = HURT_GUARD;
-    this.calm = 0;
-    this.skills.add('fighting', 0.5);
-    this.hud.float(`-${Math.round(taken * 10) / 10}`, s.x, s.y + 2.6, s.z, '#ff7a6a');
+  hurt(p, amount, fromX, fromZ) {
+    const s = p.state;
+    if (p.guard > 0 || p.rooms.house) return;
+    const heavy = p.body.massScale, taken = Math.max(0.5, amount / Math.sqrt(heavy));
+    p.hp -= taken;
+    p.guard = HURT_GUARD;
+    p.calm = 0;
+    p.skills.add('fighting', 0.5);
+    p.hud.float(`-${Math.round(taken * 10) / 10}`, s.x, s.y + 2.6, s.z, '#ff7a6a');
     const d = Math.hypot(s.x - fromX, s.z - fromZ) || 1, push = 2.5 / heavy;
     s.x += ((s.x - fromX) / d) * push;
     s.z += ((s.z - fromZ) / d) * push;
     this.work.shake = Math.max(this.work.shake, 0.2);
-    if (this.hp <= 0) {
-      this.hp = this.body.maxHealth;
-      this.guard = 3;
-      this.onDown();
-    }
-    this.hud.setHealth(this.hp / this.body.maxHealth);
+    if (p.hp <= 0) p.down();
+    p.hud.setHealth(p.hp / p.body.maxHealth);
   }
 
-  update(dt, state, hidden) {
-    this.state = state;
-    this.hidden = hidden;
-    this.time += dt;
-    this.guard = Math.max(0, this.guard - dt);
-    this.calm += dt;
-    const p = this.player;
-    p.x = state.x;
-    p.z = state.z;
-    p.dead = hidden;
+  nearest(x, z) {
+    let best = null, d = 1e9;
+    for (const p of this.players) {
+      if (p.rooms.house) continue;
+      const k = Math.hypot(p.state.x - x, p.state.z - z);
+      if (k < d) { d = k; best = p; }
+    }
+    return best;
+  }
 
-    if ((this.spawnIn -= dt) <= 0 && !hidden) {
+  update(dt) {
+    this.time += dt;
+    const out = this.players.filter((p) => !p.rooms.house);
+    if ((this.spawnIn -= dt) <= 0 && out.length) {
       this.spawnIn = SPAWN_EVERY;
-      this.spawn(state);
+      this.spawn(out[Math.floor(Math.random() * out.length)].state);
     }
     for (const e of [...this.list]) {
-      if (Math.hypot(e.x - state.x, e.z - state.z) > FORGET * 1.3) {
+      const hero = this.nearest(e.x, e.z);
+      const far = hero ? Math.hypot(e.x - hero.state.x, e.z - hero.state.z) : 0;
+      if (far > FORGET * 1.3) {
         this.removeEnemy(e);
         continue;
+      }
+      // Enemy reads one `player`, so it's pointed at whoever this monster is nearest.
+      this.player.dead = !hero;
+      if (hero) {
+        this.player.x = hero.state.x;
+        this.player.z = hero.state.z;
       }
       e.update(dt);
       if (this.list.indexOf(e) < 0) continue;
@@ -197,23 +200,20 @@ export default class Monsters {
         if (!e.air) e.rise = 0;
       }
       e.group.position.y = height(e.x, e.z) + e.air;
-      if (!e.dying && e.air < 1 && Math.hypot(e.x - state.x, e.z - state.z) < e.radius + 0.7) this.hurt(e.def.damage, e.x, e.z);
+      if (hero && !e.dying && e.air < 1 && far < e.radius + 0.7) this.hurt(hero, e.def.damage, e.x, e.z);
     }
     for (const o of this.orbs) {
       o.life -= dt;
       o.orb.position.x += o.dx * o.speed * dt;
       o.orb.position.z += o.dz * o.speed * dt;
-      if (Math.hypot(o.orb.position.x - state.x, o.orb.position.z - state.z) < 1) {
-        this.hurt(o.damage, o.orb.position.x, o.orb.position.z);
-        o.life = 0;
+      for (const p of out) {
+        if (Math.hypot(o.orb.position.x - p.state.x, o.orb.position.z - p.state.z) < 1) {
+          this.hurt(p, o.damage, o.orb.position.x, o.orb.position.z);
+          o.life = 0;
+        }
       }
       if (o.life <= 0) this.scene.remove(o.orb);
     }
     this.orbs = this.orbs.filter((o) => o.life > 0);
-
-    if (this.calm > REGEN_DELAY && this.hp < this.body.maxHealth) {
-      this.hp = Math.min(this.body.maxHealth, this.hp + REGEN * dt);
-      this.hud.setHealth(this.hp / this.body.maxHealth);
-    }
   }
 }

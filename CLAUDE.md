@@ -47,6 +47,14 @@ It grows feature by feature with the user, who plays and tests with a controller
 - `src/systems/lockOn.js`: lock-on targeting. `src/systems/shop.js`: buy, sell and bag helpers.
 - One loop: while a menu is open, only the HUD gets input; the world is paused.
 
+## Open-world prototype (`/world.html`, `src/open/`)
+- `main.js`: the shared world, cameras, join and leave, the adaptive split. `player.js`: one hero (input, body, skills, bag, HUD, sprite).
+- `work.js`: solid objects, chopping and mining; `work.actor` is the player whose blow is being worked out. `melee.js`: punches and blasts.
+  `monsters.js`: adapter around `entities/Enemy.js`. `rooms.js`: house interiors. `splitView.js`: puts two views on screen.
+- `terrain.js`: pure height plus saved dents. `chunks.js`: streaming around every hero, `deform()` edits live ground.
+- Debug handle: `window.__world`. Testing while the user plays: use a separate pane tab, stub `Storage.prototype.setItem` and
+  `navigator.getGamepads`, set `__world.world.skipRender = true`, and render only captured frames, or the save changes or the tab crashes.
+
 ## Rules
 - Keep everything original. Genre conventions are fine; don't copy characters, maps, names or assets from existing games.
 - After a feature change, update `FEATURES.md` (table, backlog, changelog), test in the browser, commit and push to GitHub.

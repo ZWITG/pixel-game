@@ -9,23 +9,24 @@ float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
   return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
 `;
 
-export const shared = { uTime: { value: 0 }, uHole: { value: new THREE.Vector3(0, 0, 0) } };
+export const shared = { uTime: { value: 0 }, uHole: { value: new THREE.Vector3(0, 0, 0) }, uHole2: { value: new THREE.Vector3(0, 0, 0) } };
 
 export function terrainMaterial({ far = false } = {}) {
   const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   mat.onBeforeCompile = (s) => {
     s.uniforms.uHole = shared.uHole;
+    s.uniforms.uHole2 = shared.uHole2;
     s.vertexShader = `attribute vec3 aBiome; attribute float aRoad;
       varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR;\n${s.vertexShader}`.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
        vP=(modelMatrix*vec4(position,1.)).xyz; vN=normal; vB=aBiome; vR=aRoad;`,
     );
-    s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; uniform vec3 uHole;
+    s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; uniform vec3 uHole,uHole2;
       ${HASH}\n${s.fragmentShader}`.replace(
       '#include <color_fragment>',
       /* glsl */`
-      ${far ? 'if(max(abs(vP.x-uHole.x),abs(vP.z-uHole.z))<uHole.y) discard;' : ''}
+      ${far ? 'if(max(abs(vP.x-uHole.x),abs(vP.z-uHole.z))<uHole.y||max(abs(vP.x-uHole2.x),abs(vP.z-uHole2.z))<uHole2.y) discard;' : ''}
       float dist=length(vP-cameraPosition);
       float slope=1.-normalize(vN).y;
       float rocky=smoothstep(.3,.42,slope);

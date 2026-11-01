@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: local co-op. A second controller joins with OPTIONS as a second hero with separate progress; shared camera when close, adaptive split-screen when apart; terrain streams around both
 - 2026-11-01 prototype: monsters roam the open world, tougher further out, with Elder versions; hero health; Mass grows with Strength, Endurance and fighting and multiplies destruction; Fighting skill; real terrain craters, torn-up grass, destructible houses; heavy heroes stomp when landing
 - 2026-11-01 prototype: Square is now a punch (keyboard J) with a three-hit chain; six punch stages from Jab to Worldbreaker need Punching practice plus Strength, adding force, hit-stop, shockwaves and ground cracks; new Punching skill and bough; axe and pick removed
 - 2026-11-01 prototype: interactive world. Trees, new rocks, houses and landmarks are solid; chop trees and mine rocks for Wood, Stone and Iron; Woodcutting and Mining skills; Strength sets bag size, blow force and which boulders crack; enter houses, sleep, store items in a chest; cut trees leave stumps and regrow after 15 minutes; jump (Cross / Space), higher with Strength and Speed, clears low rocks

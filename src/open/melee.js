@@ -82,15 +82,15 @@ function makeCrater(scene, map) {
 }
 
 export default class Melee {
-  constructor(scene, work, skills, body, hud) {
-    Object.assign(this, { work, skills, body, hud });
+  constructor(scene, player, work) {
+    Object.assign(this, { player, work, skills: player.skills, body: player.body, hud: player.hud });
     this.active = null;
     this.queued = false;
     this.chain = 0;
     this.idle = CHAIN_WINDOW; // the first punch starts a fresh chain
     this.waves = [];
     this.monsters = null;
-    this.stage = punchStage(skills, body);
+    this.stage = punchStage(this.skills, this.body);
     this.promised = this.stage; // the stage we've already said is waiting on Strength
     this.rings = Array.from({ length: RINGS }, () => {
       const ring = new THREE.Mesh(new THREE.RingGeometry(0.86, 1, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false, fog: false, blending: THREE.AdditiveBlending }));
@@ -234,6 +234,7 @@ export default class Melee {
   }
 
   update(dt, state) {
+    this.work.actor = this.player;
     this.idle += dt;
     const a = this.active;
     if (a) {

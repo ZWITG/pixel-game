@@ -7,7 +7,8 @@ const $ = (id) => document.getElementById(id);
 
 // World HUD: short messages, the breath bar, and the skill map.
 export default class WorldHud {
-  constructor() {
+  constructor(prefix) {
+    this.$ = (id) => $(prefix + id);
     this.open = false;
     this.map = new SkillMap($('skill-map'), $('skill-tag'));
     this.timer = null;
@@ -15,7 +16,7 @@ export default class WorldHud {
   }
 
   message(text, big = false) {
-    const el = $('toast');
+    const el = this.$('toast');
     el.textContent = text;
     el.className = big ? 'show big' : 'show';
     clearTimeout(this.timer);
@@ -23,9 +24,9 @@ export default class WorldHud {
   }
 
   setBreath(amount) {
-    const bar = $('breath');
+    const bar = this.$('breath');
     bar.hidden = amount === null;
-    if (amount !== null) $('breath-fill').style.width = `${Math.max(0, amount) * 100}%`;
+    if (amount !== null) this.$('breath-fill').style.width = `${Math.max(0, amount) * 100}%`;
   }
 
   // A quick dark blink while the hero is carried back to shore.
@@ -40,12 +41,12 @@ export default class WorldHud {
     const el = document.createElement('div');
     el.textContent = `${attribute.name} ${value}`;
     el.style.color = attribute.color;
-    $('gains').appendChild(el);
+    this.$('gains').appendChild(el);
     setTimeout(() => el.remove(), 2600);
   }
 
   setHealth(amount) {
-    $('hp-fill').style.width = `${Math.max(0, amount) * 100}%`;
+    this.$('hp-fill').style.width = `${Math.max(0, amount) * 100}%`;
   }
 
   // What monsters call for their damage numbers; `y` is above the ground there.
@@ -69,12 +70,12 @@ export default class WorldHud {
   setAction(html) {
     if (html === this.action) return;
     this.action = html;
-    $('act').innerHTML = html;
+    this.$('act').innerHTML = html;
   }
 
   setBag(bag) {
     const held = Object.entries(bag.items).filter(([, n]) => n);
-    $('bag').innerHTML = held.length ? `${held.map(([id, n]) => `<span style="color:${ITEMS[id].color}">${ITEMS[id].name} ${n}</span>`).join('&nbsp;&nbsp;')}&nbsp;&nbsp;${bag.weight}/${Math.floor(bag.body.carry)}` : '';
+    this.$('bag').innerHTML = held.length ? `${held.map(([id, n]) => `<span style="color:${ITEMS[id].color}">${ITEMS[id].name} ${n}</span>`).join('&nbsp;&nbsp;')}&nbsp;&nbsp;${bag.weight}/${Math.floor(bag.body.carry)}` : '';
   }
 
   toggle(skills, body) {

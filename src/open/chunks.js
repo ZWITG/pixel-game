@@ -9,7 +9,7 @@ const CHUNK = 64;
 const RING = 4;            // chunks each way from the center (9 x 9 streamed)
 const GRASS_RING = 1;
 const BUILDS_PER_FRAME = 2;
-const MAX_TREES = 9000, MAX_BLADES = 45000, MAX_ROCKS = 4000;
+const MAX_TREES = 9000, MAX_BLADES = 90000, MAX_ROCKS = 4000;
 const ROCK_TINTS = ['#b0a2ac', '#9aa39a', '#a8968c'], ORE_TINT = '#c08a64';
 // Trees stay out of these, so landmarks stand in the open.
 const CLEARINGS = [PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }];
@@ -209,29 +209,49 @@ export default class Chunks {
     return out;
   }
 
-  update(x, z) {
-    const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK), key = `${cx},${cz}`;
+  // `points`: where the heroes are, as [x, z] pairs.
+  update(points) {
+    const cells = points.map(([x, z]) => [Math.floor(x / CHUNK), Math.floor(z / CHUNK)]), key = cells.join('|');
     if (key !== this.center) {
       this.center = key;
-      this.plan(cx, cz);
-      this.scatter(cx, cz);
+      this.cells = cells;
+      this.plan();
+      this.scatter();
     }
     for (let i = 0; i < BUILDS_PER_FRAME && this.queue.length; i++) this.build(this.queue.shift());
   }
 
+  // Every chunk within reach of any hero, with its distance to the closest one.
+  around(range) {
+    const best = new Map();
+    for (const [cx, cz] of this.cells) {
+      for (let j = -range; j <= range; j++) for (let i = -range; i <= range; i++) {
+        const k = `${cx + i},${cz + j}`, ring = Math.max(Math.abs(i), Math.abs(j));
+        if (!best.has(k) || ring < best.get(k).ring) best.set(k, { cx: cx + i, cz: cz + j, ring });
+      }
+    }
+    return [...best.values()];
+  }
+
+  setHoles(size) {
+    const [a, b = a] = this.cells;
+    shared.uHole.value.set((a[0] + 0.5) * CHUNK, size ?? shared.uHole.value.y, (a[1] + 0.5) * CHUNK);
+    shared.uHole2.value.set((b[0] + 0.5) * CHUNK, size ?? shared.uHole2.value.y, (b[1] + 0.5) * CHUNK);
+  }
+
   // Works out which chunks should exist, nearest first; the far mesh is cut away under them.
-  plan(cx, cz) {
+  plan() {
     const want = new Map();
-    for (let j = -RING; j <= RING; j++) for (let i = -RING; i <= RING; i++) {
-      const ring = Math.max(Math.abs(i), Math.abs(j)), step = stepFor(ring);
-      want.set(`${cx + i},${cz + j},${step}`, { cx: cx + i, cz: cz + j, step, ring });
+    for (const c of this.around(RING)) {
+      const step = stepFor(c.ring);
+      want.set(`${c.cx},${c.cz},${step}`, { ...c, step });
     }
     for (const [k, mesh] of this.live) {
       if (want.has(k)) continue;
       mesh.userData.stale = true;
     }
     this.queue = [...want.entries()].filter(([k]) => !this.live.has(k)).map(([k, c]) => ({ k, ...c })).sort((a, b) => a.ring - b.ring);
-    shared.uHole.value.set((cx + 0.5) * CHUNK, this.queue.length ? shared.uHole.value.y : (RING + 0.5) * CHUNK - 1, (cz + 0.5) * CHUNK);
+    this.setHoles(this.queue.length ? undefined : (RING + 0.5) * CHUNK - 1);
   }
 
   build(c) {
@@ -249,7 +269,7 @@ export default class Chunks {
         m.geometry.dispose();
         this.live.delete(k);
       }
-      shared.uHole.value.y = (RING + 0.5) * CHUNK - 1;
+      this.setHoles((RING + 0.5) * CHUNK - 1);
     }
   }
 
@@ -264,8 +284,7 @@ export default class Chunks {
       s.blades = s.blades.filter(([bx, , bz]) => Math.hypot(bx - x, bz - z) > r * 0.8);
       for (const o of s.things) if (Math.hypot(o.x - x, o.z - z) < r) o.y = height(o.x, o.z);
     }
-    const [hx, hz] = this.center.split(',').map(Number);
-    this.scatter(hx, hz);
+    this.scatter();
   }
 
   patch(mesh, x, z, r, depth) {
@@ -287,15 +306,15 @@ export default class Chunks {
     nor.needsUpdate = true;
   }
 
-  // Refill the instanced trees and grass around the new center chunk.
-  scatter(cx, cz) {
+  // Refill the instanced trees and grass around the heroes.
+  scatter() {
     const d = new THREE.Object3D(), color = new THREE.Color();
     const counts = [0, 0, 0];
     let b = 0, r = 0;
     this.slots.clear();
     for (const { stump } of this.trees) stump.count = 0;
-    for (let j = -RING; j <= RING; j++) for (let i = -RING; i <= RING; i++) {
-      const s = this.spots(cx + i, cz + j);
+    for (const { cx, cz, ring } of this.around(RING)) {
+      const s = this.spots(cx, cz);
       s.trees.forEach((list, kind) => {
         for (const o of list) {
           if (counts[kind] >= MAX_TREES) continue;
@@ -315,8 +334,9 @@ export default class Chunks {
         this.rocks.setMatrixAt(r, this.place(o));
         this.rocks.setColorAt(r++, color.set(o.tint));
       }
-      if (Math.max(Math.abs(i), Math.abs(j)) > GRASS_RING) continue;
+      if (ring > GRASS_RING) continue;
       for (const [x, y, z, sc, c] of s.blades) {
+        if (b >= MAX_BLADES) break;
         d.position.set(x, y, z);
         d.rotation.set(0, x, 0);
         d.scale.setScalar(sc);

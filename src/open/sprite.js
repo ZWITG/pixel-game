@@ -4,11 +4,20 @@ import * as THREE from 'three';
 // Atlas: rows back / front / side, each with four walking frames, then wind-up and punch.
 const W = 32, H = 38, FRAMES = 6, ROWS = 3;
 const WINDUP = 4, PUNCH = 5;
-const C = {
-  hair: '#3f4fd0', hairHi: '#7f90ff', hairDark: '#2a3398', skin: '#ffd2a8', skinDark: '#e8a884', eye: '#1b2233',
-  tunic: '#f3ead8', tunicDark: '#c9b89e', cape: '#d0344a', capeDark: '#8e2036', pants: '#2b2f45',
-  boot: '#5a3320', metal: '#c9d4e2', gold: '#ffb547', glow: '#fff0b0',
-};
+export const LOOKS = [
+  {
+    hair: '#3f4fd0', hairHi: '#7f90ff', hairDark: '#2a3398', skin: '#ffd2a8', skinDark: '#e8a884', eye: '#1b2233',
+    tunic: '#f3ead8', tunicDark: '#c9b89e', cape: '#d0344a', capeDark: '#8e2036', pants: '#2b2f45',
+    boot: '#5a3320', metal: '#c9d4e2', gold: '#ffb547', glow: '#fff0b0',
+  },
+  // The second hero: pale hair in a long tail, teal tunic, gold cape.
+  {
+    hair: '#e4dcf2', hairHi: '#ffffff', hairDark: '#a49ac8', skin: '#c98f66', skinDark: '#a86f4c', eye: '#1b2233',
+    tunic: '#2fa89a', tunicDark: '#1f7a72', cape: '#f0b13c', capeDark: '#b87a22', pants: '#3a2f45',
+    boot: '#2b2f45', metal: '#c9d4e2', gold: '#9fe8ff', glow: '#e8fbff', tail: true,
+  },
+];
+let C = LOOKS[0]; // the look being drawn
 
 function drawFrame(g, row, frame, ox, oy) {
   const step = [0, 1, 0, -1, 0, 1][frame], bob = frame === 1 || frame === 3 ? 1 : 0;
@@ -39,6 +48,11 @@ function drawFrame(g, row, frame, ox, oy) {
     r(19, 9 + body, 2, 4, C.eye);
     r(17, 15 + body, 3, 1, C.skinDark);
     r(10, 17 + body, 12, 3, C.cape);
+    if (C.tail) {
+      r(3, 6 + body, 5, 4, C.hair);
+      r(2, 9 + body, 4, 13, C.hair);
+      r(3, 19 + body, 2, 6, C.hairDark);
+    }
     punchArm(r, frame);
     return;
   }
@@ -65,6 +79,10 @@ function drawFrame(g, row, frame, ox, oy) {
     r(10, 14 + body, 12, 3, C.hairDark);
     r(12, 16 + body, 3, 3, C.hairDark);
     r(18, 16 + body, 2, 2, C.hairDark);
+    if (C.tail) {
+      r(14, 13 + body, 4, 16, C.hair);
+      r(15, 25 + body, 2, 7, C.hairDark);
+    }
     r(9, 18 + body, 14, 3, C.tunic); // pale collar breaks up hair and cape
     r(9, 20 + body, 14, 1, C.tunicDark);
     r(24, 6 + body, 2, 19, C.metal); // sword slung over the shoulder
@@ -146,7 +164,8 @@ function burstTexture() {
 export const punchFrame =(t) => (t < 0.35 ? WINDUP : PUNCH);
 
 export default class HeroSprite {
-  constructor(scene) {
+  constructor(scene, look) {
+    C = look;
     const c = document.createElement('canvas');
     c.width = W * FRAMES;
     c.height = H * ROWS;

@@ -28,7 +28,7 @@ const LEAVES = [['#2a7a55', '#46a06a'], ['#b81f2e', '#ff7a56'], ['#cf8f1e', '#ff
 const BARK = ['#8a5236', '#c9a070'], DUST = ['#94808a', '#c9bcc4', '#6f6068'];
 const MAX_CHIPS = 400;
 const MAX_FALLING = 24;     // past this, a shockwave just blows trees apart
-const BAG_KEY = 'lumen.bag', WORLD_KEY = 'lumen.world', DENT_KEY = 'lumen.dents';
+const WORLD_KEY = 'lumen.world', DENT_KEY = 'lumen.dents';
 
 function load(key) {
   try {
@@ -46,9 +46,10 @@ function save(key, value) {
 
 // What the hero carries, limited by Strength, and what they keep in house chests.
 export class Bag {
-  constructor(body) {
+  constructor(body, saveKey) {
     this.body = body;
-    const saved = load(BAG_KEY);
+    this.saveKey = saveKey;
+    const saved = load(saveKey);
     this.items = saved?.items ?? {};
     this.stored = saved?.stored ?? {};
   }
@@ -76,13 +77,14 @@ export class Bag {
   }
 
   save() {
-    save(BAG_KEY, { items: this.items, stored: this.stored });
+    save(this.saveKey, { items: this.items, stored: this.stored });
   }
 }
 
 export default class Work {
-  constructor(scene, chunks, skills, body, bag, hud, marks) {
-    Object.assign(this, { scene, chunks, skills, body, bag, hud, marks });
+  constructor(scene, chunks, marks) {
+    Object.assign(this, { scene, chunks, marks });
+    this.actor = null; // the player whose blow is being worked out
     this.stop = 0; // hit-stop: seconds of slowed time after a heavy blow
     this.hurt = new Map();
     this.shaking = null;
@@ -105,6 +107,11 @@ export default class Work {
     this.color = new THREE.Color();
     this.d = new THREE.Object3D();
   }
+
+  get skills() { return this.actor.skills; }
+  get body() { return this.actor.body; }
+  get bag() { return this.actor.bag; }
+  get hud() { return this.actor.hud; }
 
   // Stops the hero at trees, rocks, houses and landmarks; they slide around the edge.
   collide(state) {
@@ -240,7 +247,7 @@ export default class Work {
       this.burst(o.x, o.y + 4, o.z, LEAVES[o.kind], 12, 6, true);
       return;
     }
-    const away = Math.atan2(o.x - this.heroX, o.z - this.heroZ);
+    const away = Math.atan2(o.x - this.actor.state.x, o.z - this.actor.state.z);
     const parts = ['crown', 'trunk'].map((name) => {
       const src = this.chunks.trees[o.kind][name];
       const m = new THREE.InstancedMesh(src.geometry, src.material, 1);
@@ -321,9 +328,7 @@ export default class Work {
     this.chipsLive = live;
   }
 
-  update(dt, state) {
-    this.heroX = state.x;
-    this.heroZ = state.z;
+  update(dt) {
     this.shake = Math.max(0, this.shake - dt * 0.8);
     if (this.shaking) {
       const s = this.shaking;

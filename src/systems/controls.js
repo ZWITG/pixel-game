@@ -41,17 +41,21 @@ export const ACTIONS = {
 };
 const NO_DEFAULT = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab']; // keys the browser shouldn't act on
 
-export function getPad() {
+export function getPad(avoid = null) {
   if (!FEATURES.gamepad || !navigator.getGamepads) return null;
   // Steam and virtual-pad drivers can add a second pad that never moves, so use the one touched last.
-  const pads = [...navigator.getGamepads()].filter((p) => p && p.connected);
+  const pads = [...navigator.getGamepads()].filter((p) => p && p.connected && p.index !== avoid);
   return pads.reduce((a, b) => (!a || b.timestamp > a.timestamp ? b : a), null);
 }
 
 const axis = (v) => (Math.abs(v ?? 0) > DEADZONE ? v : 0);
 
 export default class Controls {
-  constructor(dragTarget) {
+  // keyboard: false for a second local player, who only has their pad.
+  constructor(dragTarget, { keyboard = true } = {}) {
+    this.padIndex = null;   // set to tie these controls to one pad; otherwise the last one touched
+    this.avoid = null;      // a pad that belongs to someone else
+    this.locks = false;     // tie to the first pad pressed, so another player's pad can't steal input
     this.held = new Set();
     this.queued = new Set(); // keys pressed since the last update, so quick taps are never missed
     this.padHeld = {};
@@ -59,6 +63,7 @@ export default class Controls {
     this.lookDelta = { x: 0, y: 0 };
     this.mouse = { dx: 0, dy: 0, dragging: false };
     this.device = 'keyboard'; // last used: 'keyboard' or 'pad' (prompts follow it)
+    if (!keyboard) return;
 
     window.addEventListener('keydown', (e) => {
       if (!e.repeat) this.queued.add(e.code);
@@ -80,10 +85,16 @@ export default class Controls {
     });
   }
 
+  get pad() {
+    const tied = this.padIndex === null ? null : navigator.getGamepads?.()[this.padIndex];
+    return tied ?? getPad(this.avoid);
+  }
+
   readPad() {
-    const pad = getPad();
+    const pad = this.pad;
     const state = {};
     if (!pad) return state;
+    if (this.locks && this.padIndex === null && pad.buttons.some((b) => b.pressed)) this.padIndex = pad.index ?? null;
     for (const [name, i] of Object.entries(PAD)) state[name] = !!pad.buttons[i]?.pressed;
     state.stickX = axis(pad.axes[0]);
     state.stickY = axis(pad.axes[1]);

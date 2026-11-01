@@ -72,6 +72,15 @@ export default class Post {
     this.composer.setSize(w, h);
   }
 
+  // false keeps the finished picture off screen, in `output`, for the split view.
+  set toScreen(value) {
+    this.composer.renderToScreen = value;
+  }
+
+  get output() {
+    return this.composer.readBuffer.texture;
+  }
+
   // Shafts fade out when the sun is behind the camera.
   render(sunDir) {
     const u = this.grade.uniforms, v = this.v;
