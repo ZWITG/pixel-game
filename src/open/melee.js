@@ -27,10 +27,12 @@ const CRATER_MARK = 34;      // largest crack mark, in tiles; past this the dent
 // Destructive Blow, by its skill level: seconds to charge fully, force, and reach in tiles.
 const BLOW_TIME = [2, 1.8, 1.6, 1.4, 1.2, 1];
 const BLOW_POWER = [8, 12, 18, 26, 38, 60];
-const BLOW_REACH = [14, 20, 28, 38, 50, 64];
-const BLOW_MOST = 64;        // as far as nearby objects can be searched
+const BLOW_REACH = [14, 20, 28, 40, 58, 90];
+const BLOW_MOST = 110;
+const BLOW_PIT = 26;         // how deep the land can be driven by these
 const BLOW_HOLD = 0.35;      // seconds of holding punch before it starts to charge
 const BLOW_COLOR = '#ffb020';
+const WHITE = new THREE.Color('#ffffff');
 const HARD_LANDING = 10;      // tiles fallen before a stomp breaks the ground
 const HOP_STOMP = 0.25;      // an ordinary jump's landing reaches this share of a hard one
 const DEEPEST_PIT = 8;      // the land can't be pushed down further than this
@@ -115,6 +117,8 @@ export default class Melee {
     this.charging = false;
     this.charge = 0;
     this.heldFor = 0;
+    this.slam = 0;
+    this.lift = 0;
     this.orb = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 2), new THREE.MeshBasicMaterial({ color: BLOW_COLOR, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.orb.visible = false;
     this.orbAge = 9;
@@ -145,46 +149,96 @@ export default class Melee {
     return FEATURES.blow && this.skills.level('punching') >= PUNCHES.length - 1;
   }
 
+  // How big this blow is shaping up to be, 0..1: its charge and how far the skill has come.
+  get might() {
+    return this.charge * (0.35 + 0.65 * (this.skills.level('blow') / (BLOW_POWER.length - 1)));
+  }
+
   // Holding punch gathers a Destructive Blow; letting go sets it off.
   updateCharge(dt, state, held) {
-    const { house } = this.player.rooms;
+    const { house } = this.player.rooms, { quake } = this.player.world;
+    // Once the Blow is open a punch throws when the button comes up, so holding never punches.
+    if (!held && this.heldFor > 0 && !this.charging && this.blowReady && !state.air && (!house || house.hostile)) this.punch(state);
     this.heldFor = held ? this.heldFor + dt : 0;
+    this.slam = Math.max(0, this.slam - dt);
     if (!this.charging) {
+      this.lift = Math.max(0, this.lift - dt * 18);
       if (this.blowReady && this.heldFor >= BLOW_HOLD && !this.active && (!house || house.hostile)) {
         this.charging = true;
         this.charge = 0;
+        this.stamp = 0;
+        this.pulse = 0;
       }
-    } else if (held) {
-      this.charge = Math.min(1, this.charge + dt / BLOW_TIME[this.skills.level('blow')]);
-      this.work.shake = Math.max(this.work.shake, this.charge * 0.12);
-      this.work.shakeAt = state;
-      this.orb.visible = true;
-      this.orb.position.set(state.x, this.height(state.x, state.z) + state.air + 1.4, state.z);
-      this.orb.scale.setScalar(0.8 + this.charge * 3 + Math.sin(this.heldFor * 30) * 0.15 * this.charge);
-      this.orb.material.opacity = 0.2 + this.charge * 0.4;
-      if (Math.random() < dt * 30) this.work.burst(state.x, this.height(state.x, state.z) + 0.5, state.z, [BLOW_COLOR, '#ffffff'], 2, 3 + this.charge * 5);
-    } else this.release(state);
+      return;
+    }
+    if (!held) {
+      this.release(state);
+      return;
+    }
+    this.charge = Math.min(1, this.charge + dt / BLOW_TIME[this.skills.level('blow')]);
+    const m = this.might, ground = this.height(state.x, state.z);
+    this.work.shake = Math.max(this.work.shake, m * 0.22);
+    this.work.shakeAt = state;
+    // The hero climbs into the air as it nears its peak, more the stronger it is.
+    this.lift += (Math.max(0, this.charge - 0.6) * m * 9 - this.lift) * Math.min(1, dt * 5);
+    // A brighter, faster glow as it builds, burning white at the top.
+    this.orb.visible = true;
+    this.orb.position.set(state.x, ground + state.air + this.lift + 1.4, state.z);
+    this.orb.scale.setScalar(0.8 + this.charge * (2 + m * 3) + Math.sin(this.heldFor * (20 + this.charge * 30)) * 0.2 * this.charge);
+    this.orb.material.opacity = 0.2 + this.charge * 0.4;
+    this.orb.material.color.set(BLOW_COLOR).lerp(WHITE, this.charge * this.charge * m);
+    if (Math.random() < dt * (20 + m * 50)) this.work.burst(state.x, ground + 0.5, state.z, [BLOW_COLOR, '#ffffff'], 2, 3 + m * 9);
+    // Rings run out through the ground in time with it.
+    if ((this.pulse -= dt) <= 0) {
+      this.pulse = 0.55 - this.charge * 0.35;
+      this.ring(state.x, ground, state.z, 5 + m * 22, BLOW_COLOR);
+    }
+    if (house) return;
+    if (m > 0.15) quake.gather(dt, state.x, ground, state.z, m);
+    // At each third of the charge the ground under them cracks further.
+    const step = Math.floor(this.charge * 3);
+    if (step > this.stamp && m > 0.1) {
+      this.stamp = step;
+      this.crater(state.x, state.z, Math.min(CRATER_MARK, 5 + step * m * 10));
+      this.work.shake = Math.max(this.work.shake, 0.2 + m * 0.3);
+    }
   }
 
   release(state) {
-    const level = this.skills.level('blow'), c = this.charge;
-    const force = this.force * BLOW_POWER[level] * (0.4 + 0.6 * c);
+    const level = this.skills.level('blow'), c = this.charge, m = this.might;
+    const force = this.force * BLOW_POWER[level] * (0.4 + 0.6 * c), { quake } = this.player.world, inside = !!this.player.rooms.house;
     // Reach is the skill's to grow; Mass adds a little, and force does the rest.
     const reach = Math.min(BLOW_MOST, BLOW_REACH[level] * (0.5 + 0.5 * c) * (1 + Math.sqrt(this.body.massScale) * 0.08));
+    const ground = this.height(state.x, state.z);
     this.charging = false;
     this.charge = 0;
+    this.slam = 0.2 + m * 0.35;
     this.work.actor = this.player;
-    this.blast(state.x, state.z, force, reach, this.player.rooms.house ? 0 : reach * 0.45, BLOW_COLOR, null);
-    this.ring(state.x, this.height(state.x, state.z), state.z, reach * 0.6, '#ffffff');
-    this.work.burst(state.x, this.height(state.x, state.z) + 1.5, state.z, [BLOW_COLOR, '#fff0b0', '#ff5a3d'], 90, 14);
-    this.work.shake = Math.max(this.work.shake, 0.45);
+    this.blast(state.x, state.z, force, reach, 0, BLOW_COLOR, null);
+    if (!inside) this.tear(state.x, state.z, reach * 0.45, BLOW_PIT);
+    this.ring(state.x, ground, state.z, reach * 0.6, '#ffffff');
+    this.work.burst(state.x, ground + 1.5, state.z, [BLOW_COLOR, '#fff0b0', '#ff5a3d'], Math.round(40 + m * 120), 10 + m * 14);
+    this.work.shake = Math.max(this.work.shake, 0.3 + m * 0.5);
     this.work.shakeAt = state;
-    this.work.stop = 0.18;
+    this.work.stop = 0.1 + m * 0.3;
+    this.work.rumble = m > 0.45 ? m * m * 3.5 : 0;
     this.orbAge = 0;
     this.orbSize = reach;
-    this.orb.position.set(state.x, this.height(state.x, state.z) + 1.4, state.z);
+    this.orb.material.color.set(BLOW_COLOR);
+    this.orb.position.set(state.x, ground + 1.4, state.z);
     this.orb.visible = true;
     this.skills.add('blow', 1 + c * 2);
+    quake.fling(state.x, state.z, 18 + m * 45);
+    if (m > 0.25) this.hud.flash(0.25 + m * 0.7);
+    if (inside) return;
+    quake.throwStones(state.x, ground, state.z, Math.round(m * m * 34), 14 + m * 34);
+    // Past the first shock, the land itself gives way.
+    if (m > 0.4) {
+      for (const [at, k] of [[0.18, 0.75], [0.4, 1.15], [0.75, 1.6]]) {
+        if (m > k * 0.4) quake.after(at, () => this.ring(state.x, ground, state.z, reach * k, k > 1 ? '#ff5a3d' : BLOW_COLOR));
+      }
+      quake.shatter(state.x, state.z, reach, m, (x, z, size) => this.canTear(x, z, size), () => this.work.saveGone());
+    }
   }
 
   // For the sprite: null when not punching.
@@ -259,9 +313,13 @@ export default class Melee {
   }
 
   // Tears the ground open, except right under the great landmarks.
-  tear(x, z, size) {
-    const safe = [PLACES.spire, { ...PLACES.ribs, r: 260 }, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 90 }, ...TOWNS];
-    if (safe.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + size) || dentAt(x, z) > DEEPEST_PIT) return;
+  canTear(x, z, size, deepest = DEEPEST_PIT) {
+    const safe = [PLACES.spire, { ...PLACES.ribs, r: 260 }, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 90 }, PLACES.hollow, ...TOWNS];
+    return !safe.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + size) && dentAt(x, z) <= deepest;
+  }
+
+  tear(x, z, size, deepest) {
+    if (!this.canTear(x, z, size, deepest)) return;
     this.work.chunks.deform(x, z, size, size * CRATER_DEPTH);
     this.crater(x, z, Math.min(CRATER_MARK, size * 1.1));
   }
@@ -339,7 +397,7 @@ export default class Melee {
       this.orbAge += dt;
       const k = Math.min(1, this.orbAge / 0.45);
       this.orb.scale.setScalar(Math.max(1, this.orbSize * Math.sqrt(k)));
-      this.orb.material.opacity = (1 - k) * 0.85;
+      this.orb.material.opacity = (1 - k) * 0.35;
       if (k === 1) {
         this.orbAge = 9;
         this.orb.visible = false;

@@ -134,7 +134,8 @@ export default class Player {
     }
     const door = !rooms.house && !swim.inWater && world.work.door(state);
     const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.people.spot(this);
-    if (FEATURES.punching && just.punch && !state.air && (!rooms.house || rooms.house.hostile)) melee.punch(state);
+    // With Destructive Blow, the button waits to see if it's a tap or a hold (see updateCharge).
+    if (FEATURES.punching && just.punch && !melee.blowReady && !state.air && (!rooms.house || rooms.house.hostile)) melee.punch(state);
     if (!spot) {
       hud.setAction('');
       return false;
@@ -407,7 +408,8 @@ export default class Player {
     const { state, swim, melee } = this, pace = state.pace ?? 0;
     if (this.flinch) return [FRAME.hurt, -0.15];
     if (pose) return [FRAME.punch(pose.t, pose.chain), 0];
-    if (melee.charging) return [FRAME.charge(time), 0.08];
+    if (melee.slam > 0) return [FRAME.slam, 0.25];
+    if (melee.charging) return [FRAME.charge(time, melee.charge), 0.08 - melee.charge * 0.18];
     if (state.flying) return [FRAME.fly(time), state.moving ? 1.25 : 0.2];
     if (state.air > 0.4) {
       if (state.rise > 1) return [FRAME.rising, 0.1];
@@ -428,7 +430,7 @@ export default class Player {
     const ahead = -sy * dx - cy * dz, right = cy * dx - sy * dz;
     const view = Math.abs(right) > Math.abs(ahead) ? 2 : ahead > 0 ? 0 : 1;
     // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
-    const heroY = swim.inWater ? SURFACE + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air;
+    const heroY = swim.inWater ? SURFACE + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air + melee.lift;
     const pose = melee.pose, flip = pose && view !== 2 ? pose.chain === 1 : right < 0;
     const [frame, lean] = this.motion(pose, time);
     hero.update(state.x, heroY, state.z, camera, view, flip, frame, lean);

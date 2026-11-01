@@ -132,6 +132,7 @@ export default class Work {
   constructor(scene, chunks, marks) {
     Object.assign(this, { scene, chunks, marks });
     this.actor = null; // the player whose blow is being worked out
+    this.rumble = 0;
     this.stop = 0; // hit-stop: seconds of slowed time after a heavy blow
     this.hurt = new Map();
     this.shaking = null;
@@ -378,6 +379,11 @@ export default class Work {
 
   update(dt) {
     this.shake = Math.max(0, this.shake - dt * 2.5);
+    // A long rumble after the worst blows.
+    if (this.rumble > 0) {
+      this.rumble -= dt;
+      this.shake = Math.max(this.shake, Math.min(0.5, this.rumble * 0.3));
+    }
     if (this.shaking) {
       const s = this.shaking;
       s.t += dt;

@@ -203,8 +203,8 @@ export default class Chunks {
 
   // Standing trees and rocks within `range` of a point.
   near(x, z, range) {
-    const out = [], cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
-    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const out = [], cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK), span = Math.max(1, Math.ceil(range / CHUNK));
+    for (let j = -span; j <= span; j++) for (let i = -span; i <= span; i++) {
       for (const o of this.spots(cx + i, cz + j).things) {
         if (Math.abs(o.x - x) < range && Math.abs(o.z - z) < range && !this.gone.has(o.id)) out.push(o);
       }
@@ -278,7 +278,8 @@ export default class Chunks {
 
   // Presses a bowl into the land. The shown ground is edited in place rather than rebuilt,
   // which would stall the punch; anything standing there settles or is torn up with it.
-  deform(x, z, r, depth) {
+  // `later`: many at once call scatter() themselves when they're done.
+  deform(x, z, r, depth, later = false) {
     addDent(x, z, r, depth);
     for (const mesh of this.live.values()) this.patch(mesh, x, z, r, depth);
     const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
@@ -287,7 +288,7 @@ export default class Chunks {
       s.blades = s.blades.filter(([bx, , bz]) => Math.hypot(bx - x, bz - z) > r * 0.8);
       for (const o of s.things) if (Math.hypot(o.x - x, o.z - z) < r) o.y = height(o.x, o.z);
     }
-    this.scatter();
+    if (!later) this.scatter();
   }
 
   patch(mesh, x, z, r, depth) {

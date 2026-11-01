@@ -16,6 +16,7 @@ import Monsters from './monsters.js';
 import Player from './player.js';
 import SplitView from './splitView.js';
 import Sites from './sites.js';
+import Quake from './quake.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -94,6 +95,7 @@ const world = { scene, renderer, chunks, work, monsters, marks, players, shared:
 
 world.sites = new Sites(scene, monsters, work, players);
 world.people = new People(scene, world);
+world.quake = new Quake(scene, chunks);
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
 // fills its owner's half: the other hero plays on, and both can have theirs open.
 world.checkPause = () => {
@@ -410,7 +412,7 @@ function aimCameras(dt) {
   views.forEach((v, i) => {
     const s = (players[i] ?? a).state;
     if (work.shake && Math.hypot(s.x - source.x, s.z - source.z) < SHAKE_REACH) {
-      v.camera.position.addScaledVector(tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), Math.min(MAX_SHAKE, work.shake));
+      v.camera.position.addScaledVector(tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), Math.min(MAX_SHAKE + work.rumble * 0.1, work.shake));
     }
   });
   if (state.drone) {
@@ -465,6 +467,7 @@ function step(dt) {
     world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);
     work.update(dt);
+    world.quake.update(dt);
   }
 
   const dir = sky.material.uniforms.uSun.value;

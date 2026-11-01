@@ -59,6 +59,7 @@
       @keyframes float { to { opacity: 0; margin-top: -30px; } }
       #breath, #p2-breath { position: fixed; left: 50%; bottom: 44px; width: 220px; height: 10px; transform: translateX(-50%); background: #141a28; }
       #breath-fill, #p2-breath-fill { height: 100%; width: 100%; background: #9fe8ff; }
+      #flash { position: fixed; inset: 0; background: #fff4d0; opacity: 0; pointer-events: none; z-index: 4; }
       #blink { position: fixed; inset: 0; background: #141a28; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
       #blink.on { opacity: 1; transition: none; }
       #skills { position: fixed; inset: 0; background: #0a0f22; }
@@ -91,6 +92,7 @@
     <div id="pad-status"></div>
     <div id="help"></div>
     <div id="blink"></div>
+    <div id="flash"></div>
     <div id="toast"></div>
     <div id="gains"></div>
     <div id="act"></div>

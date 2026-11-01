@@ -120,7 +120,7 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Superspeed (built 2026-11-01):** Running's top level evolves it into Superspeed, its own skill, practised by time at speed. At full sprint, let go and press sprint again. Speed builds from a sprint over several seconds and carries on a moment after letting go; hard turns scrub it off. Level sets duration (4 s to unlimited), top speed and how quickly it builds (`SUPER_*` in player.js, capped at 130 tiles a second). From level 3 the hero stays on top of water if moving fast enough. Whatever they barrel into takes a hit, harder with speed. The camera becomes a steady chase view as speed rises.
 
-**Destructive Blow (built 2026-11-01):** the top level of Punching evolves into it. Hold Square to gather it, walking slowly, and let go to explode around the hero. Its own skill, practised by using it, sets charge time, force and reach (`BLOW_*` in melee.js); a longer charge is stronger, and force and Mass add on top. It breaks and craters like other blows.
+**Destructive Blow (built 2026-11-01):** the top level of Punching evolves into it. Hold Square to gather it, walking slowly, and let go to explode around the hero. Its own skill, practised by using it, sets charge time, force and reach (`BLOW_*` in melee.js); a longer charge is stronger, and force and Mass add on top. It breaks and craters like other blows. `might` (charge and skill level together) drives its build-up: poses, rising hero, cracking ground, orbiting boulders. Past 0.4 it erupts rock pillars and fissures (`src/open/quake.js`); near 1 it is earth-shattering, with a white flash, flung stone and a long rumble.
 
 ## 7. UI direction (from the taste rules)
 

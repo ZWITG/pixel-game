@@ -96,6 +96,9 @@ const POSES = [
   { name: 'glide', s: 0.2, bob: 0, wave: 2, lean: 1, near: [-11, -1], far: [11, -1], arms: 'out' },
   { name: 'hurt', s: -0.2, bob: 2, wave: 5, lean: -4, near: [-9, -7], far: [-11, 2], arms: 'out' },
   ...[0, 1].map((i) => ({ name: 'charge', s: 0.2, bob: 2 + i, wave: i * 3, lean: 1, near: [-3, 11], far: [5, 11], arms: 'in', bend: 2 })),
+  ...[0, 1].map((i) => ({ name: 'gather', s: 0.3, bob: 1 + i, wave: i * 3 + 1, lean: -1, near: [-11, 3], far: [-9, 6], arms: 'out', bend: 1 })),
+  ...[0, 1].map((i) => ({ name: 'peak', s: 0.25, bob: -2 + i, wave: i * 3 + 2, lean: -2, near: [3, -21], far: [-9, 5], arms: 'up' })),
+  { name: 'slam', s: 0.5, bob: 5, wave: 4, lean: 6, near: [14, 19], far: [-10, 2], arms: 'in', bend: 5 },
   ...[0, 1, 2, 3].map((i) => {
     const q = stride(i, 4, 1.5);
     return { name: 'dash', s: q, bob: i % 2, wave: i * 2, lean: 5, near: [-13, 8], far: [-15, 10] };
@@ -332,7 +335,8 @@ export const FRAME = {
   dash: (time) => loop('dash', 4, time, 18),
   swim: (time, rate) => loop('swim', 4, time, rate),
   fly: (time) => loop('fly', 2, time, 8),
-  charge: (time) => loop('charge', 2, time, 16),
+  charge: (time, c) => (c < 0.4 ? loop('charge', 2, time, 12) : c < 0.8 ? loop('gather', 2, time, 18) : loop('peak', 2, time, 26)),
+  slam: frameOf('slam'),
   punch: (t, chain) => frameOf(t < 0.35 ? 'windup' : chain === 2 ? 'uppercut' : 'punch'),
   rising: frameOf('rising'),
   falling: frameOf('falling'),

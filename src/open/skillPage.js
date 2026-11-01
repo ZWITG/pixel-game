@@ -51,6 +51,17 @@ export default class WorldHud {
     setTimeout(() => el.remove(), 2600);
   }
 
+  // A full-screen flash from a huge blast.
+  flash(strength) {
+    const el = $('flash');
+    el.style.transition = 'none';
+    el.style.opacity = strength;
+    requestAnimationFrame(() => {
+      el.style.transition = 'opacity 1.1s';
+      el.style.opacity = 0;
+    });
+  }
+
   setHealth(amount) {
     this.$('hp-fill').style.width = `${Math.max(0, amount) * 100}%`;
   }
