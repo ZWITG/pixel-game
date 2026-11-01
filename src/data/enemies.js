@@ -136,7 +136,7 @@ export const ENEMIES = {
   // Bosses: huge, and fought with powers (see src/open/bosses.js).
   gravemaw: { name: 'Gravemaw the Colossus', boss: true, plain: true, model: 'beast', shape: 'colossus', scale: 7, ai: 'chase', hp: 45, damage: 5, speed: 1.2, chaseSpeed: 1.6, aggro: 60, radius: 2.6, xp: 200, spawns: false, drops: [] },
   mirewyrm: { name: 'The Mirewyrm', boss: true, plain: true, model: 'beast', shape: 'wyrm', scale: 7, ai: 'chase', hp: 40, damage: 4, speed: 1.4, chaseSpeed: 2, aggro: 60, radius: 2.2, xp: 200, spawns: false, drops: [] },
-  frostwarden: { name: 'The Frostwarden', boss: true, plain: true, model: 'beast', shape: 'warden', scale: 7, ai: 'chase', hp: 42, damage: 4, speed: 1.2, chaseSpeed: 1.8, aggro: 60, radius: 2.2, xp: 200, spawns: false, drops: [] },
+  frostwarden: { name: 'The Rime King', boss: true, plain: true, model: 'beast', shape: 'warden', scale: 7, ai: 'chase', hp: 42, damage: 4, speed: 1.2, chaseSpeed: 1.8, aggro: 60, radius: 2.2, xp: 200, spawns: false, drops: [] },
   emberhorn: { name: 'Emberhorn', boss: true, plain: true, model: 'beast', shape: 'emberhorn', scale: 6, ai: 'chase', hp: 40, damage: 5, speed: 1.6, chaseSpeed: 2.4, aggro: 60, radius: 2.4, xp: 200, spawns: false, drops: [] },
   wisp: {
     name: 'Wisp',

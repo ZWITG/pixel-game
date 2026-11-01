@@ -1,0 +1,8 @@
+{
+  "note": "The creator's original Lv 259 hero, kept for a later update: a secret boss that only arrives once the player has conquered all nations. Not used by the game yet. Taken 2026-11-01 from the Code tab save. In a browser, the same save is archived under lumen.legend.* the first time v0.10 loads.",
+  "look": { "hair": "#2c3fc4", "coat": "#efe6d4", "scarf": "#e0344a" },
+  "powers": ["Worldbreaker punch", "Destructive Blow", "Flight", "Superspeed"],
+  "skills": {"climbing":599.4825819999787,"running":2602.2490360000506,"swimming":773.4846703995298,"mining":84,"woodcutting":128,"punching":913.3000000000001,"fighting":10858,"jumping":420,"flight":511.43952799995503,"superspeed":460.42373600001696,"blow":353.3870658730158},
+  "bag": {"items":{"wood":251,"stone":43,"iron":59,"dust":72,"ember":64,"spore":188,"hide":80,"gel":105,"tusk":7,"pearl":11,"salve":6},"stored":{"stone":5,"wood":10},"worn":{},"perks":{"health":23,"force":0.1}},
+  "sites": ["shrine0","shrine7","shrine9","camp0","camp3","vault0","vault1","vault4","vault7","vault8","vein0","vein3","trial0","hermit0","cave0","cache0","cache5","cache11","lair-The Drowned Hollow"]
+}

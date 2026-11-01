@@ -5,9 +5,9 @@ import { FEATURES } from '../config/features.js';
 import { height, SPAWN } from './terrain.js';
 import HeroModel, { LOOKS } from './hero3d.js';
 import Compass from './compass.js';
-import { reachPin } from './gameMenu.js';
-
-const SATCHEL_TAB = 2;
+import { reachPin, SATCHEL_TAB } from './gameMenu.js';
+import PowerSet, { PowerBar } from './powers.js';
+import { CONQUERORS } from './conquerors.js';
 import Skills from './skills.js';
 import Swim, { DEEP, SURFACE } from './swim.js';
 import WorldHud from './skillPage.js';
@@ -66,9 +66,11 @@ export default class Player {
     this.controls.device = 'pad'; // PS5 prompts by default; pressing a key switches them to keyboard
     const hud = this.hud = new WorldHud(prefix);
     this.skills = new Skills((skill, level) => {
-      if (skill.name === 'Jumping' && level === JUMP_MAX) hud.message('Jumping has evolved into Flight! Jump and hold X to fly.', true, 5000);
-      else if (skill.name === 'Punching' && level === 5) hud.message('Punching has evolved into Destructive Blow! Hold Square, then let go.', true, 5000);
-      else if (skill.name === 'Running' && level === RUN_MAX) hud.message('Running has evolved into Superspeed! While sprinting, press sprint again.', true, 5000);
+      const conq = this.powers?.def;
+      if (skill.power) hud.message(`${skill.name} reached rank ${level + 1}!`, true);
+      else if (skill.name === 'Jumping' && level === JUMP_MAX && conq?.flight) hud.message('Jumping has evolved into Flight! Jump and hold X to fly.', true, 5000);
+      else if (skill.name === 'Punching' && level === 5 && conq?.blow) hud.message('Punching has evolved into Destructive Blow! Hold Square, then let go.', true, 5000);
+      else if (skill.name === 'Running' && level === RUN_MAX && conq?.superspeed) hud.message('Running has evolved into Superspeed! While sprinting, press sprint again.', true, 5000);
       else if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
       else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
     }, (name, value) => hud.gain(ATTRIBUTES[name], value), `${save}skills`);
@@ -80,7 +82,10 @@ export default class Player {
     this.cave = new Cave(world.scene, this);
     this.melee = new Melee(world.scene, this, world.work);
     this.melee.monsters = world.monsters;
-    this.hero = new HeroModel(world.scene, LOOKS[index]);
+    this.powers = new PowerSet(this, `${save}conqueror`);
+    this.body.powers = this.powers;
+    this.bar = new PowerBar(prefix);
+    this.hero = new HeroModel(world.scene, this.powers.def?.look ?? LOOKS[index]);
     this.compass = new Compass(index ? 'p2-' : '');
     this.state = { x: SPAWN.x, z: SPAWN.z, y: 0, yaw: 2.6, pitch: 0.16, recenter: null, phase: 0, moving: false, dir: [0, -1], steepAt: 0, air: 0, rise: 0 };
     this.hp = this.body.maxHealth;
@@ -167,7 +172,7 @@ export default class Player {
   }
 
   get bolt() {
-    return FEATURES.superspeed && this.skills.level('running') >= RUN_MAX;
+    return FEATURES.superspeed && !!this.powers.def?.superspeed && this.skills.level('running') >= RUN_MAX;
   }
 
   // Superspeed: at full sprint, let go of sprint and press it again. It lasts until you stop
@@ -212,7 +217,7 @@ export default class Player {
   }
 
   get wings() {
-    return FEATURES.flight && this.skills.level('jumping') >= JUMP_MAX;
+    return FEATURES.flight && !!this.powers.def?.flight && this.skills.level('jumping') >= JUMP_MAX;
   }
 
   jump(dt, y) {
@@ -268,6 +273,11 @@ export default class Player {
     if (!world.paused) reachPin(this);
     const used = this.act(just);
     const free = !hud.open && !this.frozen;
+    if (free && !melee.active && this.powers.def) {
+      for (let i = 0; i < 4; i++) if (just[`power${i}`]) this.powers.use(i);
+    }
+    if (!world.paused) this.powers.update(dt);
+    this.bar.update(this.powers, controls.device);
     if (FEATURES.jump && just.jump && !used && free && !state.air && !melee.active) {
       // A kick up out of the water is weaker than a jump off the ground, but it gets you out.
       state.rise = body.jumpSpeed * (swim.inWater ? WATER_JUMP : 1);
@@ -286,7 +296,7 @@ export default class Player {
     }
     aim.pitch = THREE.MathUtils.clamp(aim.pitch + look.y, -0.25, 1.2);
 
-    const m = !free || melee.active || melee.rolling > 0 ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
+    const m = !free || melee.active || melee.rolling > 0 ? { x: 0, y: 0 } : controls.move(false), amount = Math.min(1, Math.hypot(m.x, m.y));
     if (!world.paused) {
       this.updateSuper(dt, !!(controls.held.has('ShiftLeft') || controls.padHeld.R2), amount > 0.05 && free);
       melee.updateMoves(dt, state);
@@ -385,6 +395,20 @@ export default class Player {
     }
   }
 
+  // Stands a Conqueror's figure in the hero's place, for the choosing screen or for good.
+  showAs(id) {
+    this.hero.dispose();
+    this.hero = new HeroModel(this.world.scene, CONQUERORS[id].look);
+  }
+
+  becomeConqueror(id) {
+    this.powers.choose(id);
+    this.showAs(id);
+    this.melee.refreshStage();
+    this.hp = this.body.maxHealth;
+    this.hud.setHealth(1);
+  }
+
   enterCave(site) {
     const { world, state, hud } = this;
     site.level ??= new CaveLevel(world.scene, site, world.monsters, site.index * 971 + 13);
@@ -440,6 +464,7 @@ export default class Player {
   motion(pose, time) {
     const { state, swim, melee } = this, pace = state.pace ?? 0;
     if (this.flinch) return ['hurt', -0.15];
+    if (this.powers.casting > 0) return [this.powers.pose, 0.05];
     if (pose) return [pose.t < 0.35 ? 'windup' : pose.chain === 2 ? 'uppercut' : 'punch', 0, { arm: pose.chain === 1 ? 1 : 0 }];
     if (melee.rolling > 0) return ['roll', (1 - melee.rolling / 0.42) * Math.PI * 2];
     if (melee.held) return ['hold', 0];

@@ -1,6 +1,7 @@
 import { PLACES, TOWNS, WORLD } from './terrain.js';
 import { prompt } from '../ui/glyphs.js';
 import { QUALITY, saveSettings } from './startMenu.js';
+import { svg, MAX_RANK } from './powers.js';
 
 // The menu in play: one row of icon tabs over the map, the Spirit Tree, the Satchel, the
 // buttons and the settings. Add a tab by adding an entry to TABS and a case in `show`.
@@ -8,6 +9,7 @@ const SVG = (d, size = 26) => `<svg viewBox="0 0 24 24" width="${size}" height="
 const SHAPES = {
   map: 'M2 6.500 8.500 3l7 3.500L22 3v14.500L15.500 21l-7-3.500L2 21zM8 5.500v10.700l-4 2.200V7.600zm2 0v10.800l4 2V8zm6 2.400v10.400l4-2.100V5.700z',
   powers: 'M13 1.500s1.200 4.300-1.800 7.300S6 13.800 6 16.800a6.200 6.200 0 0 0 12.400.200c0-3.500-2.300-6.300-3.200-8.500-.2 1.700-.8 2.800-1.900 3.300.8-3.600.6-7.700-.3-10.300z',
+  skills: 'M12 2l7 9h-4l5 7h-6v4h-4v-4H4l5-7H5z',
   satchel: 'M8 8V6.500a4 4 0 0 1 8 0V8h3.200L21 21.500H3L4.800 8zm2 0h4V6.500a2 2 0 0 0-4 0zm.5 4v3h3v-3z',
   controls: 'M7 6.500h10a5 5 0 0 1 5 4.800l.8 6.400a3 3 0 0 1-5.300 2.200L16 18H8l-1.500 1.900a3 3 0 0 1-5.300-2.200l.8-6.400a5 5 0 0 1 5-4.800zM6.500 9v2h-2v2h2v2h2v-2h2v-2h-2V9zM16 12.500a1.300 1.300 0 1 0 0 2.600 1.300 1.300 0 0 0 0-2.600zm2.500-3a1.300 1.300 0 1 0 0 2.600 1.300 1.300 0 0 0 0-2.600z',
   settings: 'M10.300 2h3.400l.5 2.600 1.900.8 2.200-1.500 2.400 2.400-1.500 2.200.8 1.900 2.600.5v3.400l-2.600.5-.8 1.900 1.500 2.200-2.400 2.400-2.200-1.500-1.900.8-.5 2.600h-3.400l-.5-2.600-1.900-.8-2.200 1.500-2.400-2.400 1.500-2.200-.8-1.900L1.400 13.700v-3.400L4 9.800l.8-1.900L3.300 5.700l2.400-2.400 2.200 1.500 1.900-.8zM12 8.500a3.500 3.500 0 1 0 0 7 3.500 3.500 0 0 0 0-7z',
@@ -20,7 +22,9 @@ const SHAPES = {
   goal: 'M12 2 22 12 12 22 2 12z',
   pin: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6z',
 };
-const TABS = [['map', 'Map'], ['powers', 'Powers'], ['satchel', 'Satchel'], ['controls', 'Controls'], ['settings', 'Settings']];
+const TABS = [['map', 'Map'], ['powers', 'Powers'], ['skills', 'Skills'], ['satchel', 'Satchel'], ['controls', 'Controls'], ['settings', 'Settings']];
+export const SATCHEL_TAB = 3;
+const POWER_COLS = 4, DIRS = ['up', 'right', 'down', 'left'], DIR_NAMES = ['Up', 'Right', 'Down', 'Left'];
 const KINDS = { city: ['#ffe7b0', 'City'], village: ['#ffd9a0', 'Village'], bandit: ['#ff8f7f', 'Bandit camp'], keep: ['#d8d0c8', 'Ruined keep'], lair: ['#ff4a6a', 'Lair'], landmark: ['#9fe8ff', 'Landmark'], goal: ['#ffffff', 'Place you have found'], pin: ['#ffe15a', 'Your pin'] };
 const HINTS = [['Auto', 'auto'], ['Always', 'always'], ['Off', 'off']];
 const ZOOMS = [1, 2.4, 5];
@@ -63,11 +67,15 @@ export default class GameMenu {
       this.cursor = { x: (((e.clientX - r.left) * k - ox) / s) * WORLD, z: (((e.clientY - r.top) * k - oy) / s) * WORLD };
     });
     this.page.addEventListener('click', (e) => {
-      const at = e.target.closest('[data-at]');
+      const at = e.target.closest('[data-at]'), card = e.target.closest('[data-card]'), slot = e.target.closest('[data-slot]');
       if (at) {
         this.at = Number(at.dataset.at);
         this.choose(1);
-      }
+      } else if (card) {
+        this.at = Number(card.dataset.card);
+        this.assigning = false;
+        this.drawPage();
+      } else if (slot && this.assigning) this.place(Number(slot.dataset.slot));
     });
     setTimeout(() => this.survey(), SURVEY_AFTER);
   }
@@ -123,8 +131,9 @@ export default class GameMenu {
     this.device = p.controls.device;
     [...this.tabs.children].forEach((el, i) => el.classList.toggle('at', i === tab));
     this.mapBox.hidden = id !== 'map';
-    this.page.hidden = id !== 'controls' && id !== 'settings';
-    if (id === 'powers') p.hud.toggle(p.skills.all(), p.body);
+    this.page.hidden = id !== 'controls' && id !== 'settings' && id !== 'powers';
+    this.assigning = false;
+    if (id === 'skills') p.hud.toggle(p.skills.all(), p.body);
     if (id === 'satchel') {
       p.hud.togglePack(p);
       const key = (action) => prompt(action, p.controls.device);
@@ -149,7 +158,8 @@ export default class GameMenu {
     document.getElementById('menu-next').innerHTML = p('menuRight');
     const pin = this.owner.pin;
     const own = { map: `${p('confirm')} ${pin ? 'Remove pin' : 'Drop pin'}&nbsp;&nbsp; ${p('punch')} Zoom&nbsp;&nbsp;`, satchel: '', powers: '', controls: '', settings: `${p('confirm')} Change&nbsp;&nbsp;` }[id];
-    this.hints.innerHTML = id === 'powers' || id === 'satchel' ? '' : `${own}${p('back')} Close`;
+    if (id === 'powers') this.hints.innerHTML = this.assigning ? `${p('left')} ${p('up')} ${p('right')} ${p('down')} Pick a button&nbsp;&nbsp; ${p('back')} Cancel` : `${p('confirm')} Equip&nbsp;&nbsp; ${p('back')} Close`;
+    else this.hints.innerHTML = id === 'skills' || id === 'satchel' ? '' : `${own}${p('back')} Close`;
   }
 
   options() {
@@ -190,7 +200,9 @@ export default class GameMenu {
     if (id === 'controls') {
       const pad = this.owner.controls.device === 'pad';
       this.page.innerHTML = `<div class="menu-rows">${this.rows(pad).map(([key, label]) => `<div>${key}<span>${label}</span></div>`).join('')}</div>`;
-    } else if (id === 'settings') {
+    }
+    if (id === 'powers') this.drawPowers();
+    if (id === 'settings') {
       this.page.innerHTML = this.options().map((o, i) => `<button data-at="${i}" class="${i === this.at ? 'at' : ''}"><b>${o.label}</b><small>${o.note}</small><em>${o.action ? o.value : `‹ ${o.value} ›`}</em></button>`).join('');
     }
   }
@@ -199,9 +211,76 @@ export default class GameMenu {
     this.options()[this.at].step(d);
   }
 
+  // The Conqueror's eight powers, and the D-pad cross they're worn on.
+  drawPowers() {
+    const set = this.owner.powers, c = set.def;
+    if (!c) {
+      this.page.innerHTML = '';
+      return;
+    }
+    const ids = Object.keys(c.powers), pid = ids[this.at], def = c.powers[pid], rank = set.rank(pid), open = set.open(pid);
+    const slots = DIRS.map((dir, i) => {
+      const worn = set.loadout[i];
+      return `<div data-slot="${i}" class="cross-${dir} ${this.assigning ? 'choosing' : ''}" style="color:${c.color}" title="${worn ? c.powers[worn].name : ''}">${worn ? svg(c.powers[worn].kind, 30) : ''}</div>`;
+    }).join('');
+    const pips = (id) => Array.from({ length: MAX_RANK + 1 }, (_, i) => `<i class="${i <= set.rank(id) ? 'on' : ''}"></i>`).join('');
+    const cards = ids.map((id, i) => {
+      const q = c.powers[id], ok = set.open(id), worn = set.loadout.indexOf(id);
+      return `<button data-card="${i}" class="${i === this.at ? 'at' : ''} ${ok ? '' : 'locked'}" style="--c:${c.color}">
+        ${svg(ok ? q.kind : 'lock', 34)}<b>${q.name}</b><span class="pips">${ok ? pips(id) : `Mastery ${q.mastery}`}</span>${worn >= 0 ? `<em>${DIR_NAMES[worn]}</em>` : ''}
+      </button>`;
+    }).join('');
+    const skill = this.owner.skills.all().find((s) => s.id === set.skillOf(pid));
+    const stats = `<div class="power-bar"><i style="width:${Math.round((skill?.progress ?? 0) * 100)}%;background:${c.color}"></i></div>`;
+    this.page.innerHTML = `<div class="powers-page">
+      <div class="powers-head" style="color:${c.color}">${svg(c.emblem, 34)}<div><b>${c.name}</b><span>Mastery ${set.mastery}</span></div></div>
+      <div class="powers-main">
+        <div class="cross">${slots}</div>
+        <div class="power-grid">${cards}</div>
+      </div>
+      <div class="power-info"><b>${def.name}</b>${open ? `<span>Rank ${rank + 1} of ${MAX_RANK + 1}</span>` : `<span>Opens at Mastery ${def.mastery}. You are at ${set.mastery}.</span>`}<p>${def.text}</p>${open ? stats : ''}</div>
+    </div>`;
+  }
+
+  place(slot) {
+    const set = this.owner.powers, pid = Object.keys(set.def.powers)[this.at];
+    set.wear(pid, slot);
+    this.assigning = false;
+    this.drawPage();
+    this.drawHints();
+  }
+
+  updatePowers(just) {
+    const set = this.owner.powers;
+    if (!set.def) return;
+    if (this.assigning) {
+      const dir = DIRS.findIndex((d) => just[d]);
+      if (dir >= 0) this.place(dir);
+      return;
+    }
+    const n = Object.keys(set.def.powers).length, before = this.at;
+    if (just.left) this.at = (this.at + n - 1) % n;
+    if (just.right) this.at = (this.at + 1) % n;
+    if (just.up || just.down) this.at = (this.at + POWER_COLS) % n;
+    if (this.at !== before) this.drawPage();
+    if (just.confirm) {
+      const pid = Object.keys(set.def.powers)[this.at];
+      if (!set.open(pid)) return;
+      this.assigning = true;
+      this.drawPage();
+      this.drawHints();
+    }
+  }
+
   // Runs while the menu is open, in place of the owner's own input.
   update(dt) {
     const p = this.owner, { controls, hud } = p, { just } = controls, id = TABS[this.tab][0];
+    if (this.assigning && just.back) {
+      this.assigning = false;
+      this.drawPage();
+      this.drawHints();
+      return undefined;
+    }
     if (just.back || just.pause) return this.close();
     if (just.menuLeft || just.menuRight) return this.show((this.tab + (just.menuRight ? 1 : TABS.length - 1)) % TABS.length);
     if (controls.device !== this.device) {
@@ -209,7 +288,8 @@ export default class GameMenu {
       this.drawHints();
       this.drawPage();
     }
-    if (id === 'powers') {
+    if (id === 'powers') this.updatePowers(just);
+    else if (id === 'skills') {
       hud.map.handle(just);
       hud.map.update(dt);
     } else if (id === 'satchel') {
@@ -245,7 +325,7 @@ export default class GameMenu {
   }
 
   updateMap(dt, just) {
-    const p = this.owner, m = p.controls.move(), span = WORLD / ZOOMS[this.zoom], c = this.cursor;
+    const p = this.owner, m = p.controls.move(true), span = WORLD / ZOOMS[this.zoom], c = this.cursor;
     c.x = Math.max(0, Math.min(WORLD, c.x + m.x * span * CURSOR_SPEED * dt));
     c.z = Math.max(0, Math.min(WORLD, c.z + m.y * span * CURSOR_SPEED * dt));
     if (just.punch) this.zoom = (this.zoom + 1) % ZOOMS.length;

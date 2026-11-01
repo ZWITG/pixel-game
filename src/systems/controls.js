@@ -37,6 +37,10 @@ export const ACTIONS = {
   camera: { keys: ['KeyC'], pad: ['TOUCHPAD', 'CREATE'] },         // switch view (only with FEATURES.topDownCamera)
   pause: { keys: ['Escape', 'KeyP'], pad: ['OPTIONS'] },
   restart: { keys: ['KeyR'], pad: ['CROSS', 'OPTIONS'] },
+  power0: { keys: ['Digit1'], pad: ['UP'] },              // open world: the four worn powers
+  power1: { keys: ['Digit2'], pad: ['RIGHT'] },
+  power2: { keys: ['Digit3'], pad: ['DOWN'] },
+  power3: { keys: ['Digit4'], pad: ['LEFT'] },
   // Menus
   menuLeft: { keys: ['KeyZ'], pad: ['L1'] },
   menuRight: { keys: ['KeyX'], pad: ['R1'] },
@@ -142,8 +146,9 @@ export default class Controls {
   }
 
   // Movement on screen axes (x right, y down), each -1..1.
-  move() {
-    const h = this.held, p = this.padHeld;
+  // `dpad`: false where the D-pad has another job.
+  move(dpad = true) {
+    const h = this.held, p = dpad ? this.padHeld : { stickX: this.padHeld.stickX, stickY: this.padHeld.stickY };
     let x = (h.has('KeyD') || h.has('ArrowRight') || p.RIGHT ? 1 : 0) - (h.has('KeyA') || h.has('ArrowLeft') || p.LEFT ? 1 : 0);
     let y = (h.has('KeyS') || h.has('ArrowDown') || p.DOWN ? 1 : 0) - (h.has('KeyW') || h.has('ArrowUp') || p.UP ? 1 : 0);
     if (!x && !y && (p.stickX || p.stickY)) {

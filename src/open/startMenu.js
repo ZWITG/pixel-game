@@ -26,9 +26,10 @@ export function saveSettings(settings) {
   } catch { /* it still applies for this visit */ }
 }
 
+// A hero worth continuing has chosen a Conqueror.
 function hasHero() {
   try {
-    return Object.keys(JSON.parse(localStorage.getItem('lumen.skills')) ?? {}).length > 0;
+    return !!JSON.parse(localStorage.getItem('lumen.conqueror'))?.id;
   } catch {
     return false;
   }
@@ -38,7 +39,7 @@ function hasHero() {
 function eraseHero() {
   try {
     for (const key of Object.keys(localStorage)) {
-      if (!key.startsWith('lumen.') || key === SETTINGS_KEY || key.startsWith(KEEP)) continue;
+      if (!key.startsWith('lumen.') || key === SETTINGS_KEY || key.startsWith(KEEP) || key.startsWith('lumen.legend.')) continue;
       localStorage.setItem(KEEP + key.slice(6), localStorage.getItem(key));
       localStorage.removeItem(key);
     }

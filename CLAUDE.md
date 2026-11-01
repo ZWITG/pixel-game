@@ -58,6 +58,7 @@ It grows feature by feature with the user, who plays and tests with a controller
 - `post.js`: own picture pipeline (scene, glow, shafts, tone curve). `materials.js`: terrain, water, sky, `masonry()`, shared noise texture, fog chunks. `foliage.js`: leaf and grass cards. `compass.js`: compass strip and place names.
 - `startMenu.js`: the title screen (Continue, New Game, Controls, Graphics). `/world.html?play` skips it, which tests should use. Continue reads `lumen.spot`; New Game moves the save to `lumen.old.*`.
 - `gameMenu.js`: the menu in play (Options): tabs for Map, Powers (the Spirit Tree), Satchel, Controls, Settings; L1/R1 change tab. `mapWorker.js` surveys the chart once in the background.
+- `conquerors.js`: the five Conquerors and their powers as data. `powers.js`: what each `kind` does, effects (`PowerFx`), the D-pad bar. `conquerorPick.js`: the permanent choice. `/world.html?play=titan` starts as one (titan, storm, void, ember, frost). A later update adds the secret boss from `docs/legend-hero.json`; old saves move to `lumen.legend.*`.
 - Debug handle: `window.__world`. Testing while the user plays: use a separate pane tab, stub `Storage.prototype.setItem` and
   `navigator.getGamepads`, set `__world.world.skipRender = true`, and render only captured frames, or the save changes or the tab crashes.
 

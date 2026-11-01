@@ -13,10 +13,15 @@ export default class Body {
   constructor(skills) {
     this.skills = skills;
     this.bag = null; // set once the bag exists: worn gear and potions add to the numbers below
+    this.powers = null; // the hero's Conqueror: its nature and its active powers count here too
+  }
+
+  get conq() {
+    return this.powers?.def ?? null;
   }
 
   bonus(name) {
-    return this.bag?.bonus(name) ?? 0;
+    return (this.bag?.bonus(name) ?? 0) + (this.powers?.bonus(name) ?? 0);
   }
 
   get strength() { return this.skills.attribute('strength'); }
@@ -28,7 +33,7 @@ export default class Body {
   // off, so a sprint stays a sprint and Superspeed always has room above it.
   get moveScale() {
     const gain = (this.speed - 10) * 0.015;
-    return (1 + gain / (1 + gain * 0.35)) * (1 + this.bonus('speed'));
+    return (1 + gain / (1 + gain * 0.35)) * (1 + this.bonus('speed')) * (this.conq?.speed ?? 1);
   }
   // Every point of Endurance is 3% more breath.
   get breathScale() { return (1 + (this.endurance - 10) * 0.03) * (1 + this.bonus('breath')); }
@@ -39,16 +44,16 @@ export default class Body {
   get massScale() { return this.mass / 60; }
   // The hero's level: their whole build, before gear. Monsters evolve against it.
   get level() { return 1 + Math.floor((this.skills.attribute('mass') - 60) / 18 + (this.speed - 10) / 10); }
-  get heroScale() { return 1 + Math.min(0.6, (this.mass - 60) * 0.004); }
+  get heroScale() { return (1 + Math.min(0.6, (this.mass - 60) * 0.004)) * (this.conq?.size ?? 1); }
   // Heavy enough, and just landing from a jump shakes the ground. Tiles of reach, 0 for none.
   get stompReach() { return Math.max(0, (this.mass - 90) * 0.06); }
-  get maxHealth() { return 20 + (this.endurance - 10) * 2.5 + this.bonus('health'); }
+  get maxHealth() { return (20 + (this.endurance - 10) * 2.5) * (this.conq?.health ?? 1) + this.bonus('health'); }
   // Share of every hit that armor takes away.
   get guard() { return Math.min(0.7, this.bonus('guard')); }
 
   // Each point of Strength is 3% more force behind every blow (melee.js multiplies this)
   // and 2 more units of carrying.
-  get damageScale() { return (1 + (this.strength - 10) * 0.03) * (1 + this.bonus('force')); }
+  get damageScale() { return (1 + (this.strength - 10) * 0.03) * (1 + this.bonus('force')) * (this.conq?.force ?? 1); }
   get carry() { return 20 + (this.strength - 10) * 2 + this.bonus('carry'); }
   // Strong legs jump higher: about 1.3 tiles at the start, past 3 when fully trained.
   get jumpSpeed() { return 7.5 + (this.strength - 10) * 0.05 + (this.speed - 10) * 0.03 + this.skills.level('jumping') * 0.4; }

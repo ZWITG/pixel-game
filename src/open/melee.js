@@ -64,7 +64,7 @@ const PVP_SHARE = 0.25;      // the most one blow can take of the other hero's h
 // Which punch the hero has right now.
 export function punchStage(skills, body) {
   const level = skills.level('punching');
-  return PUNCHES.reduce((best, p, i) => (level >= p.level && body.strength >= p.strength ? i : best), 0);
+  return PUNCHES.reduce((best, p, i) => (i <= (body.conq?.punchCap ?? 1) && level >= p.level && body.strength >= p.strength ? i : best), 0);
 }
 
 // Thin cracks and scattered scorch: the crater's shape comes from the dented land under it.
@@ -341,7 +341,7 @@ export default class Melee {
   }
 
   get blowReady() {
-    return FEATURES.blow && this.skills.level('punching') >= PUNCHES.length - 1;
+    return FEATURES.blow && !!this.body.conq?.blow && this.skills.level('punching') >= PUNCHES.length - 1;
   }
 
   // How big this blow is shaping up to be, 0..1: its charge and how far the skill has come.
@@ -541,7 +541,7 @@ export default class Melee {
       return;
     }
     // Practised enough for the next punch, but the arms aren't there yet.
-    const next = PUNCHES[this.stage + 1];
+    const next = this.stage < (this.body.conq?.punchCap ?? 1) ? PUNCHES[this.stage + 1] : null;
     if (next && this.promised <= this.stage && this.skills.level('punching') >= next.level) {
       this.promised = this.stage + 1;
       this.hud.message(`Your form is ready for ${next.name}. It needs Strength ${next.strength}.`);

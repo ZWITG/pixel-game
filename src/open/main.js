@@ -19,6 +19,9 @@ import Sites from './sites.js';
 import Quake from './quake.js';
 import StartMenu, { loadSettings } from './startMenu.js';
 import GameMenu from './gameMenu.js';
+import ConquerorPick from './conquerorPick.js';
+import { PowerFx } from './powers.js';
+import { CONQUERORS } from './conquerors.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -118,6 +121,8 @@ const monsters = new Monsters(scene, work, players);
 const shared2 = { yaw: 0, pitch: 0.2, recenter: null }; // the camera both heroes steer while together
 const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'morning', clock: 0.3, clockHold: 0, setTime, travel, splash };
 
+world.fx = new PowerFx(scene);
+world.pick = new ConquerorPick();
 world.sites = new Sites(scene, monsters, work, players);
 world.people = new People(scene, world);
 world.quake = new Quake(scene, chunks);
@@ -125,7 +130,7 @@ monsters.quake = world.quake;
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
 // fills its owner's half: the other hero plays on, and both can have theirs open.
 world.checkPause = () => {
-  world.paused = world.menu || world.gameMenu.isOpen || players.some((p) => p.hud.mapOpen) || (players.length === 1 && p1.hud.packOpen);
+  world.paused = world.menu || world.pick.isOpen || world.gameMenu.isOpen || players.some((p) => p.hud.mapOpen) || (players.length === 1 && p1.hud.packOpen);
 };
 world.viewYaw = (p) => (world.together ? shared2.yaw : p.state.yaw);
 
@@ -278,6 +283,7 @@ function buttonRows(usePad) {
     [p('roll'), 'Roll'],
     [p('target'), 'Lock on'],
     [p('pack'), 'Satchel'],
+    [usePad ? btn('D-pad') : `${key('Digit1')}${key('Digit2')}${key('Digit3')}${key('Digit4')}`, 'Powers'],
     [p('pause'), 'Menu'],
   ];
 }
@@ -334,10 +340,12 @@ function join() {
   extra.hud.setHealth(1);
   p1.hud.message('Player 2 joined!', true);
   extra.hud.message('Hello, Player 2!', true);
+  if (!extra.powers.def) world.pick.open(extra, () => {});
 }
 
 function leave() {
   if (world.gameMenu.owner === extra) world.gameMenu.close();
+  if (world.pick.owner === extra) world.pick.cancel();
   extra.hud.closeAll(extra);
   if (extra.rooms.house) extra.rooms.leave(extra.state);
   players.pop();
@@ -490,9 +498,17 @@ function setLens(cam, fov) {
   cam.updateProjectionMatrix();
 }
 
-// The title shot: over the hero's shoulder toward the Spire, drifting very slowly.
+// The title shot: over the hero's shoulder toward the Spire, drifting very slowly. Choosing a
+// Conqueror, the camera comes round to the front, with the hero standing to the right.
 function titleView() {
   const [dx, dz] = state.dir, len = Math.hypot(dx, dz) || 1, ax = dx / len, az = dz / len, time = shared.uTime.value;
+  if (world.pick.isOpen) {
+    const y0 = Math.max(state.y, 0), big = p1.body.heroScale;
+    camera.position.set(state.x + ax * 6.4 * big - az * 2.3 * big, y0 + 1.9 * big, state.z + az * 6.4 * big + ax * 2.3 * big);
+    camera.lookAt(state.x - az * 2.3 * big, y0 + 1.35 * big, state.z + ax * 2.3 * big);
+    setLens(camera, FOV);
+    return;
+  }
   const drift = Math.sin(time * 0.08) * 0.8, y = Math.max(state.y, 0);
   camera.position.set(state.x - ax * TITLE_BACK + az * (TITLE_SIDE + drift), y + 2.6 + Math.sin(time * 0.11) * 0.15, state.z - az * TITLE_BACK - ax * (TITLE_SIDE + drift));
   camera.lookAt(state.x + ax * 60 - az * -16, y + 13, state.z + az * 60 + ax * -16);
@@ -574,8 +590,9 @@ function step(dt) {
   shared.uTime.value += dt;
   windTime.value = shared.uTime.value;
   for (const p of players) p.controls.update(dt);
-  const begin = world.menu ? menu.update(dt) : null;
-  if (world.gameMenu.isOpen) world.gameMenu.update(dt);
+  const begin = world.menu && !world.pick.isOpen ? menu.update(dt) : null;
+  if (world.pick.isOpen) world.pick.update();
+  else if (world.gameMenu.isOpen) world.gameMenu.update(dt);
   joinOrLeave(dt);
   renderPrompts();
   world.checkPause();
@@ -638,8 +655,14 @@ function keepSpot(dt) {
 }
 
 function beginGame(how) {
-  world.menu = false;
   menu.hide();
+  // A new hero chooses a Conqueror first, with the world still waiting behind the screen.
+  if (how === 'new' && !p1.powers.def) {
+    document.body.classList.add('title');
+    world.pick.open(p1, () => beginGame('new'));
+    return;
+  }
+  world.menu = false;
   let spot = null;
   try {
     spot = how === 'continue' ? JSON.parse(localStorage.getItem(SPOT_KEY)) : null;
@@ -679,16 +702,11 @@ const SHOTS = {
   5: [3000, 2300, 3500, 800, 'morning'],
   6: [2940, 5470, 2900, 5300, 'night'],
 };
-addEventListener('keydown', (e) => {
-  const s = SHOTS[e.key];
-  if (s && !world.menu) goto(...s);
-});
-
 const fresh = sessionStorage.getItem('lumen.fresh');
 sessionStorage.removeItem('lumen.fresh');
 const menu = new StartMenu(p1, settings, { onQuality: setQuality, rows: buttonRows });
-world.menu = !fresh && !QUERY.has('play');
-document.getElementById('start').hidden = !world.menu;
+world.menu = !QUERY.has('play');
+document.getElementById('start').hidden = !world.menu || !!fresh;
 document.body.classList.toggle('title', world.menu);
 if (!world.menu) menu.hide();
 // Settings the title screen and the menu in play both change.
@@ -712,4 +730,6 @@ const loop = (now) => {
   requestAnimationFrame(loop);
 };
 goto(SPAWN.x, SPAWN.z, PLACES.spire.x, PLACES.spire.z);
+if (CONQUERORS[QUERY.get('play')] && !p1.powers.def) p1.becomeConqueror(QUERY.get('play'));
+if (fresh) beginGame('new');
 requestAnimationFrame(loop);

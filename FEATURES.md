@@ -88,6 +88,8 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 Conquerors: New Game asks for one of five, for good: Titan, Stormcaller, Voidwalker, Emberlord, Frostwarden. Each is its own menacing creature (stone colossus, hovering storm spirit, legless shadow wraith, winged fire demon, ice knight) with eight powers that train by use, rank up to 6 and open new ones through Mastery. Four are worn on the D-pad (keys 1 to 4), swapped on the new Powers tab; Skills holds the Spirit Tree. Player 2 chooses their own. Punch stages past Solid Punch and Destructive Blow are Titan only, Flight Stormcaller only, Superspeed Voidwalker only. The Frostwarden boss is now The Rime King
+- Backlog: secret boss, the creator's original hero (`docs/legend-hero.json`), arrives only once the player has conquered all nations
 - 2026-11-01 menu in play on Options: icon tabs for Map, Powers, Satchel, Controls and Settings, L1 and R1 change tab; a world map drawn from the real land with contours, town icons, heroes and a pin that shows on the compass; settings for graphics, button hints and compass, and a way back to the title
 - 2026-11-01 the game is now called Eradication; animated ZWITG studio intro plays while it loads (a button skips it)
 - 2026-11-01 open world: start menu over a live title shot at dusk: Continue returns to where you left off and the hour it was, New Game asks first and puts the old hero aside, Controls, Graphics (Auto, High, Balanced, Fast); works with controller, keyboard and mouse

@@ -144,7 +144,8 @@ const crouch = (p, swing, knee) => set(p, { lx0: swing, lx1: swing * 0.8, lk0: k
 
 // What every motion looks like. `arm` is the punching arm, 0 or 1.
 const POSES = {
-  idle: (p, t) => set(p, { chest: Math.sin(t * 1.8) * 0.018, ax0: 0.04 + Math.sin(t * 1.8) * 0.02, ax1: 0.04 + Math.sin(t * 1.8) * 0.02, head: Math.sin(t * 0.6) * 0.05 }),
+  // A slow, heavy breath: chest forward, chin down, fists held away from the body, watching.
+  idle: (p, t) => set(p, { waist: 0.07, chest: 0.04 + Math.sin(t * 1.3) * 0.022, head: 0.16 + Math.sin(t * 0.5) * 0.03, ax0: 0.06, ax1: 0.06, as0: 0.34 + Math.sin(t * 1.3) * 0.015, as1: 0.34 + Math.sin(t * 1.3) * 0.015, ae0: 0.32, ae1: 0.32, ls0: 0.11, ls1: 0.11 }),
   walk: (p, t) => { gait(p, t * 7.5, 0.55, 0.85, 0.5, 0.35); p.waist = 0.04; },
   run: (p, t) => { gait(p, t * 12, 0.95, 1.5, 0.9, 1.45, 0.12); p.waist = 0.14; },
   dash: (p, t) => { gait(p, t * 22, 1.15, 1.8, 0, 0.2, 0.15); set(p, { ax0: -1.25, ax1: -1.25, as0: 0.2, as1: 0.2, waist: 0.2, head: -0.25 }); },
@@ -205,7 +206,9 @@ export default class HeroModel {
     scene.add(this.mesh);
 
     const cloth = new THREE.MeshToonMaterial({ color: look.scarf, gradientMap: toonSteps, side: THREE.DoubleSide });
-    this.ribbons = [new Ribbon(scene, cloth, 11, 0.16, 0.22), new Ribbon(scene, cloth, 8, 0.15, 0.17)];
+    // A Conqueror trails a long torn cape; the plain hero, a scarf.
+    const cape = { horns: [], bolt: [[6, 0.13, 0.1]], hood: [[14, 0.17, 0.42], [12, 0.16, 0.36]], flame: [[12, 0.16, 0.13]], ice: [[14, 0.17, 0.46], [13, 0.17, 0.4]] }[look.crest];
+    this.ribbons = (cape ?? [[11, 0.16, 0.22], [8, 0.15, 0.17]]).map(([count, link, width]) => new Ribbon(scene, cloth, count, link, width));
     if (look.tail) this.ribbons.push(new Ribbon(scene, new THREE.MeshToonMaterial({ color: look.hair, gradientMap: toonSteps, side: THREE.DoubleSide }), 10, 0.15, 0.2));
 
     // A star of light on the fist as the punch lands; bigger and hotter at higher stages.
@@ -233,6 +236,12 @@ export default class HeroModel {
     parent.add(b);
     this.bones[name] = b;
     return b;
+  }
+
+  // Parts that give off their own light, so they burn through shadow and bloom at night.
+  shine(bone, parts) {
+    const mesh = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(2.4, 2.4, 2.4), fog: false }));
+    bone.add(mesh);
   }
 
   skin(bone, parts) {
@@ -306,6 +315,199 @@ export default class HeroModel {
     B.tail0.rotation.order = B.tail1.rotation.order = 'XYZ';
     this.neck = neck;
     this.chest = chest;
+    if (C.crest) {
+      this.armor(chest, head);
+      this[C.crest](chest, head);
+    }
+  }
+
+  // What makes a Conqueror a threat: a crown of its element, a mask, burning eyes, plated
+  // shoulders with spikes, and a core of light showing through the chest.
+  armor(chest, head) {
+    const C = this.look, B = this.bones, H = 0.2, big = C.bulk, hot = [], crown = [], plate = [];
+    const up = (x, y, z, dx, dy, dz, r, length, color, list = crown) => list.push(paint(aimed(spike(r, length), x, H + y, z, dx, dy, dz), color));
+    crown.push(paint(ball(0.205, 1, 0.62, 0.72).translate(0, H - 0.17, 0.09), C.trim));
+    for (const s of [-1, 1]) {
+      hot.push(paint(ball(0.052, 1.45, 0.42, 0.3).rotateZ(s * -0.42).translate(s * 0.105, H + 0.005, 0.25), C.iris));
+      crown.push(paint(new THREE.BoxGeometry(0.15, 0.04, 0.05).rotateZ(s * -0.55).translate(s * 0.105, H + 0.065, 0.25), C.trim));
+      if (C.crest === 'horns') {
+        up(s * 0.21, 0.2, 0.04, s * 0.9, 0.55, 0.05, 0.095, 0.42, C.coatDark);
+        up(s * 0.53, 0.42, 0.06, s * 0.15, 1, -0.1, 0.06, 0.36, C.gold);
+      } else if (C.crest === 'hood') {
+        up(s * 0.16, 0.25, -0.02, s * 0.5, 0.55, -0.9, 0.07, 0.72, C.hairHi);
+      } else if (C.crest === 'bolt') {
+        up(s * 0.2, 0.2, 0.06, s * 0.75, 1, -0.2, 0.05, 0.42, C.gold, hot);
+        up(s * 0.42, 0.45, 0, s * -0.5, 1, -0.3, 0.04, 0.26, C.gold, hot);
+      }
+    }
+    if (C.crest === 'hood') crown.push(paint(ball(0.335, 1, 1.08, 1.06).translate(0, H + 0.03, -0.07), C.coatDark), paint(ball(0.26, 1, 0.5, 0.5).translate(0, H + 0.26, 0.12), C.coat));
+    for (let i = 0; i < 7; i++) {
+      const a = -1.35 + (i / 6) * 2.7, x = Math.sin(a), z = Math.cos(a), tall = 0.3 + (i % 2) * 0.16 + (i === 3 ? 0.2 : 0);
+      if (C.crest === 'flame') up(x * 0.24, 0.24, z * 0.2 - 0.03, x * 0.25, 1, z * 0.1, 0.07, tall + 0.1, i % 2 ? C.glow : C.iris, hot);
+      if (C.crest === 'ice') up(x * 0.23, 0.26, z * 0.2 - 0.03, x * 0.3, 1, z * 0.12, 0.06, tall + 0.14, C.hairHi);
+    }
+    this.skin(head, crown);
+    this.shine(head, hot);
+    // Shoulders: a plate each side, with spikes raking back.
+    for (const s of [-1, 1]) {
+      plate.push(paint(ball(0.2 * big, 1.1, 0.74, 1.05).translate(s * 0.32 * big, 0.47, 0), C.coatDark), paint(ball(0.15 * big, 1.05, 0.6, 1).translate(s * 0.34 * big, 0.54, 0), C.trim));
+      [[0.1, 0.05], [-0.06, -0.06], [0.0, -0.17]].forEach(([dz, back], i) => plate.push(paint(aimed(spike(0.055 * big, (0.3 - i * 0.03) * big), s * (0.4 + i * 0.03) * big, 0.58, dz, s * 0.55, 1, back * 6), i === 0 ? C.gold : C.trim)));
+    }
+    plate.push(paint(limb(0.3 * big, 0.24, 0.3, 0.74).translate(0, 0.52, 0), C.coatDark), paint(new THREE.BoxGeometry(0.34, 0.03, 0.03).translate(0, 0.28, 0.21), C.trim));
+    this.skin(chest, plate);
+    this.shine(chest, [
+      paint(new THREE.OctahedronGeometry(0.075).scale(0.9, 1.5, 0.5).translate(0, 0.36, 0.21), C.glow),
+      paint(new THREE.BoxGeometry(0.018, 0.2, 0.02).translate(-0.075, 0.25, 0.195).rotateZ(0.22), C.glow),
+      paint(new THREE.BoxGeometry(0.018, 0.2, 0.02).translate(0.075, 0.25, 0.195).rotateZ(-0.22), C.glow),
+    ]);
+    // Gauntlets with a claw of spikes over each fist, and a band of light at the wrist.
+    for (const i of [0, 1]) {
+      this.skin(B[`fore${i}`], [
+        paint(limb(0.095, 0.085, 0.2).translate(0, -0.16, 0), C.coatDark),
+        ...[-0.05, 0.05].map((x) => paint(aimed(spike(0.03, 0.2), x, -LOWER_ARM - 0.1, 0.05, 0, -1, 0.35), C.trim)),
+      ]);
+      this.shine(B[`fore${i}`], [paint(new THREE.TorusGeometry(0.083, 0.012, 6, 14).rotateX(Math.PI / 2).translate(0, -0.3, 0), C.glow)]);
+      this.skin(B[`shin${i}`], [paint(aimed(spike(0.05, 0.2), 0, -0.05, 0.08, 0, 1, 0.5), C.trim)]);
+    }
+  }
+
+  // Each Conqueror is its own creature. These set the build and add what no other one has.
+
+  // Titan: a walking cliff. Vast arms, a head sunk between the shoulders, boulders grown from
+  // its back, and fire showing through the cracks.
+  horns(chest, head) {
+    const C = this.look, B = this.bones, rock = (r, x, y, z, color = C.coat) => paint(new THREE.DodecahedronGeometry(r, 0).scale(1, 0.85, 1).rotateY(x * 5).translate(x, y, z), color);
+    chest.scale.set(1.34, 1.04, 1.28);
+    head.scale.setScalar(0.84);
+    this.neck.position.y = 0.42;
+    for (const i of [0, 1]) {
+      const s = i ? -1 : 1;
+      B[`arm${i}`].position.x = s * 0.4;
+      B[`arm${i}`].scale.set(1.55, 1.08, 1.55);
+      B[`fore${i}`].scale.set(1.2, 1, 1.2);
+      B[`thigh${i}`].scale.set(1.35, 0.9, 1.35);
+      B[`tail${i}`].visible = false;
+      this.skin(B[`fore${i}`], [rock(0.19, 0, -0.5, 0), rock(0.1, s * 0.09, -0.34, 0.08, C.coatDark)]);
+      this.skin(B[`arm${i}`], [rock(0.12, s * 0.08, -0.2, 0.03, C.coatDark)]);
+      this.skin(B[`shin${i}`], [rock(0.13, 0, -0.5, 0.06, C.coatDark)]);
+      this.shine(B[`arm${i}`], [paint(new THREE.BoxGeometry(0.02, 0.3, 0.02).rotateZ(s * 0.4).translate(0, -0.26, 0.08), C.glow)]);
+    }
+    this.skin(chest, [rock(0.34, -0.05, 0.56, -0.22), rock(0.26, 0.24, 0.72, -0.2, C.coatDark), rock(0.24, -0.26, 0.74, -0.14, C.coatDark), rock(0.17, 0.05, 0.92, -0.2)]);
+    this.shine(chest, [-0.16, 0.13].map((x, i) => paint(new THREE.BoxGeometry(0.018, 0.34, 0.02).rotateZ(i ? -0.5 : 0.6).translate(x, 0.12, 0.17), C.glow)));
+  }
+
+  // Stormcaller: tall, thin, never quite touching the ground, with a turning halo and a fan of
+  // lightning blades at its back.
+  bolt(chest, head) {
+    const C = this.look, B = this.bones;
+    this.hover = 0.32;
+    chest.scale.set(0.84, 1.12, 0.84);
+    head.scale.setScalar(0.92);
+    for (const i of [0, 1]) {
+      B[`arm${i}`].scale.set(0.8, 1.14, 0.8);
+      B[`thigh${i}`].scale.set(0.82, 1.06, 0.82);
+    }
+    const halo = this.bone('spin', this.neck, 0, 0.3, -0.26);
+    this.shine(halo, [
+      paint(new THREE.TorusGeometry(0.44, 0.018, 6, 40), C.glow),
+      ...Array.from({ length: 8 }, (_, i) => {
+        const a = (i / 8) * 6.283;
+        return paint(aimed(spike(0.03, i % 2 ? 0.2 : 0.36), Math.cos(a) * 0.44, Math.sin(a) * 0.44, 0, Math.cos(a), Math.sin(a), 0), C.iris);
+      }),
+    ]);
+    const wings = this.bone('fan', chest, 0, 0.42, -0.2);
+    this.shine(wings, [-1, 1].flatMap((s) => [[0.25, 1.05], [0.55, 0.95], [0.9, 0.82]].map(([a, length]) => paint(aimed(spike(0.05, length), s * 0.12, 0, 0, s * Math.sin(a), Math.cos(a) * 0.9, -0.35), C.glow))));
+  }
+
+  // Voidwalker: no legs at all, only a torn robe drifting above the ground, long thin arms that
+  // end in claws, nothing in the hood but two eyes, and shards of night circling it.
+  hood(chest, head) {
+    const C = this.look, B = this.bones;
+    this.hover = 0.42;
+    chest.scale.set(0.82, 1.05, 0.78);
+    const robe = new THREE.CylinderGeometry(0.22, 0.6, 1.5, 14, 4, true);
+    const pos = robe.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const down = (0.75 - pos.getY(i)) / 1.5, a = Math.atan2(pos.getZ(i), pos.getX(i));
+      pos.setY(i, pos.getY(i) - Math.max(0, Math.sin(a * 7)) * 0.26 * down ** 3);
+    }
+    robe.computeVertexNormals();
+    this.skin(this.body, [paint(robe.translate(0, -0.62, -0.04), C.coatDark), paint(limb(0.235, 0.24, 0.08, 0.8).translate(0, -0.04, 0), C.scarf)]);
+    for (const i of [0, 1]) {
+      const s = i ? -1 : 1;
+      B[`thigh${i}`].visible = false;
+      B[`tail${i}`].visible = false;
+      B[`arm${i}`].scale.set(0.72, 1.32, 0.72);
+      B[`fore${i}`].scale.set(0.9, 1.25, 0.9);
+      this.skin(B[`fore${i}`], [-0.07, 0, 0.07].map((x, k) => paint(aimed(spike(0.022, 0.34), x, -LOWER_ARM - 0.1, 0.03, x * 3, -1, 0.3 + s * 0), k === 1 ? C.gold : C.trim)));
+    }
+    const ring = this.bone('spin', this.body, 0, 0.6, 0);
+    this.shine(ring, Array.from({ length: 5 }, (_, i) => {
+      const a = (i / 5) * 6.283;
+      return paint(new THREE.OctahedronGeometry(0.1).scale(0.7, 1.7, 0.7).translate(Math.cos(a) * 0.85, Math.sin(i * 2) * 0.28, Math.sin(a) * 0.85), i % 2 ? C.glow : C.gold);
+    }));
+  }
+
+  // Emberlord: a burnt, horned thing with wings of black bone, a mane of fire, a long tail, and
+  // molten light running through every crack in it.
+  flame(chest, head) {
+    const C = this.look, B = this.bones;
+    chest.scale.set(1.14, 1, 1.1);
+    const curl = (s, n, r0) => Array.from({ length: n }, (_, i) => {
+      const t = i / n, r = r0 * (1 - t * 0.75), a = t * 2.1;
+      return paint(ball(r, 1, 1, 1).translate(s * (0.2 + Math.sin(a) * 0.3), 0.42 + (1 - Math.cos(a)) * -0.08 + Math.sin(a) * 0.22, 0.02 - t * 0.28), i > n - 3 ? C.gold : C.coatDark);
+    });
+    this.skin(head, [...curl(1, 9, 0.075), ...curl(-1, 9, 0.075)]);
+    for (const i of [0, 1]) {
+      const s = i ? -1 : 1;
+      B[`arm${i}`].scale.set(1.1, 1, 1.1);
+      B[`tail${i}`].visible = false;
+      const seam = (bone, y, turn) => this.shine(bone, [paint(new THREE.BoxGeometry(0.02, 0.26, 0.02).rotateZ(turn).translate(s * 0.03, y, 0.09), C.glow), paint(new THREE.BoxGeometry(0.016, 0.17, 0.02).rotateZ(-turn).translate(s * -0.04, y - 0.12, 0.08), C.iris)]);
+      seam(B[`thigh${i}`], -0.3, 0.4);
+      seam(B[`shin${i}`], -0.22, -0.3);
+      seam(B[`arm${i}`], -0.22, 0.3);
+      seam(B[`fore${i}`], -0.14, -0.4);
+      // One wing: three bones spread out of the shoulder, skin stretched between them.
+      const wing = this.bone(`wing${i}`, chest, s * 0.2, 0.52, -0.18);
+      const tips = [[1.5, 0.9], [1.65, 0.05], [1.2, -0.62]], root = [0, 0, 0], tri = [], colors = [];
+      tips.forEach(([x, y], k) => {
+        const next = tips[k + 1];
+        if (next) tri.push(...root, s * x, y, -0.3 * x, s * next[0], next[1], -0.3 * next[0]);
+      });
+      const skinGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(tri, 3));
+      skinGeo.computeVertexNormals();
+      for (let k = 0; k < tri.length / 3; k++) colors.push(new THREE.Color(C.scarf).r, new THREE.Color(C.scarf).g, new THREE.Color(C.scarf).b);
+      const membrane = new THREE.Mesh(skinGeo, new THREE.MeshLambertMaterial({ color: C.scarf, side: THREE.DoubleSide }));
+      membrane.castShadow = true;
+      wing.add(membrane);
+      this.skin(wing, tips.map(([x, y]) => paint(aimed(spike(0.05, Math.hypot(x, y, x * 0.3)), 0, 0, 0, s * x, y, -0.3 * x), C.coatDark)));
+    }
+    this.shine(this.bones.chest ?? chest, Array.from({ length: 6 }, (_, i) => paint(aimed(spike(0.06, 0.26 + (i % 2) * 0.16), (i - 2.5) * 0.09, 0.72, -0.17, (i - 2.5) * 0.12, 1, -0.5), i % 2 ? C.iris : C.glow)));
+  }
+
+  // Frostwarden: a knight of ice. A great helm with no face, a skirt of plates, and long
+  // crystals hanging in the air behind it, moving as it moves.
+  ice(chest, head) {
+    const C = this.look, B = this.bones, H = 0.2;
+    head.scale.setScalar(1.04);
+    chest.scale.set(1.12, 1.08, 1.04);
+    this.skin(head, [
+      paint(ball(0.29, 1, 1.12, 1.04).translate(0, H + 0.02, 0), C.coat),
+      paint(new THREE.BoxGeometry(0.26, 0.025, 0.05).translate(0, H + 0.0, 0.285), C.trim),
+      paint(new THREE.ConeGeometry(0.3, 0.3, 4).rotateX(Math.PI).scale(0.9, 1, 0.62).rotateY(Math.PI / 4).translate(0, H - 0.26, 0.05), C.coatDark),
+    ]);
+    this.shine(head, [-1, 1].map((s) => paint(ball(0.04, 1.8, 0.36, 0.3).translate(s * 0.1, H + 0.015, 0.292), C.iris)));
+    const plates = Array.from({ length: 9 }, (_, i) => {
+      const a = (i / 9) * 6.283;
+      return paint(new THREE.ConeGeometry(0.14, 0.72, 4).rotateX(Math.PI).scale(1, 1, 0.42).rotateY(-a).translate(Math.cos(a + 1.57) * 0.24, -0.34, Math.sin(a + 1.57) * 0.2), i % 2 ? C.coat : C.coatDark);
+    });
+    this.skin(this.body, plates);
+    for (const i of [0, 1]) {
+      B[`tail${i}`].visible = false;
+      this.skin(B[`shin${i}`], [paint(new THREE.ConeGeometry(0.13, 0.5, 4).rotateX(Math.PI).scale(1, 1, 0.6).translate(0, -0.24, 0.05), C.coat)]);
+    }
+    const rack = this.bone('spin2', chest, 0, 0.5, -0.72);
+    this.shine(rack, [[0, 0.5, 1.1], [-0.42, 0.28, 0.9], [0.42, 0.28, 0.9], [-0.74, -0.06, 0.72], [0.74, -0.06, 0.72]].map(([x, y, length], i) => paint(new THREE.OctahedronGeometry(0.15).scale(0.62, length * 3.1, 0.62).rotateZ(-x * 0.32).translate(x, y, i * 0.012), i % 2 ? C.hairHi : C.glow)));
   }
 
   headParts() {
@@ -313,7 +515,7 @@ export default class HeroModel {
       paint(ball(0.26, 0.96, 1.05, 1).translate(0, H, 0), C.skin),
       paint(ball(0.17, 0.95, 0.9, 1).translate(0, H - 0.13, 0.05), C.skin),
     ];
-    for (const s of [-1, 1]) {
+    for (const s of C.crest ? [] : [-1, 1]) {
       parts.push(
         paint(ball(0.055, 0.95, 1.5, 0.3).translate(s * 0.105, H - 0.01, 0.238), '#1b1c34'),
         paint(ball(0.036, 1, 1.5, 0.3).translate(s * 0.105, H - 0.03, 0.25), C.iris),
@@ -322,6 +524,7 @@ export default class HeroModel {
       );
     }
     // The hair: a cap, then locks swept back by the wind.
+    if (C.crest === 'hood' || C.crest === 'ice') return parts;
     parts.push(paint(ball(0.285, 1, 0.98, 1.04).translate(0, H + 0.05, -0.03), C.hair));
     const locks = C.tail
       ? [[0.2, 0.2, 0.17, 0.5, -0.25, 0.8, 0.07, 0.24], [-0.2, 0.2, 0.17, -0.5, -0.25, 0.8, 0.07, 0.24], [0.06, 0.3, 0.25, 0.25, -0.45, 0.8, 0.08, 0.24], [-0.09, 0.3, 0.25, -0.2, -0.5, 0.8, 0.08, 0.25],
@@ -351,7 +554,12 @@ export default class HeroModel {
     // Feet stay on the ground by setting the hips to the height of the straighter leg.
     const reach = (i) => UPPER_LEG * Math.cos(p[`lx${i}`]) + LOWER_LEG * Math.cos(p[`lk${i}`] - p[`lx${i}`]);
     const stand = Math.max(reach(0), reach(1)), full = UPPER_LEG + LOWER_LEG;
-    this.body.position.y = HIP_Y - (full - stand) * (1 - p.air);
+    const float = this.hover ? this.hover + Math.sin(time * 2.1) * 0.05 : 0;
+    this.body.position.y = HIP_Y - (full - stand) * (1 - p.air) * (float ? 0.2 : 1) + float;
+    if (B.spin) B.spin.rotation[B.fan ? 'z' : 'y'] = time * (B.fan ? 0.9 : 1.3);
+    if (B.fan) B.fan.scale.set(1 + Math.sin(time * 9) * 0.05, 1 + Math.sin(time * 7) * 0.04, 1);
+    if (B.spin2) B.spin2.position.y = 0.5 + Math.sin(time * 1.4) * 0.05;
+    if (B.wing0) for (const [i, s] of [[0, 1], [1, -1]]) B[`wing${i}`].rotation.y = s * (Math.sin(time * 1.6) * 0.08 + (name === 'idle' ? 0.3 : -0.25));
     const rise = 1 - Math.exp(-dt * TURN);
     let turn = Math.atan2(dir[0], dir[1]) - this.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
@@ -383,10 +591,15 @@ export default class HeroModel {
     this.wind[2] = -Math.max(-90, Math.min(90, vz)) * 6 + Math.cos(time * 1.1) * 18;
     this.side.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     this.ribbons.forEach((r, i) => {
-      this.anchor.set(i === 2 ? 0 : i ? 0.09 : -0.08, i === 2 ? 0.42 : 0.02, -0.21);
+      this.anchor.set(i === 2 ? 0 : (i ? 0.09 : -0.08) * (this.look.crest ? 1.9 : 1), i === 2 ? 0.42 : 0.02, -0.21);
       (i === 2 ? B.head : this.neck).localToWorld(this.anchor);
       r.update(this.anchor, this.side, scale, dt, this.wind);
     });
+  }
+
+  // Takes the whole figure out of the world, for a new one to stand in its place.
+  dispose() {
+    this.scene.remove(this.mesh, this.flash, ...this.ribbons.map((r) => r.mesh), ...this.ghosts);
   }
 
   // A hero who has left the game takes their cloth with them.

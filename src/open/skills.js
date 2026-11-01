@@ -1,9 +1,12 @@
+import { POWER_SKILLS } from './conquerors.js';
+
 // Skills are learned by doing, not bought. A skill gathers hidden practice from the first
 // try; its first node lights on the skill map when practice reaches level 1.
 // Practice also shapes the body: `trains` says how much each attribute gains per point of
 // practice, so doing a thing makes the hero better in general, not just at that thing.
 // `levels`: { at: practice needed, title, icon }. Add a skill here, plus a bough in skillMap.js.
 export const SKILLS = {
+  ...POWER_SKILLS,
   swimming: {
     name: 'Swimming',
     color: '#5fd8f0',
