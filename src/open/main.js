@@ -13,10 +13,14 @@ import Skills from './skills.js';
 import Swim, { DEEP } from './swim.js';
 import WorldHud from './skillPage.js';
 import Body, { ATTRIBUTES } from './body.js';
+import Work, { Bag, ITEMS, ROCKS } from './work.js';
+import Rooms, { ROOM_Y } from './rooms.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const PIXEL = Number(new URLSearchParams(location.search).get('px') ?? 1.5); // screen pixels per game pixel
 const RUN = 6, SPRINT = 16;
+const GRAVITY = 22;
+const ROOM_CAMERA = 5.5; // camera distance indoors
 const CLIMB_START = 0.45; // slopes steeper than this count as climbing practice
 
 const TIMES = {
@@ -68,8 +72,12 @@ const skills = new Skills((skill, level) => {
 }, (name, value) => hud.gain(ATTRIBUTES[name], value));
 const body = new Body(skills);
 const swim = new Swim(skills, body, hud);
+const bag = new Bag(body);
+const work = new Work(scene, chunks, skills, body, bag, hud, marks);
+const rooms = new Rooms(scene);
+hud.setBag(bag);
 
-const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '', recenter: null, stop: 0, promptDevice: null, steepAt: 0 };
+const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '', recenter: null, stop: 0, promptDevice: null, steepAt: 0, air: 0, rise: 0 };
 const tmp = new THREE.Vector3();
 
 function setTime(name) {
@@ -140,11 +148,70 @@ function renderPrompts() {
     [usePad ? btn('L-stick') : `${key('KeyW')}${key('KeyA')}${key('KeyS')}${key('KeyD')}`, 'Move'],
     [usePad ? btn('R-stick') : key('Drag'), 'Look'],
     [usePad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
+    [p('jump'), 'Jump'],
     [p('recenter'), 'Recenter'],
     [p('camera'), 'Travel'],
     [p('pause'), 'Spirit Tree'],
   ].map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');
   document.getElementById('map-hints').innerHTML = `${usePad ? btn('D-pad') : `${key('KeyA')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
+}
+
+const TIME_ORDER = ['morning', 'dusk', 'mist', 'night'];
+
+// Doors, beds and chests, all used with the same button.
+function use(spot) {
+  if (spot.action === 'enter' || spot.action === 'leave') {
+    hud.gasp();
+    if (spot.action === 'enter') rooms.enter(spot.house, state);
+    else rooms.leave(state);
+    post.indoors = !!rooms.house;
+  } else if (spot.action === 'rest') {
+    hud.gasp();
+    setTime(TIME_ORDER[(TIME_ORDER.indexOf(state.time) + 1) % TIME_ORDER.length]);
+    hud.message(`You sleep until ${state.time === 'mist' ? 'the mist rises' : state.time === 'night' ? 'nightfall' : state.time}.`);
+  } else if (spot.action === 'store') {
+    const moved = Object.entries(bag.store());
+    hud.setBag(bag);
+    const kept = Object.entries(bag.stored).map(([id, n]) => `${ITEMS[id].name} ${n}`).join(', ');
+    hud.message(moved.length ? `Stored. In the chest: ${kept}` : kept ? `In the chest: ${kept}` : 'The chest is empty.');
+  }
+}
+
+// What the hero could do right now, shown as a prompt and done on a button press.
+// Returns true when the press was used, so the same button doesn't also jump.
+function act(just) {
+  if (hud.open || !FEATURES.worldWork) {
+    hud.setAction('');
+    return false;
+  }
+  const door = !rooms.house && !swim.inWater && work.door(state);
+  const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : null;
+  const thing = !spot && !rooms.house && !swim.inWater ? work.target(state) : null;
+  const d = controls.device;
+  if (spot) {
+    hud.setAction(`${prompt('interact', d)} ${spot.label}`);
+    if (just.interact) use(spot);
+    return just.interact;
+  }
+  if (thing) {
+    const tough = thing.type === 'rock' && ROCKS[thing.size].need;
+    hud.setAction(`${prompt('attack', d)} ${thing.type === 'tree' ? 'Chop' : tough ? 'Mine boulder' : 'Mine'}`);
+    if (just.attack && !state.air) work.swing(thing, state);
+    return just.attack;
+  }
+  hud.setAction('');
+  return false;
+}
+
+function jump(dt, y) {
+  if (state.air > 0 || state.rise > 0) {
+    state.rise -= GRAVITY * dt;
+    state.air += state.rise * dt;
+    if (state.air <= 0) {
+      state.air = state.rise = 0;
+      work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], 5, 2);
+    }
+  }
 }
 
 function step(dt) {
@@ -166,6 +233,12 @@ function step(dt) {
     hud.map.handle(just);
     hud.map.update(dt);
   }
+  const used = act(just);
+  if (FEATURES.jump && just.jump && !used && !hud.open && !state.air && !swim.inWater && !work.swinging) {
+    state.rise = body.jumpSpeed;
+    state.air = 0.01;
+    skills.add('running', 0.3);
+  }
   const look = hud.open ? { x: 0, y: 0 } : controls.look();
   state.yaw -= look.x;
   if (look.x) state.recenter = null;
@@ -176,14 +249,14 @@ function step(dt) {
   }
   state.pitch = THREE.MathUtils.clamp(state.pitch + look.y, -0.25, 1.2);
 
-  const m = hud.open ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
+  const m = hud.open || work.swinging ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
   if (amount > 0.05) {
     const sprint = controls.held.has('ShiftLeft') || controls.padHeld.R2;
     const s = Math.sin(state.yaw), c = Math.cos(state.yaw), speed = (swim.inWater ? swim.speed : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
     const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
     const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
-    const rise = height(nx, nz) - height(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
-    const wet = height(nx, nz) < DEEP;
+    const rise = rooms.house ? 0 : height(nx, nz) - height(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
+    const wet = !rooms.house && height(nx, nz) < DEEP;
     const steep = rise / Math.max(dist, 1e-3);
     if (steep < body.climbLimit && (FEATURES.swimming || !wet)) {
       state.x = nx;
@@ -200,24 +273,32 @@ function step(dt) {
     state.phase += dt * (sprint ? 16 : 10);
   }
   state.moving = amount > 0.05;
-  let y = height(state.x, state.z);
-  if (FEATURES.swimming && !hud.open) {
+  if (rooms.house) rooms.collide(state);
+  else if (FEATURES.worldWork) work.collide(state);
+  let y = rooms.house ? ROOM_Y : height(state.x, state.z);
+  if (!hud.open) jump(dt, y);
+  if (FEATURES.swimming && !hud.open && !rooms.house) {
     const shore = swim.update(dt, state.x, state.z, y, state.moving);
     if (shore) {
       state.x = shore.x;
       state.z = shore.z;
       y = height(state.x, state.z);
     }
-    if (swim.inWater) splash(dt);
+    if (swim.inWater) {
+      state.air = state.rise = 0;
+      splash(dt);
+    }
   }
 
   chunks.update(state.x, state.z);
 
-  const dist = 7, cp = Math.cos(state.pitch), eye = Math.max(y, -0.3);
+  const dist = rooms.house ? ROOM_CAMERA : 7, cp = Math.cos(state.pitch), eye = Math.max(y, -0.3);
   tmp.set(state.x + Math.sin(state.yaw) * cp * dist, eye + 1.7 + Math.sin(state.pitch) * dist, state.z + Math.cos(state.yaw) * cp * dist);
-  tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
+  if (rooms.house) rooms.clampCamera(tmp, state.x, state.z);
+  else tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
   camera.position.copy(tmp);
   camera.lookAt(state.x, eye + 1.7, state.z);
+  if (work.shake) camera.position.y += (Math.random() - 0.5) * work.shake;
   if (state.drone) {
     // Preview only: a raised camera aimed at a landmark.
     const [up, lx, ly, lz] = state.drone;
@@ -225,6 +306,7 @@ function step(dt) {
     camera.lookAt(lx, ly, lz);
   }
 
+  if (!hud.open) work.update(dt, state);
   hero.mesh.scale.setScalar(body.heroScale);
   // Pick the sprite's view from where the hero faces relative to the camera.
   const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw), [dx, dz] = state.dir;
@@ -232,8 +314,10 @@ function step(dt) {
   const view = Math.abs(right) > Math.abs(ahead) ? 2 : ahead > 0 ? 0 : 1;
   // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
   const time = shared.uTime.value;
-  const heroY = swim.inWater ? -1.25 + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.22 : 0.07) : Math.max(y, -0.9);
-  hero.update(state.x, heroY, state.z, camera, view, right < 0, state.moving || swim.flailing ? Math.floor(time * (swim.flailing ? 12 : 6)) % 4 : 0);
+  const heroY = swim.inWater ? -1.25 + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.22 : 0.07) : Math.max(y, -0.9) + state.air;
+  hero.update(state.x, heroY, state.z, camera, view, right < 0, state.air ? 1 : state.moving || swim.flailing ? Math.floor(time * (swim.flailing ? 12 : 6)) % 4 : 0);
+
+  hero.swing(work.tool, right < 0 ? -1 : 1);
 
   const dir = sky.material.uniforms.uSun.value;
   sun.target.position.set(state.x, y, state.z);
@@ -250,7 +334,7 @@ function step(dt) {
     r.ring.scale.setScalar(1 + r.age * 2.5);
   }
   post.render(dir);
-  const text = `${nearestPlace()}   |   ${(state.x / 1000).toFixed(2)} km, ${(state.z / 1000).toFixed(2)} km   |   height ${Math.round(y)}`;
+  const text = rooms.house ? 'Inside a house' : `${nearestPlace()}   |   ${(state.x / 1000).toFixed(2)} km, ${(state.z / 1000).toFixed(2)} km   |   height ${Math.round(y)}`;
   if (text !== state.lit) document.getElementById('where').textContent = state.lit = text;
 }
 
@@ -279,7 +363,7 @@ addEventListener('keydown', (e) => {
 });
 
 setTime('dusk');
-window.__world = { body, controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
+window.__world = { work, bag, rooms, marks, body, controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
   step((now - last) / 1000);

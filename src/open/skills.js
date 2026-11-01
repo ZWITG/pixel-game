@@ -40,6 +40,30 @@ export const SKILLS = {
       { at: 800, title: 'Windfoot', icon: 'star' },
     ],
   },
+  woodcutting: {
+    name: 'Woodcutting',
+    color: '#8fd86a',
+    trains: { strength: 0.05, endurance: 0.02 },
+    levels: [
+      { at: 12, title: 'Kindling Gatherer', icon: 'axe' },
+      { at: 40, title: 'Woodcutter', icon: 'log' },
+      { at: 100, title: 'Feller', icon: 'stump' },
+      { at: 220, title: 'Forester', icon: 'pine' },
+      { at: 450, title: 'Forest Breaker', icon: 'oak' },
+    ],
+  },
+  mining: {
+    name: 'Mining',
+    color: '#c9a0ff',
+    trains: { strength: 0.06, endurance: 0.015 },
+    levels: [
+      { at: 10, title: 'Stone Picker', icon: 'pebble' },
+      { at: 35, title: 'Quarry Hand', icon: 'pick' },
+      { at: 90, title: 'Miner', icon: 'ore' },
+      { at: 200, title: 'Deep Miner', icon: 'gem' },
+      { at: 420, title: 'Mountain Breaker', icon: 'anvil' },
+    ],
+  },
 };
 
 export const ATTRIBUTE_START = 10;

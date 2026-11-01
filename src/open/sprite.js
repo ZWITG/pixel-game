@@ -97,6 +97,38 @@ function drawFrame(g, row, frame, ox, oy) {
 }
 
 // A one-pixel dark ink line around everything keeps the sprite readable on busy ground.
+function toolTexture(paint) {
+  const c = document.createElement('canvas');
+  c.width = 16;
+  c.height = 24;
+  paint((x, y, w, h, col) => {
+    const g = c.getContext('2d');
+    g.fillStyle = col;
+    g.fillRect(x, y, w, h);
+  });
+  outline(c.getContext('2d'), 16, 24);
+  const map = new THREE.CanvasTexture(c);
+  map.magFilter = map.minFilter = THREE.NearestFilter;
+  map.generateMipmaps = false;
+  map.colorSpace = THREE.SRGBColorSpace;
+  return map;
+}
+
+const TOOLS = {
+  axe: (r) => {
+    r(7, 3, 2, 20, C.boot);
+    r(8, 2, 6, 8, C.metal);
+    r(13, 1, 2, 10, '#ffffff');
+    r(6, 3, 2, 5, C.tunicDark);
+  },
+  pick: (r) => {
+    r(7, 4, 2, 19, C.boot);
+    r(2, 3, 12, 3, C.metal);
+    r(1, 5, 2, 3, C.metal);
+    r(13, 5, 2, 3, '#ffffff');
+  },
+};
+
 function outline(ctx, w, h) {
   const img = ctx.getImageData(0, 0, w, h), d = img.data, src = d.slice();
   const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < h && src[(y * w + x) * 4 + 3] > 0;
@@ -130,6 +162,23 @@ export default class HeroSprite {
     this.mesh.castShadow = true;
     this.mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5 });
     scene.add(this.mesh);
+
+    // The tool in the hero's hands; it only shows during a swing.
+    this.tools = { axe: toolTexture(TOOLS.axe), pick: toolTexture(TOOLS.pick) };
+    this.tool = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 1.72).translate(0, 0.72, 0), new THREE.MeshBasicMaterial({ map: this.tools.axe, alphaTest: 0.5, side: THREE.DoubleSide }));
+    this.tool.visible = false;
+    this.mesh.add(this.tool);
+  }
+
+  // swing: { kind, t } with t from 0 to 1, or null. side 1 strikes toward screen right.
+  swing(swing, side) {
+    this.tool.visible = !!swing;
+    if (!swing) return;
+    const ease = Math.min(1, swing.t / 0.4);
+    this.tool.material.map = this.tools[swing.kind];
+    this.tool.position.set(side * 0.3, 1.1, 0.06);
+    this.tool.scale.x = side;
+    this.tool.rotation.z = side * (0.9 - ease * ease * 2.7);
   }
 
   // view: 0 back, 1 front, 2 side; flip mirrors the side view to face left.

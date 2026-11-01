@@ -3,6 +3,8 @@ import { VoxelBuilder, vmat } from '../render/voxel.js';
 import { makeSpiritTree, makeHouse } from '../render/models.js';
 import { PLACES, height } from './terrain.js';
 
+const HOUSE = { x: 3.1, z: 2.95, door: 3.8 }; // half size and door distance at the scale used here
+
 // The big things you can see from far away. Each one is a promise: walk toward it.
 
 // The Lantern Spire: a citadel of pale rose stone on the lake island, crowned with a huge lamp.
@@ -74,22 +76,33 @@ function isle(rand) {
 }
 
 export function addLandmarks(scene) {
-  const out = { isles: [] };
+  // `solids` stop the hero: { x, z, r } circles or { x0, x1, z0, z1 } boxes.
+  const out = { isles: [], houses: [], solids: [] };
   const S = spire();
   S.position.set(PLACES.spire.x, PLACES.spire.y - 2, PLACES.spire.z);
   S.scale.setScalar(1.15);
   scene.add(S);
+  out.solids.push({ x0: S.position.x - 96, x1: S.position.x + 96, z0: S.position.z - 72, z1: S.position.z + 72 });
 
   const tree = makeSpiritTree();
   tree.group.scale.setScalar(52);
   tree.group.position.set(PLACES.spirit.x, height(PLACES.spirit.x, PLACES.spirit.z) - 8, PLACES.spirit.z);
   scene.add(tree.group);
   out.crystals = tree.crystals;
+  out.solids.push({ x: PLACES.spirit.x, z: PLACES.spirit.z, r: 46 });
 
   const R = ribs();
   R.position.set(PLACES.ribs.x, PLACES.ribs.y, PLACES.ribs.z);
   R.rotation.y = 0.6;
   scene.add(R);
+  // The foot of each rib, turned the same way as the skeleton.
+  for (let r = 0; r < 9; r++) {
+    const z = -180 + r * 45, span = 95 - Math.abs(r - 4) * 11, c = Math.cos(0.6), s = Math.sin(0.6);
+    for (const side of [-1, 1]) {
+      const x = side * span;
+      out.solids.push({ x: PLACES.ribs.x + x * c + z * s, z: PLACES.ribs.z - x * s + z * c, r: 8 });
+    }
+  }
 
   let seed = 7;
   const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -114,6 +127,11 @@ export function addLandmarks(scene) {
     house.rotation.y = Math.round(a * 2) * (Math.PI / 2);
     house.castShadow = true;
     scene.add(house);
+    const rot = house.rotation.y, ox = Math.sin(rot), oz = Math.cos(rot);
+    const quarter = Math.abs(Math.round(rot / (Math.PI / 2))) % 2 === 1;
+    const sx = quarter ? HOUSE.z : HOUSE.x, sz = quarter ? HOUSE.x : HOUSE.z;
+    out.houses.push({ x: hx, z: hz, rot, door: { x: hx + ox * HOUSE.door, z: hz + oz * HOUSE.door } });
+    out.solids.push({ x0: hx - sx, x1: hx + sx, z0: hz - sz, z1: hz + sz });
   }
   return out;
 }

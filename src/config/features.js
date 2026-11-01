@@ -5,7 +5,9 @@ export const FEATURES = {
   combat: true,         // sword attack (Space / J / Square or R1)
   spinSlash: true,      // heavier attack that hits all around (F / R2 or Triangle)
   lockOn: true,         // lock onto an enemy (Q / Tab / L2 or R3), switch with Z X / right-stick flick
-  swimming: true,       // open world: learn to swim by trying; shows on the Skills page
+  swimming: true,
+  jump: true,            // open world: jump, height grows with Strength and Speed
+  worldWork: true,       // open world: solid trees and rocks, chopping, mining, house interiors       // open world: learn to swim by trying; shows on the Skills page
   dodgeRoll: true,      // roll with brief invincibility (Shift / K / Circle)
   topDownCamera: false, // angled top-down view you can switch to (C / Create); off = behind-the-hero camera only
   leveling: true,       // XP, levels, stat growth

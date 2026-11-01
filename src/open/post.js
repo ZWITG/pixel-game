@@ -78,7 +78,7 @@ export default class Post {
     v.copy(sunDir).multiplyScalar(3000).add(this.camera.position).project(this.camera);
     const facing = v.z < 1 ? 1 - Math.min(1, Math.hypot(v.x, v.y) / 1.8) : 0;
     u.uSun.value.set(v.x * 0.5 + 0.5, v.y * 0.5 + 0.5);
-    u.uShaft.value = this.shaft * facing;
+    u.uShaft.value = this.indoors ? 0 : this.shaft * facing;
     this.composer.render();
   }
 }

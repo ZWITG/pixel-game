@@ -26,8 +26,12 @@ export default class Body {
   // The hero fills out as they get stronger.
   get heroScale() { return 1 + Math.min(0.2, (this.strength - 10) * 0.004); }
 
-  // Strength's main jobs later, read by combat and inventory when they move to the open world:
-  // each point is 3% more melee damage and 2 more units of carrying.
+  // Each point of Strength is 3% more force behind a blow (axe, pick and, later, sword)
+  // and 2 more units of carrying.
   get damageScale() { return 1 + (this.strength - 10) * 0.03; }
   get carry() { return 20 + (this.strength - 10) * 2; }
+  // Strong legs jump higher: about 1.3 tiles at the start, past 3 when fully trained.
+  get jumpSpeed() { return 7.5 + (this.strength - 10) * 0.05 + (this.speed - 10) * 0.03; }
+  // Stronger arms recover from a swing sooner.
+  get swingTime() { return 0.55 / (1 + (this.strength - 10) * 0.01); }
 }

@@ -102,9 +102,15 @@ function trunkMaterial(kind) {
 }
 
 const trunkGeometry = () => new THREE.CylinderGeometry(0.14, 0.46, 15, 6, 1).translate(0, 7.5, 0);
+const STUMPS = 400; // per kind
 
 export function makeTreeMeshes(scene, max) {
   return Object.keys(LEAVES).map((kind) => {
+    const stump = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.5, 0.8, 6).translate(0, 0.4, 0), trunkMaterial(kind), STUMPS);
+    stump.frustumCulled = false;
+    stump.castShadow = true;
+    stump.count = 0;
+    scene.add(stump);
     const map = leafTexture(LEAVES[kind]);
     const mat = addWind(new THREE.MeshLambertMaterial({ map, alphaTest: 0.5 }), { from: 5, amount: 0.018 });
     const crownMesh = new THREE.InstancedMesh(crown(kind), mat, max);
@@ -117,8 +123,39 @@ export function makeTreeMeshes(scene, max) {
       m.count = 0;
       scene.add(m);
     }
-    return { crown: crownMesh, trunk: trunkMesh };
+    return { crown: crownMesh, trunk: trunkMesh, stump };
   });
+}
+
+// Rocks: one faceted stone, varied per instance by scale, turn and tint.
+export function makeRocks(scene, max) {
+  const map = pixelTexture(32, (g, S) => {
+    g.fillStyle = '#d8d0d4';
+    g.fillRect(0, 0, S, S);
+    let seed = 31;
+    const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 90; i++) {
+      g.fillStyle = r() < 0.6 ? '#b4aab2' : r() < 0.7 ? '#8e8490' : '#efe9e6';
+      g.fillRect(Math.floor(r() * S), Math.floor(r() * S), 1 + Math.floor(r() * 3), 1 + Math.floor(r() * 2));
+    }
+  });
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  const geo = new THREE.DodecahedronGeometry(1, 0);
+  const p = geo.attributes.position;
+  // Knock the corners about, keeping shared corners together so the stone stays closed.
+  for (let i = 0; i < p.count; i++) {
+    const k = 1 + Math.sin(p.getX(i) * 7 + p.getY(i) * 11 + p.getZ(i) * 5) * 0.16;
+    p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k);
+  }
+  geo.computeVertexNormals();
+  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ map, flatShading: true }), max);
+  mesh.frustumCulled = false;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.count = 0;
+  mesh.setColorAt(0, new THREE.Color());
+  scene.add(mesh);
+  return mesh;
 }
 
 // Ground cover: a tuft of thin pixel blades, tinted per instance.

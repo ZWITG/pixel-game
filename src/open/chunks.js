@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { height, biome, roadDistance, forest, WORLD, PLACES } from './terrain.js';
 import { terrainMaterial, shared } from './materials.js';
-import { makeTreeMeshes, makeGrass } from './foliage.js';
+import { makeTreeMeshes, makeGrass, makeRocks } from './foliage.js';
 
 // Terrain streams in around the hero: fine chunks close by, coarse ones further out,
 // and one low-detail mesh of the whole world behind them for the far mountains.
@@ -9,7 +9,8 @@ const CHUNK = 64;
 const RING = 4;            // chunks each way from the center (9 x 9 streamed)
 const GRASS_RING = 1;
 const BUILDS_PER_FRAME = 2;
-const MAX_TREES = 9000, MAX_BLADES = 45000;
+const MAX_TREES = 9000, MAX_BLADES = 45000, MAX_ROCKS = 4000;
+const ROCK_TINTS = ['#b0a2ac', '#9aa39a', '#a8968c'], ORE_TINT = '#c08a64';
 // Trees stay out of these, so landmarks stand in the open.
 const CLEARINGS = [PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }];
 const stepFor = (ring) => (ring <= 1 ? 1 : ring <= 2 ? 2 : 4);
@@ -88,13 +89,18 @@ export default class Chunks {
 
     this.trees = makeTreeMeshes(scene, MAX_TREES);
     this.grass = makeGrass(scene, MAX_BLADES);
+    this.rocks = makeRocks(scene, MAX_ROCKS);
+    this.gone = new Map();  // chopped or mined: id -> time it grows back
+    this.slots = new Map(); // id -> instance index, so one object can move or vanish
+    this.pose3 = new THREE.Object3D();
+    this.stumps = [0, 0, 0];
   }
 
   // What grows in one chunk. Same every visit, because it comes from the position.
   spots(cx, cz) {
     const key = `${cx},${cz}`;
     if (this.data.has(key)) return this.data.get(key);
-    const trees = [[], [], []], blades = [];
+    const trees = [[], [], []], blades = [], rocks = [];
     const x0 = cx * CHUNK, z0 = cz * CHUNK;
     for (let i = 0; i < 150; i++) {
       const x = x0 + rnd(cx, cz, i) * CHUNK, z = z0 + rnd(cx, cz, i + 500) * CHUNK;
@@ -103,7 +109,17 @@ export default class Chunks {
       if (y < 3 || y > 300 || height(x + 2, z) - y > 2.2 || roadDistance(x, z) < 9) continue;
       const [m, a] = biome(x, z);
       const roll = rnd(cx, cz, i + 1300);
-      trees[roll < a ? 1 : roll < a + m * 0.6 ? 2 : 0].push([x, y, z, 0.8 + rnd(cx, cz, i + 1700) * 0.8, rnd(cx, cz, i + 2100) * 6.28]);
+      const kind = roll < a ? 1 : roll < a + m * 0.6 ? 2 : 0, sc = 0.8 + rnd(cx, cz, i + 1700) * 0.8;
+      trees[kind].push({ id: `t${cx},${cz},${i}`, type: 'tree', kind, x, y, z, sc, rot: rnd(cx, cz, i + 2100) * 6.28, r: 0.5 * sc });
+    }
+    for (let i = 0; i < 16; i++) {
+      const x = x0 + rnd(cx, cz, i + 20000) * CHUNK, z = z0 + rnd(cx, cz, i + 20500) * CHUNK;
+      if (rnd(cx, cz, i + 21000) > 0.5 || CLEARINGS.some((p) => Math.hypot(x - p.x, z - p.z) < p.r)) continue;
+      const y = height(x, z);
+      if (y < 1 || y > 300 || roadDistance(x, z) < 7) continue;
+      const roll = rnd(cx, cz, i + 21500), size = roll < 0.6 ? 0 : roll < 0.9 ? 1 : 2;
+      const sc = [0.5, 1.2, 3][size] + rnd(cx, cz, i + 22000) * [0.4, 0.8, 1.2][size];
+      rocks.push({ id: `r${cx},${cz},${i}`, type: 'rock', size, x, y, z, sc, rot: rnd(cx, cz, i + 22500) * 6.28, r: 0.85 * sc, tint: size === 2 ? ORE_TINT : ROCK_TINTS[i % 3] });
     }
     const col = [[0.5, 0.62, 0.15], [0.8, 0.68, 0.14], [0.7, 0.3, 0.1], [0.13, 0.36, 0.2], [0.95, 0.75, 0.18], [0.9, 0.18, 0.12]];
     for (let i = 0; i < 5000; i++) {
@@ -116,9 +132,80 @@ export default class Chunks {
       const pick = r > 0.97 ? 5 : r > 0.92 ? 4 : p > m && p > a ? 3 : a > m ? 2 : r > 0.6 ? 1 : 0;
       blades.push([x, y, z, 0.8 + r * 0.7, col[pick]]);
     }
-    const out = { trees, blades };
+    const out = { trees, blades, rocks, things: [...trees.flat(), ...rocks] };
     this.data.set(key, out);
     if (this.data.size > 400) this.data.delete(this.data.keys().next().value);
+    return out;
+  }
+
+  // Sets one object's instance transform; `lean` tips it a little, for the shudder of a blow.
+  place(o, lean = 0) {
+    const d = this.pose3;
+    if (o.type === 'tree') {
+      d.position.set(o.x, o.y - 0.2, o.z);
+      d.rotation.set(lean, o.rot, lean * 0.6);
+      d.scale.set(o.sc, o.sc * 1.25, o.sc);
+    } else {
+      d.position.set(o.x, o.y + o.sc * 0.2, o.z);
+      d.rotation.set(o.rot + lean, o.rot * 2, lean);
+      d.scale.set(o.sc, o.sc * 0.78, o.sc * 0.92);
+    }
+    d.updateMatrix();
+    return d.matrix;
+  }
+
+  meshesOf(o) {
+    return o.type === 'tree' ? [this.trees[o.kind].crown, this.trees[o.kind].trunk] : [this.rocks];
+  }
+
+  pose(o, lean = 0) {
+    const slot = this.slots.get(o.id);
+    if (slot === undefined) return;
+    const matrix = this.place(o, lean);
+    for (const m of this.meshesOf(o)) {
+      m.setMatrixAt(slot, matrix);
+      m.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  // Takes one object out of the world until `back` (a time in ms).
+  remove(o, back) {
+    this.gone.set(o.id, back);
+    const slot = this.slots.get(o.id), hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    if (slot !== undefined) for (const m of this.meshesOf(o)) {
+      m.setMatrixAt(slot, hidden);
+      m.instanceMatrix.needsUpdate = true;
+    }
+    if (o.type === 'tree') this.addStump(o);
+  }
+
+  addStump(o) {
+    const mesh = this.trees[o.kind].stump;
+    if (mesh.count >= mesh.instanceMatrix.count) return;
+    const d = this.pose3;
+    d.position.set(o.x, o.y - 0.25, o.z);
+    d.rotation.set(0, o.rot, 0);
+    d.scale.set(o.sc, o.sc, o.sc);
+    d.updateMatrix();
+    mesh.setMatrixAt(mesh.count++, d.matrix);
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  isGone(id) {
+    if (!this.gone.has(id)) return false;
+    if (this.gone.get(id) > Date.now()) return true;
+    this.gone.delete(id);
+    return false;
+  }
+
+  // Standing trees and rocks within `range` of a point.
+  near(x, z, range) {
+    const out = [], cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      for (const o of this.spots(cx + i, cz + j).things) {
+        if (Math.abs(o.x - x) < range && Math.abs(o.z - z) < range && !this.gone.has(o.id)) out.push(o);
+      }
+    }
     return out;
   }
 
@@ -169,20 +256,30 @@ export default class Chunks {
   scatter(cx, cz) {
     const d = new THREE.Object3D(), color = new THREE.Color();
     const counts = [0, 0, 0];
-    let b = 0;
+    let b = 0, r = 0;
+    this.slots.clear();
+    for (const { stump } of this.trees) stump.count = 0;
     for (let j = -RING; j <= RING; j++) for (let i = -RING; i <= RING; i++) {
       const s = this.spots(cx + i, cz + j);
       s.trees.forEach((list, kind) => {
-        for (const [x, y, z, sc, rot] of list) {
+        for (const o of list) {
           if (counts[kind] >= MAX_TREES) continue;
-          d.position.set(x, y - 0.2, z);
-          d.rotation.set(0, rot, 0);
-          d.scale.set(sc, sc * 1.25, sc);
-          d.updateMatrix();
-          this.trees[kind].crown.setMatrixAt(counts[kind], d.matrix);
-          this.trees[kind].trunk.setMatrixAt(counts[kind]++, d.matrix);
+          if (this.isGone(o.id)) {
+            this.addStump(o);
+            continue;
+          }
+          const matrix = this.place(o);
+          this.slots.set(o.id, counts[kind]);
+          this.trees[kind].crown.setMatrixAt(counts[kind], matrix);
+          this.trees[kind].trunk.setMatrixAt(counts[kind]++, matrix);
         }
       });
+      for (const o of s.rocks) {
+        if (r >= MAX_ROCKS || this.isGone(o.id)) continue;
+        this.slots.set(o.id, r);
+        this.rocks.setMatrixAt(r, this.place(o));
+        this.rocks.setColorAt(r++, color.set(o.tint));
+      }
       if (Math.max(Math.abs(i), Math.abs(j)) > GRASS_RING) continue;
       for (const [x, y, z, sc, c] of s.blades) {
         d.position.set(x, y, z);
@@ -199,6 +296,9 @@ export default class Chunks {
         m.instanceMatrix.needsUpdate = true;
       }
     });
+    this.rocks.count = r;
+    this.rocks.instanceMatrix.needsUpdate = true;
+    this.rocks.instanceColor.needsUpdate = true;
     this.grass.count = b;
     this.grass.instanceMatrix.needsUpdate = true;
     this.grass.instanceColor.needsUpdate = true;

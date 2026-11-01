@@ -1,4 +1,5 @@
 import SkillMap from './skillMap.js';
+import { ITEMS } from './work.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -38,6 +39,18 @@ export default class WorldHud {
     el.style.color = attribute.color;
     $('gains').appendChild(el);
     setTimeout(() => el.remove(), 2600);
+  }
+
+  // The word and button for what the hero could do right now.
+  setAction(html) {
+    if (html === this.action) return;
+    this.action = html;
+    $('act').innerHTML = html;
+  }
+
+  setBag(bag) {
+    const held = Object.entries(bag.items).filter(([, n]) => n);
+    $('bag').innerHTML = held.length ? `${held.map(([id, n]) => `<span style="color:${ITEMS[id].color}">${ITEMS[id].name} ${n}</span>`).join('&nbsp;&nbsp;')}&nbsp;&nbsp;${bag.weight}/${Math.floor(bag.body.carry)}` : '';
   }
 
   toggle(skills, body) {
