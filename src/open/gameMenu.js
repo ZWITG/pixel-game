@@ -2,7 +2,9 @@ import { PLACES, TOWNS, WORLD } from './terrain.js';
 import { prompt } from '../ui/glyphs.js';
 import { QUALITY, saveSettings } from './startMenu.js';
 import { svg, MAX_RANK } from './powers.js';
-import { NATIONS, nationAt } from './nations.js';
+import { NATIONS, nationAt, COUNTRY } from './nations.js';
+import { DOCTRINES } from './doctrines.js';
+import { TIERS, tierOf } from './settlements.js';
 
 // The menu in play: one row of icon tabs over the map, the Spirit Tree, the Satchel, the
 // buttons and the settings. Add a tab by adding an entry to TABS and a case in `show`.
@@ -222,17 +224,20 @@ export default class GameMenu {
   // Who still stands, how close each is to breaking, and where each ruler sits.
   drawNations() {
     const { nations } = this.world, cards = NATIONS.map((n) => {
-      const r = nations.report(n), state = r.fallen ? 'Conquered' : r.open ? 'Ruler exposed' : 'Standing';
-      const fill = r.fallen ? 100 : Math.round((r.done / r.need) * 100);
+      const r = nations.report(n), { realm } = this.world, force = realm.of(n.id), d = DOCTRINES[n.id], state = r.fallen ? 'Conquered' : r.open ? 'Ruler exposed' : force.stance;
+      const fill = r.fallen ? 100 : Math.round((r.done / Math.max(1, r.need)) * 100), power = r.fallen ? 0 : Math.round(realm.strength(n.id) * 100);
+      const places = realm.placesOf(n.id).length, captain = force.captains.find((c) => c.alive);
       return `<div class="nation ${r.fallen ? 'fallen' : ''}" style="--c:${n.color}">
         <i>${SVG(r.fallen ? SHAPES.nations : SHAPES.crown, 34)}</i>
-        <div><b>${n.name}</b><span>${n.ruler} · ${n.seat}</span>
+        <div><b>${n.name}</b><span>${d.title}: ${d.style}</span>
         <div class="nation-bar"><u style="width:${fill}%"></u></div>
-        <em>${state}${r.fallen || r.open ? '' : ` · ${r.done} of ${r.need} strongholds broken`}</em></div>
+        <em>${state}${r.fallen || r.open ? '' : ` · ${r.done} of ${r.need} strongholds broken`}</em>
+        ${r.fallen ? '' : `<span>Strength ${power}% · ${Math.round(force.troops)} troops · ${places} settlements${captain ? ` · ${captain.title ?? 'Captain'} ${captain.name}` : ''}</span>`}</div>
       </div>`;
     }).join('');
-    const count = nations.fallen.size, line = count === NATIONS.length ? 'Every nation has fallen. Something has noticed.' : 'Break a nation\'s strongholds to expose its ruler, then bring the ruler down.';
-    this.page.innerHTML = `<div class="nations-page"><h2>${count} of ${NATIONS.length} nations conquered</h2><p>${line}</p><div class="nation-grid">${cards}</div></div>`;
+    const { realm } = this.world, count = nations.fallen.size, line = count === NATIONS.length ? 'The country is yours. Something has noticed.' : 'Break a nation\'s strongholds to expose its ruler, then bring the ruler down. They will not wait for you.';
+    const news = realm.news.slice(0, 12).map((e) => `<div><i style="background:${e.color}"></i><u>Day ${e.day}</u> ${e.text}</div>`).join('') || '<div>Nothing has happened yet.</div>';
+    this.page.innerHTML = `<div class="nations-page"><h2>${COUNTRY}: ${count} of ${NATIONS.length} nations conquered · Day ${realm.day}</h2><p>${line}</p><div class="nation-grid">${cards}</div><h3>Chronicle</h3><div class="chronicle">${news}</div></div>`;
   }
 
   // The Conqueror's eight powers, and the D-pad cross they're worn on.
@@ -344,6 +349,12 @@ export default class GameMenu {
     for (const s of this.world.sites.list) {
       if (!s.done && s.seen && !TOWNS.some((t) => t.name === s.cat.name)) out.push({ x: s.x, z: s.z, name: s.cat.name, icon: 'goal', color: s.cat.color });
     }
+    for (const s of this.world.realm.settlements) {
+      if (s.fixed) continue;
+      const tier = tierOf(s.pop), owner = NATIONS.find((n) => n.id === s.owner);
+      out.push({ x: s.x, z: s.z, name: `${s.name}, ${TIERS[tier].name}`, icon: tier >= 4 ? 'city' : 'village', color: owner?.color ?? '#f7efdf' });
+    }
+    for (const o of this.world.realm.outposts) if (!o.done) out.push({ x: o.x, z: o.z, name: o.name, icon: 'keep', color: NATIONS.find((n) => n.id === o.nation).color });
     if (this.owner.pin) out.push({ ...this.owner.pin, name: 'Your pin', icon: 'pin' });
     return out;
   }
@@ -377,8 +388,9 @@ export default class GameMenu {
   // Every nation's land as a wash of its color, redrawn when a nation falls.
   drawLands() {
     const { nations } = this.world, g = this.lands.getContext('2d');
-    if (this.landsOf === nations.fallen.size) return;
-    this.landsOf = nations.fallen.size;
+    const key = `${nations.fallen.size}-${this.world.realm.bordersOf}`;
+    if (this.landsOf === key) return;
+    this.landsOf = key;
     g.clearRect(0, 0, TERRITORY, TERRITORY);
     const cell = WORLD / TERRITORY;
     for (let j = 0; j < TERRITORY; j++) for (let i = 0; i < TERRITORY; i++) {

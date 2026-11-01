@@ -5,6 +5,7 @@ import { height, biome, region, PLACES, SPAWN, TOWNS } from './terrain.js';
 import { CAVE_FLOOR } from './cave.js';
 import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts } from './evolve.js';
 import { nationAt } from './nations.js';
+import { machineMesh, DOCTRINES } from './doctrines.js';
 import { arm, stagger, standDown, TURN_TAKERS, PARRIED } from './foes.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
 
@@ -115,6 +116,7 @@ export default class Monsters {
   }
 
   onEnemyKilled(e) {
+    this.world.realm.slain(e);
     // Evolved monsters teach more and drop more.
     this.work.skills.add('fighting', 3 * (1 + e.tier));
     const drops = {};
@@ -162,6 +164,10 @@ export default class Monsters {
     if (POWERS[type]) armBoss(e, type, this);
     else arm(e, type, this);
     e.rootScale = e.model.root.scale.x;
+    if (e.def.machine) {
+      e.model.root.visible = false;
+      e.group.add(machineMesh(e.def.machine));
+    }
     e.group.position.y = cave ? CAVE_FLOOR : height(x, z);
     const hero = this.nearest(e) ?? this.players[0];
     setTier(e, e.def.boss ? 0 : Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
@@ -180,8 +186,14 @@ export default class Monsters {
     // A nation still standing keeps soldiers on its land; conquered ground has none.
     const nation = nationAt(x, z);
     if (nation && !this.world.nations.isFallen(nation) && Math.random() < PATROLS) {
-      for (let i = 0; i < PATROL_SIZE; i++) this.add('soldier', x + i * 3, z + (i % 2) * 3, this.danger(x, z), false);
-      return;
+      const force = this.world.realm.of(nation.id), kinds = DOCTRINES[nation.id].troops;
+      if (force.troops >= 1) {
+        for (let i = 0; i < PATROL_SIZE; i++) {
+          const e = this.add(kinds[i % kinds.length], x + i * 3, z + (i % 2) * 3, this.danger(x, z), false);
+          e.nation = nation.id;
+        }
+        return;
+      }
     }
     this.add(type, x, z, this.danger(x, z), Math.random() < ELDER_CHANCE);
   }

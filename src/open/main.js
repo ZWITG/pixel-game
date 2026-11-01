@@ -24,6 +24,8 @@ import { PowerFx } from './powers.js';
 import { CONQUERORS } from './conquerors.js';
 import Nations from './nations.js';
 import Scars from './scars.js';
+import Realm from './realm.js';
+import Towns from './settlements.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -67,6 +69,7 @@ const SPLIT_SETTLE = 1;   // seconds before it can change back, so it never flic
 const SHIFT = 0.25;       // how far each picture slides, as a share of the screen height
 const LEAVE_HOLD = 2;     // seconds P2 holds OPTIONS to leave
 
+const BLIZZARD_FOG = 9;      // how much thicker the air gets in a nation's blizzard
 const SUN_REACH = 85;      // tiles of shadow each way from the hero
 
 const TIMES = {
@@ -130,6 +133,10 @@ world.sites = new Sites(scene, monsters, work, players);
 world.people = new People(scene, world);
 world.nations = new Nations(scene, world);
 monsters.world = world;
+world.chunks = chunks;
+world.towns = new Towns(scene, world);
+world.realm = new Realm(world);
+work.houseFell = (id) => world.realm.houseLost(id);
 world.quake = new Quake(scene, chunks);
 monsters.quake = world.quake;
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
@@ -578,6 +585,7 @@ function renderView(v, p, dir) {
   sun.shadow.needsUpdate = split.amount > 0 || (stopWatch.frame = (stopWatch.frame ?? 0) + 1) % 2 === 0;
   sky.position.copy(v.camera.position);
   shared.uScarAt.value.set(p.state.x, p.state.z);
+  scene.fog.density = world.light.density * (world.realm.blizzard > 0 && !p.rooms.house ? BLIZZARD_FOG : 1);
   water.position.x = v.camera.position.x;
   water.position.z = v.camera.position.z;
   v.post.indoors = !!p.rooms.house;
@@ -617,6 +625,7 @@ function step(dt) {
     if (FEATURES.sites) world.sites.update(dt);
     world.nations.update(dt);
     world.scars.update(dt);
+    world.realm.update(dt);
     world.fx.update(dt);
     world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);

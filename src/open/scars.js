@@ -16,6 +16,7 @@ const STAY = 170;            // tiles from a hero before a cell is forgotten
 const MAX_CELLS = 2600, MAX_BURNING = 420;
 const BURN_SECS = 4, FROST_SECS = 45, ROT_SECS = 40, CHARGE_SECS = 1.6, RUPTURE_SECS = 0.7, CHAR_SECS = 150;
 const SPREAD = { fire: 0.42, ice: 0.34, void: 0.14, storm: 0.3, earth: 0.5 };
+const HOSTILE_BITE = 0.012;   // share of health a tick on a nation's fire or rot takes
 const SLOW = 0.42;           // how fast anything crosses ice
 const ICE_SOLID = 0.35;      // frost past this will bear a hero's weight on water
 const REGROW = 15 * 60000;   // ms before a burnt tree grows back
@@ -57,8 +58,9 @@ export default class Scars {
   }
 
   // An element takes hold over a circle of ground. `gen`: how far it may go on spreading.
+  // With no `owner` it belongs to a nation, and it's the heroes it hurts.
   mark(kind, x, z, reach, owner, gen, force = 1) {
-    if (owner.rooms.house) return;
+    if (owner?.rooms.house) return;
     const r = Math.ceil(reach / CELL), ci = Math.floor(x / CELL), cj = Math.floor(z / CELL);
     for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) {
       if (Math.hypot(i, j) * CELL > reach) continue;
@@ -225,6 +227,15 @@ export default class Scars {
     }
   }
 
+  // Fire and rot set by a nation hurt the heroes who stand in them.
+  harmHeroes() {
+    for (const p of this.world.players) {
+      if (p.rooms.house || p.state.air > 1.5) continue;
+      const c = this.at(p.state.x, p.state.z);
+      if (c && !c.owner && (c.burn > 0 || c.rot > 0.25)) this.world.monsters.hurt(p, Math.max(0.5, p.body.maxHealth * HOSTILE_BITE), c.x, c.z);
+    }
+  }
+
   paint() {
     const { data } = this;
     data.fill(0);
@@ -263,6 +274,7 @@ export default class Scars {
     }
     this.rise(fx);
     this.harm();
+    this.harmHeroes();
     this.paint();
   }
 

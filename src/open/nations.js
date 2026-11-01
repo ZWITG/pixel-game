@@ -14,11 +14,12 @@ export const NATIONS = [
   { id: 'bone', name: 'The Bone Waste', seat: 'The Gravepit', ruler: 'Gravemaw the Colossus', color: '#d8c8a8', word: 'The Bone Waste bows', tribute: { health: 25 } },
 ].map((n) => {
   const T = TOWNS.find((t) => t.name === n.seat);
-  return { ...n, x: T.x, z: T.z };
+  return { ...n, x: T.x, z: T.z, base: n.sway ?? 1 };
 });
+export const COUNTRY = 'The Country of Vael';
 const SAVE_KEY = 'lumen.nations';
 const SHARE = 0.6, MIN_NEEDED = 2;   // of a nation's strongholds that must fall
-const STRONGHOLD = ['camp', 'den', 'bandit', 'keep'];
+const STRONGHOLD = ['camp', 'den', 'bandit', 'keep', 'fort'];
 const FREE_LAKE = 840, FREE_HOLLOW = 420; // the middle of the world belongs to no one
 const YOURS = '#f7efdf';
 const BANNERS = 2;           // per town
@@ -44,15 +45,31 @@ export default class Nations {
     this.state = NATIONS.map((n) => {
       const seat = sites.list.find((s) => s.cat.name === n.seat);
       const holds = sites.list.filter((s) => STRONGHOLD.includes(s.key) && nationAt(s.x, s.z) === n);
-      return { n, seat, holds, need: Math.min(holds.length, Math.max(MIN_NEEDED, Math.ceil(holds.length * SHARE))), said: 0, open: false };
+      return { n, seat, holds, need: 0, said: 0, open: false };
     });
-    for (const s of this.state) s.open = this.broken(s) >= s.need;
+    this.refreshAll();
     sites.sealed = (site, p) => this.sealed(site, p);
     sites.finished = (site, p) => this.finished(site, p);
     this.seen = new Map();
     this.wait = 0;
     this.big = document.getElementById('conquest');
     this.raiseBanners();
+  }
+
+  // What it takes to break a nation changes as it builds new forts or retakes old ones.
+  refresh(s) {
+    s.need = Math.min(s.holds.length, Math.max(MIN_NEEDED, Math.ceil(s.holds.length * SHARE)));
+    s.open = this.broken(s) >= s.need;
+  }
+
+  refreshAll() {
+    for (const s of this.state) this.refresh(s);
+  }
+
+  claim(id, site) {
+    const s = this.get(id);
+    s.holds.push(site);
+    this.refresh(s);
   }
 
   get(id) {
@@ -105,7 +122,8 @@ export default class Nations {
       for (const [name, n] of Object.entries(s.n.tribute)) h.bag.perks[name] = (h.bag.perks[name] ?? 0) + n;
       h.bag.save();
     }
-    this.proclaim(this.allFallen ? 'Every nation has fallen' : s.n.word, this.allFallen ? 'And something has noticed.' : `${this.fallen.size} of ${NATIONS.length} nations conquered`, s.n.color);
+    this.world.realm.fall(s.n.id);
+    this.proclaim(this.allFallen ? `${COUNTRY} has fallen` : s.n.word, this.allFallen ? 'And something has noticed.' : `${this.fallen.size} of ${NATIONS.length} nations conquered`, s.n.color);
     this.raiseBanners();
     this.world.work.shake = 0.5;
     this.world.work.shakeAt = p.state;

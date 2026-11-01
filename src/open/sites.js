@@ -1,3 +1,4 @@
+import { fortMesh } from './doctrines.js';
 import * as THREE from 'three';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
 import { height, biome, riverDistance, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
@@ -29,6 +30,7 @@ export const CATEGORIES = {
 
 const SAVE_KEY = 'lumen.sites';
 const SEEN_AT = 70, REACH = 6, SHOW_PROP = 450, FIRST_FROM = 160, FIRST_TO = 520, SPACING = 140;
+const SPARE_BEAMS = 40;       // room for the forts nations will build
 const CITY_COURT = 70;        // tiles south of a city's center
 const BEAMS = 3, BEAM_EVERY = 1; // beams shown per hero, and seconds between choosing them
 const SAFE = 280;            // no sites in the middle of the Hollow
@@ -110,7 +112,7 @@ export default class Sites {
     }
     // One beam per site, all in one draw.
     const geo = new THREE.CylinderGeometry(0.7, 2.2, 260, 8, 1, true).translate(0, 130, 0);
-    this.beams = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }), this.list.length);
+    this.beams = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }), this.list.length + SPARE_BEAMS);
     this.beams.frustumCulled = false;
     const m = new THREE.Matrix4(), c = new THREE.Color();
     this.list.forEach((s, i) => {
@@ -118,6 +120,10 @@ export default class Sites {
       this.beams.setMatrixAt(i, m.makeScale(0, 0, 0));
       this.beams.setColorAt(i, c.set(s.cat.color));
     });
+    for (let i = this.list.length; i < this.list.length + SPARE_BEAMS; i++) {
+      this.beams.setMatrixAt(i, m.makeScale(0, 0, 0));
+      this.beams.setColorAt(i, c.set('#ffffff'));
+    }
     scene.add(this.beams);
     // Things standing at a place settle with the land if it's broken beneath them.
     work.chunks.watchers.push((x, z, r) => {
@@ -201,11 +207,39 @@ export default class Sites {
     s.done = true;
     s.timer = 0;
     this.hideBeam(s);
-    if (s.mesh) s.mesh.material.color.set('#6a6470');
+    if (s.mesh && s.cat.fort) s.mesh.visible = false;
+    else if (s.mesh) s.mesh.material.color.set('#6a6470');
     const near = this.players.filter((h) => h === p || Math.hypot(h.state.x - s.x, h.state.z - s.z) < 120);
     for (const h of near) this.reward(h, s);
     this.save();
     this.finished?.(s, p);
+  }
+
+  // A nation raises a fort: a place like any other, held by its own troops and machine.
+  addFort(n, doctrine, x, z, name, done) {
+    if (this.list.length >= this.beams.count) return null;
+    const cat = { name, color: n.color, count: 0, goal: 'clear', built: true, fort: true, mobs: [doctrine.machine, ...doctrine.troops], size: 5, text: `Tear down this fort of ${n.name}`, reward: { items: { iron: 4, wood: 4 }, practice: { fighting: 30 } } };
+    const s = { id: `fort-${name}`, key: 'fort', cat, x, y: height(x, z), z, done, seen: false, hits: 0, held: 0, mobs: null, timer: 0, runner: null, wave: 0, mesh: null, index: this.list.length };
+    this.list.push(s);
+    this.beams.setColorAt(s.index, new THREE.Color(n.color));
+    this.beams.instanceColor.needsUpdate = true;
+    return s;
+  }
+
+  // A nation takes back a place it lost.
+  restore(s) {
+    s.done = false;
+    s.mobs = null;
+    s.hits = 0;
+    if (s.mesh && !s.cat.fort) s.mesh.material.color.set('#ffffff');
+    if (s.mesh && s.cat.fort) s.mesh.visible = true;
+    this.save();
+  }
+
+  dismantle(s) {
+    s.done = true;
+    this.dismiss(s);
+    if (s.mesh) s.mesh.visible = false;
   }
 
   hideBeam(s) {
@@ -232,6 +266,13 @@ export default class Sites {
   }
 
   showProp(s) {
+    if (s.cat.fort && !s.mesh) {
+      s.mesh = fortMesh(s.cat.color);
+      s.mesh.position.set(s.x, s.y, s.z);
+      s.mesh.visible = !s.done;
+      this.scene.add(s.mesh);
+      return;
+    }
     if (s.mesh || s.cat.built) return;
     s.mesh = new THREE.Mesh(prop(s.key, s.cat.color), vmat({ color: s.done ? '#6a6470' : '#ffffff' }));
     s.mesh.castShadow = true;

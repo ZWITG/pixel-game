@@ -264,6 +264,7 @@ export default class Work {
       return false;
     }
     this.hurt.delete(h.id);
+    this.houseFell?.(h.id.split('|')[0]);
     this.chunks.gone.set(h.id, Date.now() + REGROW);
     this.showHouse(h);
     this.burst(h.x, y, h.z, ['#e8d5b0', '#c9b89e', '#7a5230', '#8a8a8a'], 50, 10);

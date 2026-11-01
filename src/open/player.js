@@ -453,6 +453,7 @@ export default class Player {
     const { state, hud } = this;
     hud.gasp();
     hud.message('You came to by the water.', true);
+    this.world.realm.heroFell(this);
     if (this.rooms.house) this.rooms.leave(state);
     state.x = SPAWN.x + this.index * 3;
     state.z = SPAWN.z;
