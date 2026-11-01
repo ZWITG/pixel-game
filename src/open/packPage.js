@@ -67,7 +67,7 @@ export default class PackPage {
   }
 
   handle(just) {
-    const p = this.player, { bag, hud } = p;
+    const p = this.player, { bag } = p;
     if (just.packTab) {
       this.tab = 1 - this.tab;
       this.at = 0;
@@ -83,10 +83,8 @@ export default class PackPage {
       else if (slot && worn) bag.unequip(slot.id);
       else if (item && ITEMS[item].kind === 'gear') bag.equip(item);
       else if (item && ITEMS[item].kind === 'use') p.consume(item);
-      hud.setBag(bag);
     } else if (just.punch && item) {
       bag.remove(item, 1);
-      hud.setBag(bag);
     }
   }
 

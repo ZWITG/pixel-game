@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import SkillMap from './skillMap.js';
 import { height } from './terrain.js';
-import { ITEMS } from './items.js';
 import PackPage from './packPage.js';
 
 const $ = (id) => document.getElementById(id);
@@ -86,11 +85,6 @@ export default class WorldHud {
     if (html === this.action) return;
     this.action = html;
     this.$('act').innerHTML = html;
-  }
-
-  setBag(bag) {
-    const held = Object.entries(bag.items).filter(([, n]) => n);
-    this.$('bag').innerHTML = held.length ? `${held.map(([id, n]) => `<span style="color:${ITEMS[id].color}">${ITEMS[id].name} ${n}</span>`).join('&nbsp;&nbsp;')}&nbsp;&nbsp;${bag.weight}/${Math.floor(bag.body.carry)}` : '';
   }
 
   get open() {

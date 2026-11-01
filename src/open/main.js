@@ -221,7 +221,6 @@ function join() {
   document.body.classList.add('two');
   extra.hp = extra.body.maxHealth;
   extra.hud.setHealth(1);
-  extra.hud.setBag(extra.bag);
   p1.hud.message('Player 2 joined!', true);
   extra.hud.message('Hello, Player 2!', true);
 }

@@ -56,7 +56,6 @@ export default class Player {
     this.siteDist = 1e9;
     this.camPos = new THREE.Vector3();
     this.camLook = new THREE.Vector3();
-    hud.setBag(this.bag);
   }
 
   get frozen() {
@@ -82,7 +81,6 @@ export default class Player {
       hud.message(`You sleep until ${next === 'mist' ? 'the mist rises' : next === 'night' ? 'nightfall' : next}.`);
     } else if (spot.action === 'store') {
       const moved = Object.entries(bag.store());
-      hud.setBag(bag);
       const kept = Object.entries(bag.stored).map(([id, n]) => `${ITEMS[id].name} ${n}`).join(', ');
       hud.message(moved.length ? `Stored. In the chest: ${kept}` : kept ? `In the chest: ${kept}` : 'The chest is empty.');
     }

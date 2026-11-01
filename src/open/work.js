@@ -285,7 +285,6 @@ export default class Work {
       if (taken) this.hud.gain(ITEMS[id], `+${taken}`);
       if (taken < n) this.hud.message('Your bag is full. Store it in a house, or grow stronger.');
     }
-    this.hud.setBag(this.bag);
   }
 
   // The tree comes down away from the hero, on its own copy so the forest needn't change.

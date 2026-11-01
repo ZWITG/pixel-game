@@ -259,7 +259,6 @@ export class People {
       bag.remove(pile, TRADE_COST);
       bag.items.salve = (bag.items.salve ?? 0) + 1;
       bag.save();
-      hud.setBag(bag);
       hud.message(`${TRADE_COST} ${ITEMS[pile].name} for a Healing Salve.`);
     } else {
       const site = p.site;

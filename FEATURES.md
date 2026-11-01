@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: removed the item list from the game screen; items show in the Satchel, with brief +1 notes when picked up
 - 2026-11-01 prototype: explorable places: 2 walled cities, 5 villages, 6 bandit camps with new human bandits and chiefs, 3 ruined keeps, 9 caves to walk through; townsfolk talk, heal and trade
 - 2026-11-01 prototype: camera fixes: no longer passes through houses or landmarks, shared view climbs hills and avoids walls, no tunnel through the forest in split-screen, blows only shake nearby screens, shorter and capped shake, clean restart after travel, gentler sideways turn
 - 2026-11-01 prototype: in co-op each player's Satchel opens in their own half of the screen, both can be open, and the other hero keeps playing

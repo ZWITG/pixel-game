@@ -213,7 +213,6 @@ export default class Sites {
       said.push(`lasting ${name} bonus`);
     }
     bag.save();
-    hud.setBag(bag);
     hud.message(`${s.cat.name} done! ${said.join(', ')}`, true);
   }
 
