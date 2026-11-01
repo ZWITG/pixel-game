@@ -3,6 +3,7 @@ import Enemy from '../entities/Enemy.js';
 import { ENEMIES } from '../data/enemies.js';
 import { makeOrb } from '../render/models.js';
 import { height, biome, PLACES, SPAWN } from './terrain.js';
+import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts } from './evolve.js';
 
 // Monsters in the open world. They use the game's own Enemy class; this file is the small
 // `game` it expects, plus spawning around the hero and the hero's health.
@@ -16,6 +17,10 @@ const DANGER_SPAN = 1500;    // monsters get one level tougher this many tiles f
 const ELDER_CHANCE = 0.08;
 const HURT_GUARD = 0.7;      // seconds of safety after being hit
 const KNOCK_LIMIT = 45;
+const EVOLVE_CHECK = 1.5;    // seconds between looks for monsters behind the heroes' level
+const EVOLVE_ODDS = 0.3;     // chance each look, so a group changes one by one
+const EVOLVE_WATCH = 130;    // tiles: they change where you can see it
+const HARDEN_ODDS = 0.1;     // chance a monster that survives a blow starts evolving
 const GROUPS = [
   ['slime', 'slime', 'boar', 'fireSlime'],  // meadow
   ['boar', 'fireSlime', 'slime', 'puffcap'], // autumn wood
@@ -48,6 +53,7 @@ export default class Monsters {
     this.orbs = [];
     this.time = 0;
     this.spawnIn = 0;
+    this.evolveIn = 0;
     this.player = { x: 0, z: 0, dead: false };
     this.collision = {
       // Land only, so nothing wades in after a swimmer.
@@ -82,9 +88,10 @@ export default class Monsters {
   }
 
   onEnemyKilled(e) {
-    this.work.skills.add('fighting', 3);
+    // Evolved monsters teach more and drop more.
+    this.work.skills.add('fighting', 3 * (1 + e.tier));
     const drops = {};
-    for (const { item, chance } of e.def.drops) if (Math.random() < chance) drops[item] = 1;
+    for (const { item, chance } of e.def.drops) if (Math.random() < chance * (1 + e.tier * 0.4)) drops[item] = 1 + Math.floor(e.tier / 2);
     this.work.give(drops);
     if (e.def.splitInto) for (const side of [-1, 1]) this.add(e.def.splitInto, e.x + side * 2, e.z, this.danger(e.x, e.z), false);
   }
@@ -103,6 +110,8 @@ export default class Monsters {
     e.air = 0;
     e.rise = 0;
     e.group.position.y = height(x, z);
+    const hero = this.nearest(x, z) ?? this.players[0];
+    setTier(e, Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
     this.list.push(e);
     return e;
   }
@@ -143,6 +152,8 @@ export default class Monsters {
     e.knockUntil = this.time + 0.2 + Math.min(0.8, force * 0.02);
     e.rise = Math.min(30, force * 1.2);
     e.air = Math.max(e.air, 0.01);
+    // A fight it survives can push it over the edge.
+    if (!e.dying && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
   }
 
   hurt(p, amount, fromX, fromZ) {
@@ -162,6 +173,25 @@ export default class Monsters {
     p.hud.setHealth(p.hp / p.body.maxHealth);
   }
 
+  // A monster bursts into its next form.
+  evolved(e, tier) {
+    const hero = this.nearest(e.x, e.z) ?? this.players[0], { accent } = TIERS[tier];
+    setTier(e, tier, hero);
+    this.work.burst(e.x, e.group.position.y + 2, e.z, [accent, '#ffffff'], 30, 8);
+    hero.melee.ring(e.x, e.group.position.y, e.z, 12, accent);
+    hero.hud.float(`${e.def.name}!`, e.x, e.group.position.y + 5, e.z, accent);
+    this.work.shake = Math.max(this.work.shake, 0.2);
+  }
+
+  // Those behind the heroes' level start to change, one at a time, close enough to watch.
+  stir() {
+    for (const e of this.list) {
+      const hero = this.nearest(e.x, e.z);
+      if (!hero || e.dying || e.evolving !== undefined || e.tier >= tierFor(hero.body.level)) continue;
+      if (Math.hypot(e.x - hero.state.x, e.z - hero.state.z) < EVOLVE_WATCH && Math.random() < EVOLVE_ODDS) startEvolving(e);
+    }
+  }
+
   nearest(x, z) {
     let best = null, d = 1e9;
     for (const p of this.players) {
@@ -179,6 +209,10 @@ export default class Monsters {
       this.spawnIn = SPAWN_EVERY;
       this.spawn(out[Math.floor(Math.random() * out.length)].state);
     }
+    if ((this.evolveIn -= dt) <= 0) {
+      this.evolveIn = EVOLVE_CHECK;
+      this.stir();
+    }
     for (const e of [...this.list]) {
       const hero = this.nearest(e.x, e.z);
       const far = hero ? Math.hypot(e.x - hero.state.x, e.z - hero.state.z) : 0;
@@ -192,8 +226,10 @@ export default class Monsters {
         this.player.x = hero.state.x;
         this.player.z = hero.state.z;
       }
+      if (e.evolving !== undefined && !e.dying) updateEvolving(e, dt, this.time, (m, tier) => this.evolved(m, tier));
       e.update(dt);
       if (this.list.indexOf(e) < 0) continue;
+      animateParts(e, dt, this.time);
       if (e.air > 0 || e.rise > 0) {
         e.rise -= 40 * dt;
         e.air = Math.max(0, e.air + e.rise * dt);

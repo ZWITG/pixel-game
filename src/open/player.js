@@ -48,6 +48,10 @@ export default class Player {
     this.calm = 0;
     this.ringTimer = 0;
     this.looked = 9;
+    this.level = this.body.level;
+    hud.setLevel(this.level);
+    this.site = null;
+    this.siteDist = 1e9;
     this.camPos = new THREE.Vector3();
     this.camLook = new THREE.Vector3();
     hud.setBag(this.bag);
@@ -60,7 +64,9 @@ export default class Player {
   // Doors, beds and chests, all used with the same button.
   use(spot) {
     const { hud, rooms, state, bag, world } = this;
-    if (spot.action === 'enter' || spot.action === 'leave') {
+    if (spot.site) {
+      if (!spot.held) world.sites.use(this, spot.site);
+    } else if (spot.action === 'enter' || spot.action === 'leave') {
       hud.gasp();
       if (spot.action === 'enter') rooms.enter(spot.house, state);
       else rooms.leave(state);
@@ -86,13 +92,13 @@ export default class Player {
       return false;
     }
     const door = !rooms.house && !swim.inWater && world.work.door(state);
-    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : null;
+    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this);
     if (FEATURES.punching && just.punch && !state.air && !rooms.house && !swim.inWater) melee.punch(state);
     if (!spot) {
       hud.setAction('');
       return false;
     }
-    hud.setAction(`${prompt('interact', this.controls.device)} ${spot.label}`);
+    hud.setAction(`${prompt('interact', this.controls.device)} ${spot.held ? 'Hold: ' : ''}${spot.label}`);
     if (just.interact) this.use(spot);
     return just.interact;
   }
@@ -193,6 +199,11 @@ export default class Player {
     state.y = y;
     this.hero.mesh.scale.setScalar(body.heroScale);
 
+    if (body.level !== this.level) {
+      if (body.level > this.level) hud.message(`Level ${body.level}! The monsters stir...`, true);
+      this.level = body.level;
+      hud.setLevel(this.level);
+    }
     if (world.paused) return;
     for (const b of this.bag.buffs) {
       if ((b.left -= dt) <= 0) hud.message(`${ITEMS[b.id].name} wore off.`);

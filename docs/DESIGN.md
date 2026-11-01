@@ -108,6 +108,12 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Satchel and crafting (built 2026-11-01):** Triangle opens a pixel page with Bag and Craft tabs (`src/open/packPage.js`). Items and recipes are data in `src/open/items.js`. Gear goes in five slots and potions give timed bonuses; both feed `bonus()` in `body.js`, so force and Mass also strengthen punches and shockwaves. Potions can be made anywhere; gear needs a house, where chest contents count. Chests hold materials only.
 
+**Levels and evolving monsters (built 2026-11-01):** hero level comes from Mass before gear, plus Speed (`Body.level`). Six forms in `src/open/evolve.js` (plain, Thorned, Ironhide, Dread, Ancient, Cataclysm) add spikes, armor, burning eyes, horns, crowns, orbiting stones and auras to any monster. Live monsters behind the level stop, shudder and transform where you can watch; ones that survive a blow can too. Health and damage scale from the nearest hero's punch and toughness.
+
+**Places (built 2026-11-01):** ten categories in `src/open/sites.js`, each with its own goal and reward kind, marked by colored beams. The HUD points to the nearest unfinished one. Lasting perks feed `Body.bonus()`.
+
+**Hero against hero (built 2026-11-01):** blows and shockwaves hurt the other hero, capped at a quarter of their health per blow, and send them flying.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

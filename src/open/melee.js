@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { height, PLACES } from './terrain.js';
+import { FEATURES } from '../config/features.js';
 
 // Punching. Square throws a three-hit chain anywhere, at anything. The punch itself grows in
 // stages: each needs both practice (`level` of the Punching skill) and Strength, so the hero
@@ -26,6 +27,8 @@ const CRATER_MARK = 34;      // largest crack mark, in tiles; past this the dent
 const CRATER_DEPTH = 0.28;   // of its radius
 const MONSTER_REACH = 2.5;   // a plain punch still clips what's in front of it
 const HOUSE_REACH = 1.5;
+const PVP_REACH = 3;         // a plain punch reaches the other hero this far
+const PVP_SHARE = 0.25;      // the most one blow can take of the other hero's health
 
 // Which punch the hero has right now.
 export function punchStage(skills, body) {
@@ -115,6 +118,11 @@ export default class Melee {
     this.active = { target, t: 0, time: this.body.punchTime * (this.chain === 2 ? 1.3 : 1), fx: state.dir[0] / len, fz: state.dir[1] / len, landed: false, chain: this.chain };
   }
 
+  // A blow from this hero at their current punch, before the combo adds to it.
+  get force() {
+    return PUNCHES[this.stage].power * this.body.damageScale * this.body.massScale;
+  }
+
   // For the sprite: null when not punching.
   get pose() {
     const a = this.active;
@@ -123,7 +131,7 @@ export default class Melee {
 
   land(a, state) {
     const p = PUNCHES[this.stage], finisher = a.chain === 2, heavy = this.body.massScale, spread = Math.sqrt(heavy);
-    const force = p.power * CHAIN[a.chain] * this.body.damageScale * heavy;
+    const force = this.force * CHAIN[a.chain];
     const t = a.target && !a.target.dying && !this.work.chunks.gone.has(a.target.id) ? a.target : null;
     const r = t ? (t.r ?? t.radius) : 0;
     const x = t ? t.x - a.fx * r : state.x + a.fx * 1.2, z = t ? t.z - a.fz * r : state.z + a.fz * 1.2;
@@ -166,7 +174,14 @@ export default class Melee {
       this.ring(x, height(x, z), z, reach, color);
     }
     for (const h of this.work.housesAt(x, z, Math.max(reach, HOUSE_REACH))) queue.push({ h, at: Math.hypot(h.x - x, h.z - z) / WAVE_SPEED, force: falloff(0) });
+    if (FEATURES.friendlyFire) {
+      for (const foe of this.player.world.players) {
+        const d = Math.hypot(foe.state.x - x, foe.state.z - z);
+        if (foe !== this.player && !foe.rooms.house && d < Math.max(reach, PVP_REACH)) queue.push({ foe, at: d / WAVE_SPEED, force: falloff(d) });
+      }
+    }
     queue.sort((m, n) => m.at - n.at);
+    this.player.world.sites.struck(x, z, reach, this.stage, this.player);
     if (crater) this.tear(x, z, crater);
     this.waves.push({ queue, x, z, t: 0, drops: {}, broke: false });
     return queue.length > 0;
@@ -218,11 +233,24 @@ export default class Melee {
     c.mesh.material.opacity = 1;
   }
 
+  // Heroes can hurt each other. One blow is capped, so a strong hero can't flatten a new one
+  // instantly, but it still sends them flying.
+  hitHero(foe, force, x, z) {
+    if (foe.guard > 0) return;
+    const before = foe.hp, cap = foe.body.maxHealth * PVP_SHARE;
+    this.monsters.hurt(foe, Math.min(cap / (1 - foe.body.guard) * Math.sqrt(foe.body.massScale), force), x, z);
+    foe.state.rise = Math.min(14, 4 + force * 0.3);
+    foe.state.air = 0.01;
+    this.skills.add('fighting', 1);
+    if (foe.hp > before) this.hud.message('Knocked out!', true); // down() refilled them
+  }
+
   updateWave(w, dt) {
     w.t += dt;
     while (w.queue.length && w.queue[0].at <= w.t) {
-      const { o, m, h, force, at } = w.queue.shift();
-      if (m) this.monsters.hit(m, force, w.x, w.z);
+      const { o, m, h, foe, force, at } = w.queue.shift();
+      if (foe) this.hitHero(foe, force, w.x, w.z);
+      else if (m) this.monsters.hit(m, force, w.x, w.z);
       else if (h) w.broke = this.work.hitHouse(h, force) || w.broke;
       else if (!this.work.chunks.gone.has(o.id)) w.broke = this.work.hit(o, force, w.drops, at > 0) || w.broke;
     }

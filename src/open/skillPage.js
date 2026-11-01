@@ -69,6 +69,18 @@ export default class WorldHud {
     setTimeout(() => el.remove(), 800);
   }
 
+  setLevel(level) {
+    this.$('lv').textContent = `Lv ${level}`;
+  }
+
+  setGoal(text, color) {
+    if (text === this.goal) return;
+    this.goal = text;
+    const el = this.$('goal');
+    el.textContent = text;
+    el.style.color = color ?? '';
+  }
+
   // The word and button for what the hero could do right now.
   setAction(html) {
     if (html === this.action) return;

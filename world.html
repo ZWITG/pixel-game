@@ -42,6 +42,10 @@
       body.two #bag { top: calc(50% - 28px); bottom: auto; }
       #p2-bag { bottom: 10px; }
       #bag { position: fixed; right: 12px; bottom: 10px; color: #f3ead8; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
+      #lv, #p2-lv { position: fixed; left: 218px; top: 27px; color: #f3ead8; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
+      #goal, #p2-goal { position: fixed; left: 12px; top: 48px; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
+      body.two #p2-lv { top: calc(50% + 5px); }
+      body.two #p2-goal { top: calc(50% + 26px); }
       #hp, #p2-hp { position: fixed; left: 12px; top: 32px; width: 200px; height: 10px; background: #141a28; }
       #p2-hp { left: auto; right: 12px; }
       #hp-fill, #p2-hp-fill { height: 100%; width: 100%; background: #ff6f6f; }
@@ -67,7 +71,11 @@
   <body>
     <div id="game"></div>
     <div id="where"></div>
+    <div id="lv"></div>
+    <div id="goal"></div>
     <div id="p2-hp" class="p2"><div id="p2-hp-fill"></div></div>
+    <div id="p2-lv" class="p2"></div>
+    <div id="p2-goal" class="p2"></div>
     <div id="hp"><div id="hp-fill"></div></div>
     <div id="pad-status"></div>
     <div id="help"></div>

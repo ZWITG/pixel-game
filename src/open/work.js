@@ -46,6 +46,7 @@ export class Bag {
     this.items = saved?.items ?? {};
     this.stored = saved?.stored ?? {};
     this.worn = saved?.worn ?? {};  // slot id -> item id
+    this.perks = saved?.perks ?? {}; // lasting bonuses from finished places
     this.buffs = [];                // { id, left } for potions at work
   }
 
@@ -105,7 +106,7 @@ export class Bag {
     let sum = 0;
     for (const id of Object.values(this.worn)) sum += ITEMS[id].bonus?.[name] ?? 0;
     for (const b of this.buffs) sum += ITEMS[b.id].bonus[name] ?? 0;
-    return sum;
+    return sum + (this.perks[name] ?? 0);
   }
 
   // Empties the materials into the chest; gear and potions stay with you. Returns what moved.
@@ -122,7 +123,7 @@ export class Bag {
   }
 
   save() {
-    save(this.saveKey, { items: this.items, stored: this.stored, worn: this.worn });
+    save(this.saveKey, { items: this.items, stored: this.stored, worn: this.worn, perks: this.perks });
   }
 }
 

@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: players can hurt each other; hero level; monsters evolve through six visible forms, live, scaling with the heroes; ten location categories with their own goals, rewards and beams
 - 2026-11-01 prototype: Satchel page (Triangle) with inventory and crafting; five gear slots, three potions, ten recipes; gear and potions change force, health, armor, speed, carrying and Mass; gear is crafted in houses using bag and chest
 - 2026-11-01 prototype: split-screen is now horizontal, Player 1 on top and Player 2 below, each with their HUD in their own half
 - 2026-11-01 prototype: both heroes redrawn from an animated skeleton (taller anime proportions, six-frame walk, idle, punch and jump poses, wrapped fists, no sword). New camera: hero low in frame, eased following, climbs over hills, anything near the lens or between it and a hero dissolves, eases round when walking sideways

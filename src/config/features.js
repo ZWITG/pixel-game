@@ -11,6 +11,9 @@ export const FEATURES = {
   monsters: true,        // open world: monsters and hero health
   coop: true,            // open world: a second player joins on a second controller
   crafting: true,        // open world: the Satchel, gear, potions and recipes
+  friendlyFire: true,    // open world: heroes' blows hurt each other
+  evolution: true,       // open world: monsters change form as the heroes level
+  sites: true,           // open world: places with their own goals and rewards
   worldWork: true,       // open world: solid trees and rocks, chopping, mining, house interiors       // open world: learn to swim by trying; shows on the Skills page
   dodgeRoll: true,      // roll with brief invincibility (Shift / K / Circle)
   topDownCamera: false, // angled top-down view you can switch to (C / Create); off = behind-the-hero camera only

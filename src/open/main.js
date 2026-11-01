@@ -14,6 +14,7 @@ import { PUNCHES } from './melee.js';
 import Monsters from './monsters.js';
 import Player from './player.js';
 import SplitView from './splitView.js';
+import Sites from './sites.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -74,6 +75,9 @@ const players = [];
 const monsters = new Monsters(scene, work, players);
 const shared2 = { yaw: 0, pitch: 0.2, recenter: null }; // the camera both heroes steer while together
 const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'dusk', setTime, travel, splash };
+
+world.sites = new Sites(scene, monsters, work, players);
+world.viewYaw = (p) => (world.together ? shared2.yaw : p.state.yaw);
 
 const views = [{ camera, post: new Post(renderer, scene, camera) }];
 const splitView = new SplitView();
@@ -384,6 +388,7 @@ function step(dt) {
 
   if (!world.paused) {
     if (FEATURES.monsters) monsters.update(dt);
+    if (FEATURES.sites) world.sites.update(dt);
     for (const p of players) p.melee.update(dt, p.state);
     work.update(dt);
   }
