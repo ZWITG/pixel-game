@@ -19,6 +19,9 @@ import Sites from './sites.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
+const SPLIT_FOV = 72;      // a half-height picture needs a wider lens to show as much
+const SPLIT_PULL = 0.35;   // and the camera sits this much further back
+const SPLIT_RUN = 3;       // plus this many tiles while the hero is on the move
 const PIXEL = Number(new URLSearchParams(location.search).get('px') ?? 1.5); // screen pixels per game pixel
 const CAMERA_DIST = 9.5;   // tiles behind the hero
 const CAMERA_GROWTH = 5;   // extra distance per unit of hero scale, so a huge hero still fits
@@ -238,6 +241,8 @@ function leave() {
   world.together = false;
   split.amount = 0;
   views[0].camera.clearViewOffset();
+  camera.fov = FOV;
+  camera.updateProjectionMatrix();
   document.body.classList.remove('two');
   p1.hud.message('Player 2 left.');
 }
@@ -305,7 +310,10 @@ function personal(p, dt) {
   p.camZ = s.z;
   p.camY = p.camY === undefined || Math.abs(p.camY - eyeY) > 30 ? eyeY : p.camY + (eyeY - p.camY) * Math.min(1, dt * CAMERA_LIFT);
   const lookY = p.camY + LOOK_HEIGHT * big, inside = !!p.rooms.house;
-  const far = inside ? ROOM_CAMERA : CAMERA_DIST + (big - 1) * CAMERA_GROWTH;
+  // Eased, so starting and stopping don't bump the camera.
+  p.camRun = (p.camRun ?? 0) + ((s.moving ? 1 : 0) - (p.camRun ?? 0)) * Math.min(1, dt * 2);
+  const room = players.length > 1 ? split.amount : 0;
+  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) + p.camRun * SPLIT_RUN * room;
   const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(s.pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
   const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz);
   // Backed against a wall, it moves in and rises to look down past the shoulder.
@@ -373,6 +381,11 @@ function aimCameras(dt) {
       tmp.y += (p.state.y + 1.4 * p.body.heroScale - p.camLook.y) * k;
       v.camera.lookAt(tmp);
       // Slide each picture so its hero stands in the middle of their half, not on the line.
+      const lens = FOV + (SPLIT_FOV - FOV) * k;
+      if (v.camera.fov !== lens) {
+        v.camera.fov = lens;
+        v.camera.updateProjectionMatrix();
+      }
       const w = v.camera.aspect, side = (i ? 1 : -1) * k * SHIFT;
       if (k > 0) v.camera.setViewOffset(w, 1, -side * split.normal.x, side * split.normal.y, w, 1);
       else v.camera.clearViewOffset();
