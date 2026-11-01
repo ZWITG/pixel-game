@@ -1,16 +1,9 @@
 import * as THREE from 'three';
 import { height, dents, addDent } from './terrain.js';
-import { LOOT } from '../data/items.js';
+import { ITEMS } from './items.js';
 
 // Hands on the world: trees and rocks stand in the way, and can be chopped and mined for
 // materials. What is gone stays gone until it regrows, so the world remembers you were there.
-export const ITEMS = {
-  wood: { name: 'Wood', weight: 1, color: '#c98f5a' },
-  stone: { name: 'Stone', weight: 2, color: '#b7a9b4' },
-  iron: { name: 'Iron', weight: 3, color: '#e8a06a' },
-};
-for (const [id, loot] of Object.entries(LOOT)) ITEMS[id] = { name: loot.name, weight: 1, color: loot.color };
-
 // `need`: Strength needed before a strike does anything.
 export const ROCKS = [
   { hp: 3, drops: { stone: 2 } },
@@ -44,7 +37,7 @@ function save(key, value) {
   } catch { /* private window: lasts this session only */ }
 }
 
-// What the hero carries, limited by Strength, and what they keep in house chests.
+// What the hero carries (limited by Strength), wears, and keeps in house chests.
 export class Bag {
   constructor(body, saveKey) {
     this.body = body;
@@ -52,6 +45,8 @@ export class Bag {
     const saved = load(saveKey);
     this.items = saved?.items ?? {};
     this.stored = saved?.stored ?? {};
+    this.worn = saved?.worn ?? {};  // slot id -> item id
+    this.buffs = [];                // { id, left } for potions at work
   }
 
   get weight() {
@@ -67,17 +62,67 @@ export class Bag {
     return taken;
   }
 
-  // Empties the bag into the chest; returns what was moved.
+  remove(id, count) {
+    this.items[id] -= count;
+    if (this.items[id] <= 0) delete this.items[id];
+    this.save();
+  }
+
+  // How many there are to craft with; a chest counts when `chest` is true.
+  count(id, chest) {
+    return (this.items[id] ?? 0) + (chest ? this.stored[id] ?? 0 : 0);
+  }
+
+  // Spends from the bag first, then the chest.
+  spend(id, count) {
+    const held = Math.min(count, this.items[id] ?? 0);
+    if (held) this.remove(id, held);
+    if (count > held) {
+      this.stored[id] -= count - held;
+      if (this.stored[id] <= 0) delete this.stored[id];
+    }
+    this.save();
+  }
+
+  equip(id) {
+    const { slot } = ITEMS[id];
+    if (this.worn[slot]) this.unequip(slot);
+    this.remove(id, 1);
+    this.worn[slot] = id;
+    this.save();
+  }
+
+  // Back in the bag, even if that overfills it.
+  unequip(slot) {
+    const id = this.worn[slot];
+    delete this.worn[slot];
+    this.items[id] = (this.items[id] ?? 0) + 1;
+    this.save();
+  }
+
+  // Everything worn and every potion at work, added up for one bonus name.
+  bonus(name) {
+    let sum = 0;
+    for (const id of Object.values(this.worn)) sum += ITEMS[id].bonus?.[name] ?? 0;
+    for (const b of this.buffs) sum += ITEMS[b.id].bonus[name] ?? 0;
+    return sum;
+  }
+
+  // Empties the materials into the chest; gear and potions stay with you. Returns what moved.
   store() {
-    const moved = this.items;
-    for (const [id, n] of Object.entries(moved)) this.stored[id] = (this.stored[id] ?? 0) + n;
-    this.items = {};
+    const moved = {};
+    for (const [id, n] of Object.entries(this.items)) {
+      if (ITEMS[id].kind !== 'material') continue;
+      moved[id] = n;
+      this.stored[id] = (this.stored[id] ?? 0) + n;
+      delete this.items[id];
+    }
     this.save();
     return moved;
   }
 
   save() {
-    save(this.saveKey, { items: this.items, stored: this.stored });
+    save(this.saveKey, { items: this.items, stored: this.stored, worn: this.worn });
   }
 }
 

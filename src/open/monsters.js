@@ -148,7 +148,7 @@ export default class Monsters {
   hurt(p, amount, fromX, fromZ) {
     const s = p.state;
     if (p.guard > 0 || p.rooms.house) return;
-    const heavy = p.body.massScale, taken = Math.max(0.5, amount / Math.sqrt(heavy));
+    const heavy = p.body.massScale, taken = Math.max(0.5, (amount * (1 - p.body.guard)) / Math.sqrt(heavy));
     p.hp -= taken;
     p.guard = HURT_GUARD;
     p.calm = 0;

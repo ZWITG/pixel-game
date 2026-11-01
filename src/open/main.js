@@ -168,9 +168,11 @@ function renderPrompts() {
     [p('punch'), PUNCHES[melee.stage].name],
     [p('recenter'), 'Recenter'],
     [p('camera'), 'Travel'],
+    [p('pack'), 'Satchel'],
     [p('pause'), 'Spirit Tree'],
   ].map(([k, label]) => `${k} ${label}`).join('&nbsp;&nbsp; ');
   document.getElementById('map-hints').innerHTML = `${usePad ? btn('D-pad') : `${key('KeyA')}${key('KeyD')}`} Move&nbsp;&nbsp; ${p('back')} Close`;
+  document.getElementById('pack-hints').innerHTML = `${p('confirm')} Use, wear or craft&nbsp;&nbsp; ${p('punch')} Drop&nbsp;&nbsp; ${p('packTab')} Bag or Craft&nbsp;&nbsp; ${p('back')} Close`;
 }
 
 // Touchpad: both heroes go together.
@@ -207,10 +209,8 @@ function join() {
 }
 
 function leave() {
-  if (extra.hud.open) {
-    extra.hud.toggle(extra.skills.all(), extra.body);
-    world.paused = false;
-  }
+  extra.hud.closeAll(extra);
+  world.paused = false;
   if (extra.rooms.house) extra.rooms.leave(extra.state);
   players.pop();
   extra.hero.mesh.visible = false;

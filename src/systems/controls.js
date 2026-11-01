@@ -23,6 +23,8 @@ export const ACTIONS = {
   dodge: { keys: ['ShiftLeft', 'ShiftRight', 'KeyK'], pad: ['CIRCLE'] },
   interact: { keys: ['KeyE'], pad: ['CROSS'] },
   punch: { keys: ['KeyJ'], pad: ['SQUARE'] },            // open world
+  pack: { keys: ['KeyI'], pad: ['TRIANGLE'] },           // open world: the Satchel
+  packTab: { keys: ['Tab'], pad: ['L1', 'R1'] },
   jump: { keys: ['Space'], pad: ['CROSS'] },             // open world; a door in reach goes first
   lock: { keys: ['KeyQ', 'Tab'], pad: ['L2', 'R3'] },
   targetLeft: { keys: ['KeyZ'], pad: ['FLICK_LEFT'] },   // while locked on; otherwise Z / X turn the camera

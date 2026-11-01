@@ -106,6 +106,8 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Local co-op (built 2026-11-01):** a second controller joins with OPTIONS. Each player is a `Player` (`src/open/player.js`) with their own sprite, HUD, body, skills and bag; world, monsters and damage are shared. One camera frames both while they're close, then the screen splits horizontally, Player 1 on top and Player 2 below (`splitView.js`, `updateSplit` in main.js). Both views start identical, so the split has no pop. Terrain streams around both heroes.
 
+**Satchel and crafting (built 2026-11-01):** Triangle opens a pixel page with Bag and Craft tabs (`src/open/packPage.js`). Items and recipes are data in `src/open/items.js`. Gear goes in five slots and potions give timed bonuses; both feed `bonus()` in `body.js`, so force and Mass also strengthen punches and shockwaves. Potions can be made anywhere; gear needs a house, where chest contents count. Chests hold materials only.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

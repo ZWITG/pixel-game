@@ -12,17 +12,22 @@ const BASE_CLIMB = 1.0;  // steepest slope (rise per tile) a beginner can walk u
 export default class Body {
   constructor(skills) {
     this.skills = skills;
+    this.bag = null; // set once the bag exists: worn gear and potions add to the numbers below
+  }
+
+  bonus(name) {
+    return this.bag?.bonus(name) ?? 0;
   }
 
   get strength() { return this.skills.attribute('strength'); }
   get speed() { return this.skills.attribute('speed'); }
   get endurance() { return this.skills.attribute('endurance'); }
-  get mass() { return this.skills.attribute('mass'); }
+  get mass() { return this.skills.attribute('mass') + this.bonus('mass'); }
 
   // Movement: every point of Speed is 1.5% faster, on land and in water.
-  get moveScale() { return 1 + (this.speed - 10) * 0.015; }
+  get moveScale() { return (1 + (this.speed - 10) * 0.015) * (1 + this.bonus('speed')); }
   // Every point of Endurance is 3% more breath.
-  get breathScale() { return 1 + (this.endurance - 10) * 0.03; }
+  get breathScale() { return (1 + (this.endurance - 10) * 0.03) * (1 + this.bonus('breath')); }
   // Strength lets the hero haul up steeper ground.
   get climbLimit() { return BASE_CLIMB + (this.strength - 10) * 0.03; }
   // Mass is how much hero there is. Compared to a beginner's 60: it multiplies every blow,
@@ -31,12 +36,14 @@ export default class Body {
   get heroScale() { return 1 + Math.min(0.6, (this.mass - 60) * 0.004); }
   // Heavy enough, and just landing from a jump shakes the ground. Tiles of reach, 0 for none.
   get stompReach() { return Math.max(0, (this.mass - 90) * 0.06); }
-  get maxHealth() { return 20 + (this.endurance - 10) * 2.5; }
+  get maxHealth() { return 20 + (this.endurance - 10) * 2.5 + this.bonus('health'); }
+  // Share of every hit that armor takes away.
+  get guard() { return Math.min(0.7, this.bonus('guard')); }
 
   // Each point of Strength is 3% more force behind every blow (melee.js multiplies this)
   // and 2 more units of carrying.
-  get damageScale() { return 1 + (this.strength - 10) * 0.03; }
-  get carry() { return 20 + (this.strength - 10) * 2; }
+  get damageScale() { return (1 + (this.strength - 10) * 0.03) * (1 + this.bonus('force')); }
+  get carry() { return 20 + (this.strength - 10) * 2 + this.bonus('carry'); }
   // Strong legs jump higher: about 1.3 tiles at the start, past 3 when fully trained.
   get jumpSpeed() { return 7.5 + (this.strength - 10) * 0.05 + (this.speed - 10) * 0.03; }
   // Stronger arms snap back from a punch sooner.

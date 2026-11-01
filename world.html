@@ -53,6 +53,12 @@
       #blink { position: fixed; inset: 0; background: #141a28; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
       #blink.on { opacity: 1; transition: none; }
       #skills { position: fixed; inset: 0; background: #0a0f22; }
+      #pack { position: fixed; inset: 0; background: #120d14; }
+      #pack-page { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
+      #pack-tag, #pack-info { position: fixed; left: 54%; right: 4%; text-align: center; color: #f3ead8; text-shadow: 0 2px 0 #120d14; }
+      #pack-tag { top: 11%; font: 700 26px 'Zen Maru Gothic', sans-serif; color: #ffb547; }
+      #pack-info { top: 18%; font: 500 16px 'Zen Maru Gothic', sans-serif; }
+      #pack-hints { position: fixed; bottom: 10px; right: 14px; color: #f3ead8; font: 500 14px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; }
       #skill-map { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
       #skill-tag { position: fixed; left: 0; right: 0; bottom: 5%; text-align: center; font: 700 26px 'Zen Maru Gothic', sans-serif; text-shadow: 0 2px 0 #0a0f22; }
       [hidden] { display: none !important; }
@@ -80,6 +86,12 @@
       <canvas id="skill-map"></canvas>
       <div id="skill-tag"></div>
       <div id="map-hints"></div>
+    </div>
+    <div id="pack" hidden>
+      <canvas id="pack-page"></canvas>
+      <div id="pack-tag"></div>
+      <div id="pack-info"></div>
+      <div id="pack-hints"></div>
     </div>
     <script type="module" src="/src/open/main.js"></script>
   </body>

@@ -10,6 +10,7 @@ export const FEATURES = {
   punching: true,        // open world: Square punches, stages grow with practice and Strength
   monsters: true,        // open world: monsters and hero health
   coop: true,            // open world: a second player joins on a second controller
+  crafting: true,        // open world: the Satchel, gear, potions and recipes
   worldWork: true,       // open world: solid trees and rocks, chopping, mining, house interiors       // open world: learn to swim by trying; shows on the Skills page
   dodgeRoll: true,      // roll with brief invincibility (Shift / K / Circle)
   topDownCamera: false, // angled top-down view you can switch to (C / Create); off = behind-the-hero camera only

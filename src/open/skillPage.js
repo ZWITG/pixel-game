@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import SkillMap from './skillMap.js';
 import { height } from './terrain.js';
-import { ITEMS } from './work.js';
+import { ITEMS } from './items.js';
+import PackPage from './packPage.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -9,8 +10,10 @@ const $ = (id) => document.getElementById(id);
 export default class WorldHud {
   constructor(prefix) {
     this.$ = (id) => $(prefix + id);
-    this.open = false;
+    this.mapOpen = false;
+    this.packOpen = false;
     this.map = new SkillMap($('skill-map'), $('skill-tag'));
+    this.pack = new PackPage($('pack-page'), $('pack-tag'), $('pack-info'), $('pack-hints'));
     this.timer = null;
     this.point = new THREE.Vector3();
   }
@@ -78,9 +81,24 @@ export default class WorldHud {
     this.$('bag').innerHTML = held.length ? `${held.map(([id, n]) => `<span style="color:${ITEMS[id].color}">${ITEMS[id].name} ${n}</span>`).join('&nbsp;&nbsp;')}&nbsp;&nbsp;${bag.weight}/${Math.floor(bag.body.carry)}` : '';
   }
 
+  get open() {
+    return this.mapOpen || this.packOpen;
+  }
+
   toggle(skills, body) {
-    this.open = !this.open;
-    $('skills').hidden = !this.open;
-    if (this.open) this.map.open(skills, body);
+    this.mapOpen = !this.mapOpen;
+    $('skills').hidden = !this.mapOpen;
+    if (this.mapOpen) this.map.open(skills, body);
+  }
+
+  togglePack(player) {
+    this.packOpen = !this.packOpen;
+    $('pack').hidden = !this.packOpen;
+    if (this.packOpen) this.pack.open(player);
+  }
+
+  closeAll(player) {
+    if (this.mapOpen) this.toggle();
+    if (this.packOpen) this.togglePack(player);
   }
 }

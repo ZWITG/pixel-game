@@ -8,7 +8,8 @@ import Skills from './skills.js';
 import Swim, { DEEP } from './swim.js';
 import WorldHud from './skillPage.js';
 import Body, { ATTRIBUTES } from './body.js';
-import { Bag, ITEMS } from './work.js';
+import { Bag } from './work.js';
+import { ITEMS } from './items.js';
 import Melee from './melee.js';
 import Rooms, { ROOM_Y } from './rooms.js';
 
@@ -36,6 +37,7 @@ export default class Player {
     this.body = new Body(this.skills);
     this.swim = new Swim(this.skills, this.body, hud);
     this.bag = new Bag(this.body, `${save}bag`);
+    this.body.bag = this.bag;
     this.rooms = new Rooms(world.scene);
     this.melee = new Melee(world.scene, this, world.work);
     this.melee.monsters = world.monsters;
@@ -114,14 +116,19 @@ export default class Player {
     if (!this.frozen) {
       if (!hud.open && just.recenter) aim.recenter = Math.atan2(-state.dir[0], -state.dir[1]);
       if (!hud.open && just.camera) world.travel(this);
-      if (hud.open ? just.back || just.pause : just.pause) {
+      if (hud.packOpen ? just.back || just.pack || just.pause : !hud.open && just.pack) {
+        hud.togglePack(this);
+        world.paused = hud.open;
+      } else if (hud.mapOpen ? just.back || just.pause : !hud.open && just.pause) {
         hud.toggle(skills.all(), body);
         world.paused = hud.open;
-      }
-      if (hud.open) {
+      } else if (hud.mapOpen) {
         hud.map.handle(just);
-        hud.map.update(dt);
+      } else if (hud.packOpen) {
+        hud.pack.handle(just);
       }
+      if (hud.mapOpen) hud.map.update(dt);
+      if (hud.packOpen) hud.pack.update();
     }
     const used = this.act(just);
     const free = !hud.open && !this.frozen;
@@ -187,12 +194,45 @@ export default class Player {
     this.hero.mesh.scale.setScalar(body.heroScale);
 
     if (world.paused) return;
+    for (const b of this.bag.buffs) {
+      if ((b.left -= dt) <= 0) hud.message(`${ITEMS[b.id].name} wore off.`);
+    }
+    this.bag.buffs = this.bag.buffs.filter((b) => b.left > 0);
     this.guard = Math.max(0, this.guard - dt);
     this.calm += dt;
     if (this.calm > REGEN_DELAY && this.hp < body.maxHealth) {
       this.hp = Math.min(body.maxHealth, this.hp + REGEN * dt);
       hud.setHealth(this.hp / body.maxHealth);
     }
+  }
+
+  canCraft(recipe) {
+    const inside = !!this.rooms.house;
+    if (recipe.bench && !inside) return false;
+    return Object.entries(recipe.needs).every(([id, n]) => this.bag.count(id, inside) >= n);
+  }
+
+  craft(recipe) {
+    const { bag, hud } = this, def = ITEMS[recipe.id];
+    if (!this.canCraft(recipe)) return;
+    for (const [id, n] of Object.entries(recipe.needs)) bag.spend(id, n);
+    bag.items[recipe.id] = (bag.items[recipe.id] ?? 0) + 1; // made things are never lost to a full bag
+    bag.save();
+    hud.gain(def, '+1');
+  }
+
+  consume(id) {
+    const { bag, hud, body } = this, def = ITEMS[id];
+    bag.remove(id, 1);
+    if (def.heal) {
+      this.hp = Math.min(body.maxHealth, this.hp + body.maxHealth * def.heal);
+      hud.setHealth(this.hp / body.maxHealth);
+    }
+    if (def.bonus) {
+      bag.buffs = bag.buffs.filter((b) => b.id !== id);
+      bag.buffs.push({ id, left: def.secs });
+    }
+    hud.gain(def, '');
   }
 
   // Beaten: wake at the start with everything still in the bag.
