@@ -5,22 +5,39 @@ import { VoxelBuilder, vmat } from '../render/voxel.js';
 // whatever monster wears it, and scales stats from the nearest hero, so a fight stays a fight.
 export const TIERS = [
   { name: '', level: 1, hp: 1, damage: 1, size: 1, pace: 1, tint: '#ffffff', accent: '#f3ead8' },
-  { name: 'Thorned', level: 4, hp: 1.3, damage: 1.15, size: 1.15, pace: 1.05, tint: '#e6dcc8', accent: '#e8dcc0' },
-  { name: 'Ironhide', level: 8, hp: 1.7, damage: 1.35, size: 1.3, pace: 1.1, tint: '#bdb6cc', accent: '#c9d4e2' },
-  { name: 'Dread', level: 13, hp: 2.3, damage: 1.6, size: 1.5, pace: 1.15, tint: '#9484b4', accent: '#ff8a4c' },
-  { name: 'Ancient', level: 19, hp: 3, damage: 1.9, size: 1.75, pace: 1.2, tint: '#745c94', accent: '#ff5a5a' },
-  { name: 'Cataclysm', level: 26, hp: 4, damage: 2.3, size: 2, pace: 1.25, tint: '#4e3468', accent: '#9fe8ff' },
+  { name: 'Thorned', level: 6, hp: 1.15, damage: 1.06, size: 1.15, pace: 1.05, tint: '#e6dcc8', accent: '#e8dcc0' },
+  { name: 'Ironhide', level: 14, hp: 1.35, damage: 1.12, size: 1.3, pace: 1.1, tint: '#bdb6cc', accent: '#c9d4e2' },
+  { name: 'Dread', level: 26, hp: 1.6, damage: 1.2, size: 1.5, pace: 1.15, tint: '#9484b4', accent: '#ff8a4c' },
+  { name: 'Ancient', level: 42, hp: 1.9, damage: 1.28, size: 1.75, pace: 1.2, tint: '#745c94', accent: '#ff5a5a' },
+  { name: 'Cataclysm', level: 64, hp: 2.3, damage: 1.36, size: 2, pace: 1.25, tint: '#4e3468', accent: '#9fe8ff' },
 ];
+// What each kind of enemy is meant to be in a fight against a hero of its own level: `hits` of
+// that hero's blows to bring it down, and `bite`, the share of the hero's health a plain strike
+// takes. These two numbers are the whole of the balance; tune here first.
+export const ROLES = {
+  fodder: { hits: 4, bite: 0.06 },
+  fighter: { hits: 7, bite: 0.09 },
+  brute: { hits: 12, bite: 0.13 },
+  machine: { hits: 10, bite: 0.09 },
+  ruler: { hits: 90, bite: 0.13 },
+};
+const ROLE_OF = { slime: 'fodder', sporeling: 'fodder', bat: 'fodder', puffcap: 'fodder', wisp: 'fodder', fireSlime: 'fodder', bomber: 'fodder', drowned: 'fodder', assassin: 'fodder', golem: 'brute', iceGuard: 'brute', chief: 'brute' };
+const GROWTH_KEPT = 0.85;     // monsters keep up with a hero's might, but only this far: strength is felt
+const BLOW = 1.3;             // an average blow in a chain, of a hero's might
+const ELDER_HITS = 2.4, ELDER_BITE = 1.3;
+export const roleOf = (e) => ROLES[e.def.boss ? 'ruler' : e.def.machine ? 'machine' : ROLE_OF[e.kind] ?? 'fighter'];
 const EVOLVE_TIME = 2.4; // seconds of shaking and glowing before the new form breaks out
 const box3 = new THREE.Box3(), up = new THREE.Vector3(0, 1, 0);
 
 export const tierFor = (level) => TIERS.reduce((best, t, i) => (level >= t.level ? i : best), 0);
 
-// How tough a monster should be against this hero: a few hits to kill, a real bite when it lands.
-function scales(hero) {
+// How tough a monster should be against this hero: its role, then how far it's out of the
+// hero's league. `e.tough` comes from whose land this is (see Monsters.add).
+function scales(e, hero) {
+  const role = roleOf(e), { might, maxHealth, massScale } = hero.body, tough = e.tough ?? 1;
   return {
-    hp: Math.max(1, hero.melee.force * 0.4),
-    damage: Math.max(1, hero.body.maxHealth * Math.sqrt(hero.body.massScale) * 0.05),
+    hp: role.hits * BLOW * might ** GROWTH_KEPT * tough * (e.elder ? ELDER_HITS : 1),
+    damage: role.bite * maxHealth * Math.sqrt(massScale) * tough * (e.elder ? ELDER_BITE : 1),
   };
 }
 
@@ -133,14 +150,14 @@ function dress(e, tier) {
 export function setTier(e, tier, hero) {
   e.base ??= { hp: e.def.hp, damage: e.def.damage, radius: e.radius, speed: e.def.speed, chaseSpeed: e.def.chaseSpeed, scale: e.group.scale.x, name: e.def.name };
   e.box ??= measure(e);
-  const t = TIERS[tier], s = scales(hero), base = e.base;
+  const t = TIERS[tier], s = scales(e, hero), base = e.base;
   e.tier = tier;
   e.def.name = t.name ? `${t.name} ${base.name}` : base.name;
-  e.def.damage = base.damage * s.damage * t.damage;
+  e.def.damage = s.damage * t.damage;
   e.def.speed = base.speed * t.pace;
   e.def.chaseSpeed = base.chaseSpeed * t.pace;
   e.radius = base.radius * t.size;
-  e.hp = e.maxHp = base.hp * s.hp * t.hp;
+  e.hp = e.maxHp = s.hp * t.hp;
   e.group.scale.setScalar(base.scale * t.size);
   dress(e, tier);
 }

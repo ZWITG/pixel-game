@@ -9,11 +9,11 @@ import { FEATURES } from '../config/features.js';
 // `power` multiplies damageScale; `radius` and `crater` are in tiles; `stop` is hit-stop in seconds.
 export const PUNCHES = [
   { name: 'Jab', level: 0, strength: 0, power: 1, radius: 0, crater: 0, shake: 0.06, stop: 0.03, chips: 6, color: '#f3ead8' },
-  { name: 'Solid Punch', level: 1, strength: 12, power: 1.8, radius: 0, crater: 0, shake: 0.1, stop: 0.04, chips: 12, color: '#ffd98a' },
-  { name: 'Heavy Blow', level: 2, strength: 18, power: 3.2, radius: 3, crater: 2, shake: 0.2, stop: 0.06, chips: 20, color: '#ffb547' },
-  { name: 'Shockwave', level: 3, strength: 28, power: 6, radius: 8, crater: 4, shake: 0.35, stop: 0.08, chips: 30, color: '#ff8a4c' },
-  { name: 'Earthsplitter', level: 4, strength: 40, power: 12, radius: 14, crater: 7, shake: 0.55, stop: 0.1, chips: 44, color: '#ff5a5a' },
-  { name: 'Worldbreaker', level: 5, strength: 55, power: 25, radius: 24, crater: 12, shake: 0.9, stop: 0.14, chips: 60, color: '#9fe8ff' },
+  { name: 'Solid Punch', level: 1, strength: 12, power: 1.3, radius: 0, crater: 0, shake: 0.1, stop: 0.04, chips: 12, color: '#ffd98a' },
+  { name: 'Heavy Blow', level: 2, strength: 18, power: 1.7, radius: 3, crater: 2, shake: 0.2, stop: 0.06, chips: 20, color: '#ffb547' },
+  { name: 'Shockwave', level: 3, strength: 28, power: 2.2, radius: 8, crater: 4, shake: 0.35, stop: 0.08, chips: 30, color: '#ff8a4c' },
+  { name: 'Earthsplitter', level: 4, strength: 40, power: 2.8, radius: 14, crater: 7, shake: 0.55, stop: 0.1, chips: 44, color: '#ff5a5a' },
+  { name: 'Worldbreaker', level: 5, strength: 55, power: 3.6, radius: 24, crater: 12, shake: 0.9, stop: 0.14, chips: 60, color: '#9fe8ff' },
 ];
 
 const CHAIN = [1, 1.25, 2];  // left, right, finisher
@@ -27,7 +27,7 @@ const RINGS = 4, CRATERS = 8, CRATER_GRID = 18, CRATER_LIFE = 40, CRATER_FADE = 
 const CRATER_MARK = 34;      // largest crack mark, in tiles; past this the dent speaks for itself
 // Destructive Blow, by its skill level: seconds to charge fully, force, and reach in tiles.
 const BLOW_TIME = [2, 1.8, 1.6, 1.4, 1.2, 1];
-const BLOW_POWER = [8, 12, 18, 26, 38, 60];
+const BLOW_POWER = [3, 4, 5.5, 7.5, 10, 14];
 const BLOW_REACH = [14, 20, 28, 40, 58, 90];
 const BLOW_MOST = 110;
 const BLOW_PIT = 26;         // how deep the land can be driven by these

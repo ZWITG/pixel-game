@@ -403,7 +403,7 @@ export default class PowerSet {
     if ((this.waits[pid] ?? 0) > 0 || melee.held) return undefined;
     if (rooms.house && !rooms.house.dark) return hud.message('Not in here.');
     const def = this.def.powers[pid], rank = this.rank(pid), { kind } = def;
-    const aim = this.aim(), force = melee.force * def.power * rankScale(rank) || 0;
+    const aim = this.aim(), force = player.body.might * def.power * rankScale(rank) || 0;
     const job = { pid, def, rank, force, color: this.def.color };
     state.dir = [aim.dx, aim.dz];
     this.player.world.work.actor = player;
@@ -537,7 +537,7 @@ export default class PowerSet {
     if (e.dying) return;
     const y = e.group.position.y + 1.5;
     if (def.status === 'burn') {
-      this.burns.set(e, { left: BURN_SECS * (1 + rank * 0.15), dps: this.player.melee.force * BURN_SHARE * rankScale(rank) });
+      this.burns.set(e, { left: BURN_SECS * (1 + rank * 0.15), dps: this.player.body.might * BURN_SHARE * rankScale(rank) });
     } else if (def.status === 'freeze' && !e.boss) {
       stagger(e, (def.chill ?? 1) * (1 + rank * 0.12), monsters.time, true);
       this.fx.glow(e.x, y, e.z, 2.4, '#bfeaff', 0.5);
@@ -675,7 +675,7 @@ export default class PowerSet {
         for (let i = 0; i < 3; i++) this.fx.aura(this.element, state.x, ground, state.z, b.def.aura ? b.def.aura * 0.6 : 1.4);
         if (b.def.aura) this.scar(b, state.x, state.z, b.def.aura * 0.6, 0);
         if (b.def.aura) for (const e of melee.monsters.within(state.x, state.z, b.def.aura)) {
-          this.sting(e, melee.force * b.def.dps * rankScale(b.rank) * TICK);
+          this.sting(e, this.player.body.might * b.def.dps * rankScale(b.rank) * TICK);
           this.afflict(b.pid, e, b.def, b.rank);
         }
       }
@@ -701,7 +701,7 @@ export default class PowerSet {
       }
       if (beat) for (const e of melee.monsters.within(z.x, z.z, z.reach)) {
         if (z.def.pull && !e.boss) e.vel.set(z.x - e.x, z.z - e.z).multiplyScalar(1.4);
-        this.sting(e, melee.force * z.def.dps * rankScale(z.rank) * TICK);
+        this.sting(e, this.player.body.might * z.def.dps * rankScale(z.rank) * TICK);
         this.afflict(z.pid, e, z.def, z.rank);
       }
       return z.left > 0;

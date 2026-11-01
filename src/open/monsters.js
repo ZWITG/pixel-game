@@ -38,7 +38,8 @@ MODELS.human = (def) => makeFigure(def.figure ?? def.look, { sword: !!def.sword 
 MODELS.beast = (def) => makeCreature(def.shape ?? def.was, def);
 
 const OLD_SHAPES = ['slime', 'boar', 'wisp', 'mushroom'];
-const PATROLS = 0.25, PATROL_SIZE = 3; // the chance a spawn on hostile land is a patrol, and its size
+const LEAST_TOUGH = 0.75, MOST_TOUGH = 1.9, TOUGH_PER_LEVEL = 0.03;
+const PATROLS = 0.14, PATROL_SIZE = 3; // the chance a spawn on hostile land is a patrol, and its size
 const BADLANDS = ['scorpion', 'scorpion', 'golem', 'fireSlime'];
 const MARSH = ['lurker', 'lurker', 'puffcap', 'wisp'];
 const HEIGHTS = ['wraith', 'wraith', 'golem', 'wolf'];
@@ -160,6 +161,12 @@ export default class Monsters {
     e.remove();
   }
 
+  // Each nation has a level. Under it, its land is dangerous; well over it, its soldiers fold.
+  toughness(x, z, hero) {
+    const n = nationAt(x, z), left = n && !this.world.nations.isFallen(n);
+    return left ? Math.max(LEAST_TOUGH, Math.min(MOST_TOUGH, 1 + (n.level - hero.body.level) * TOUGH_PER_LEVEL)) : 1;
+  }
+
   danger(x, z) {
     return 1 + Math.hypot(x - SPAWN.x, z - SPAWN.z) / DANGER_SPAN;
   }
@@ -167,6 +174,8 @@ export default class Monsters {
   // `cave`: lives in that cave instead of on the land.
   add(type, x, z, danger, elder, cave = null) {
     const e = new Enemy(this, x, z, fit(ENEMIES[type], danger, elder));
+    e.kind = type;
+    e.elder = elder;
     e.air = 0;
     e.rise = 0;
     e.cave = cave;
@@ -179,6 +188,7 @@ export default class Monsters {
     }
     e.group.position.y = cave ? CAVE_FLOOR : height(x, z);
     const hero = this.nearest(e) ?? this.players[0];
+    e.tough = this.toughness(x, z, hero);
     setTier(e, e.def.boss ? 0 : Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
     this.list.push(e);
     return e;

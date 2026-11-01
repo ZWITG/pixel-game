@@ -54,6 +54,9 @@ export default class Body {
   // Each point of Strength is 3% more force behind every blow (melee.js multiplies this)
   // and 2 more units of carrying.
   get damageScale() { return (1 + (this.strength - 10) * 0.03) * (1 + this.bonus('force')) * (this.conq?.force ?? 1); }
+  // What's behind everything but the punch itself, which grows in stages of its own. Powers and
+  // monsters are measured by this, so every Conqueror is on the same scale.
+  get might() { return this.damageScale * this.massScale; }
   get carry() { return 20 + (this.strength - 10) * 2 + this.bonus('carry'); }
   // Strong legs jump higher: about 1.3 tiles at the start, past 3 when fully trained.
   get jumpSpeed() { return 7.5 + (this.strength - 10) * 0.05 + (this.speed - 10) * 0.03 + this.skills.level('jumping') * 0.4; }

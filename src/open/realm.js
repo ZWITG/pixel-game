@@ -22,7 +22,7 @@ const COST = { raise: 18, fortify: 40, build: 55, raid: 14, settle: 26, hunt: 20
 const RAISED = 12, CAPTAINS = 2, MOST_OUTPOSTS = 3, MOST_SETTLEMENTS = 4, MOST_FREE = 3;
 const GROWTH = 0.3;          // of the way up its curve per day
 const NEAR_NATION = 900;     // tiles a raid or a field power reaches from a hero's position in a nation
-const FIELD_GAP = 70, HUNT_GAP = 240, RAID_GAP = 120; // seconds between each, for one nation
+const FIELD_GAP = 200, HUNT_GAP = 420, RAID_GAP = 240; // seconds between each, for one nation
 const SPACING = 240;         // tiles between settlements
 const CHRONICLE = 40;
 const SAY_NEAR = 700;        // tiles at which news reaches the hero as a message
@@ -137,15 +137,17 @@ export default class Realm {
 
   // Armies grow with the hero, on a curve that levels off rather than running away.
   bandSize(id) {
-    const level = this.hero().body.level, by = 2 + Math.min(5, Math.sqrt(level) * 0.8);
-    return Math.max(2, Math.round(by * (0.6 + this.strength(id) * 0.8)));
+    const level = this.hero().body.level, by = 2 + Math.min(4, Math.sqrt(level) * 0.4);
+    return Math.max(2, Math.round(by * (0.6 + this.strength(id) * 0.6)));
   }
 
   // ---- how a nation decides ----
   plans(id) {
-    const s = this.of(id), weights = DOCTRINES[id].weights, threat = this.threat(id), st = this.world.nations.get(id);
+    const s = this.of(id), weights = DOCTRINES[id].weights, threat = this.threat(id), st = this.world.nations.get(id), n = NATIONS.find((a) => a.id === id);
     const army = s.troops / Math.min(MOST_ARMY, Math.max(MIN_ARMY, this.people(id) * ARMY_PER_POP));
     const broken = st.holds.filter((h) => h.done).length, here = this.heroOn(id);
+    // A hero far below a nation's notice isn't worth an army, until they start breaking things.
+    const noticed = threat > 0.25 || this.hero().body.level >= n.level * 0.6 ? 1 : 0;
     const afford = (plan) => (s.gold >= COST[plan] ? 1 : 0), ready = (plan) => ((s.waits[plan] ?? 0) <= this.time ? 1 : 0);
     const rival = this.weakestNeighbor(id);
     const score = {
@@ -153,9 +155,9 @@ export default class Realm {
       fortify: (broken ? 0.55 + threat * 0.4 : 0) * afford('fortify'),
       build: (this.outposts.filter((o) => o.nation === id && !o.done).length < MOST_OUTPOSTS ? 0.3 + threat * 0.5 : 0) * afford('build'),
       settle: (this.placesOf(id).length < MOST_SETTLEMENTS ? 0.45 * (1 - threat) : 0) * afford('settle'),
-      raid: (here ? 0.55 + threat * 0.3 : 0) * clamp(s.troops / 20) * afford('raid') * ready('raid'),
-      hunt: (here && s.captains.some((c) => c.alive) ? 0.45 + threat * 0.4 : 0) * afford('hunt') * ready('hunt'),
-      field: (here ? 0.75 : 0) * afford('field') * ready('field'),
+      raid: (here ? 0.55 + threat * 0.3 : 0) * noticed * clamp(s.troops / 20) * afford('raid') * ready('raid'),
+      hunt: (here && s.captains.some((c) => c.alive) ? 0.45 + threat * 0.4 : 0) * noticed * afford('hunt') * ready('hunt'),
+      field: (here ? 0.75 : 0) * noticed * afford('field') * ready('field'),
       war: rival ? clamp(this.strength(id) - this.strength(rival.owner) + 0.4) * (1 - threat) * afford('war') * ready('war') : 0,
     };
     return Object.entries(score).map(([plan, v]) => [plan, v * weights[plan] + Math.random() * CHANCE * (v > 0 ? 1 : 0)]).sort((a, b) => b[1] - a[1]);
@@ -282,7 +284,7 @@ export default class Realm {
   raid(id) {
     const hero = this.heroOn(id), n = NATIONS.find((a) => a.id === id), s = this.of(id);
     if (!hero) return;
-    s.waits.raid = this.time + RAID_GAP;
+    s.waits.raid = this.time + RAID_GAP * (1.2 - this.threat(id) * 0.6);
     const size = Math.min(this.bandSize(id), Math.ceil(s.troops / 4));
     if (size < 1) return;
     this.warband(hero, n, size, 42);
@@ -298,7 +300,8 @@ export default class Realm {
     const [e] = this.warband(hero, n, 1, 34, DOCTRINES[id].troops[0]);
     e.captain = cap;
     e.def = { ...e.def, name: `${cap.title ?? 'Captain'} ${cap.name}` };
-    e.hp *= 3 + cap.rank * 1.5;
+    e.hp *= 2.2 + cap.rank * 0.5;
+    e.def.damage *= 1.1 + cap.rank * 0.1;
     e.group.scale.multiplyScalar(1.35 + cap.rank * 0.08);
     this.warband(hero, n, Math.min(3, cap.rank + 1), 38);
     this.say(`${cap.title ?? 'Captain'} ${cap.name} of ${n.name} has come for you!`, n.color);
@@ -308,14 +311,14 @@ export default class Realm {
   field(id) {
     const hero = this.heroOn(id), n = NATIONS.find((a) => a.id === id), s = this.of(id), d = DOCTRINES[id];
     if (!hero) return;
-    s.waits.field = this.time + FIELD_GAP;
+    s.waits.field = this.time + FIELD_GAP * (1.2 - this.threat(id) * 0.6);
     hero.hud.message(d.fieldWord, true, 2000);
     FIELD[d.field](this, hero, n);
   }
 
   // A stone from far off: its shadow lands first.
   bombard(hero, x, z, size, delay) {
-    this.world.monsters.mark(x, z, size, delay, { def: { damage: Math.max(2, hero.body.maxHealth * 0.14) }, foe: hero }, '#ff6a4a');
+    this.world.monsters.mark(x, z, size, delay, { def: { damage: hero.body.maxHealth * 0.1 * Math.sqrt(hero.body.massScale) }, foe: hero }, '#ff6a4a');
   }
 
   // ---- what war costs ----

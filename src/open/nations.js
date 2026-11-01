@@ -6,12 +6,12 @@ import { addWind } from '../render/wind.js';
 // break enough of its strongholds to expose its ruler, then bring the ruler down at the seat.
 // `share`: how much of its strongholds must fall. Add a nation by adding an entry.
 export const NATIONS = [
-  { id: 'aurel', name: 'The Aurel Crown', seat: 'Aurelgate', ruler: 'High Marshal Verane', color: '#e8c050', sway: 1.45, word: 'The Aurel Crown has fallen', tribute: { force: 0.1 } },
-  { id: 'thorn', name: 'The Thorn League', seat: 'Thornmere', ruler: 'Sable, the Thorn Queen', color: '#5fae62', sway: 0.9, word: 'The Thorn League lies broken', tribute: { speed: 0.04 } },
-  { id: 'frost', name: 'The Frostwall', seat: 'The Frozen Throne', ruler: 'The Rime King', color: '#9fe8ff', word: 'The Frozen Throne stands empty', tribute: { health: 25 } },
-  { id: 'cinder', name: 'The Cinder Reach', seat: 'The Ember Caldera', ruler: 'Emberhorn', color: '#ff7a3a', word: 'The Cinder Reach burns no more', tribute: { force: 0.1 } },
-  { id: 'mire', name: 'The Drowned Court', seat: 'The Drowned Hollow', ruler: 'The Mirewyrm', color: '#a8d84a', word: 'The Drowned Court is silent', tribute: { guard: 0.06 } },
-  { id: 'bone', name: 'The Bone Waste', seat: 'The Gravepit', ruler: 'Gravemaw the Colossus', color: '#d8c8a8', word: 'The Bone Waste bows', tribute: { health: 25 } },
+  { id: 'aurel', name: 'The Aurel Crown', level: 42, seat: 'Aurelgate', ruler: 'High Marshal Verane', color: '#e8c050', sway: 1.45, word: 'The Aurel Crown has fallen', tribute: { force: 0.1 } },
+  { id: 'thorn', name: 'The Thorn League', level: 30, seat: 'Thornmere', ruler: 'Sable, the Thorn Queen', color: '#5fae62', sway: 0.9, word: 'The Thorn League lies broken', tribute: { speed: 0.04 } },
+  { id: 'frost', name: 'The Frostwall', level: 55, seat: 'The Frozen Throne', ruler: 'The Rime King', color: '#9fe8ff', word: 'The Frozen Throne stands empty', tribute: { health: 25 } },
+  { id: 'cinder', name: 'The Cinder Reach', level: 20, seat: 'The Ember Caldera', ruler: 'Emberhorn', color: '#ff7a3a', word: 'The Cinder Reach burns no more', tribute: { force: 0.1 } },
+  { id: 'mire', name: 'The Drowned Court', level: 12, seat: 'The Drowned Hollow', ruler: 'The Mirewyrm', color: '#a8d84a', word: 'The Drowned Court is silent', tribute: { guard: 0.06 } },
+  { id: 'bone', name: 'The Bone Waste', level: 5, seat: 'The Gravepit', ruler: 'Gravemaw the Colossus', color: '#d8c8a8', word: 'The Bone Waste bows', tribute: { health: 25 } },
 ].map((n) => {
   const T = TOWNS.find((t) => t.name === n.seat);
   return { ...n, x: T.x, z: T.z, base: n.sway ?? 1 };

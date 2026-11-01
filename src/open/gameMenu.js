@@ -242,7 +242,7 @@ export default class GameMenu {
       const places = realm.placesOf(n.id).length, captain = force.captains.find((c) => c.alive);
       return `<div class="nation ${r.fallen ? 'fallen' : ''}" style="--c:${n.color}">
         <i>${SVG(r.fallen ? SHAPES.nations : SHAPES.crown, 34)}</i>
-        <div><b>${n.name}</b><span>${d.title}: ${d.style}</span>
+        <div><b>${n.name}<small> · Level ${n.level}</small></b><span>${d.title}: ${d.style}</span>
         <div class="nation-bar"><u style="width:${fill}%"></u></div>
         <em>${state}${r.fallen || r.open ? '' : ` · ${r.done} of ${r.need} strongholds broken`}</em>
         ${r.fallen ? '' : `<span>Strength ${power}% · ${Math.round(force.troops)} troops · ${places} settlements${captain ? ` · ${captain.title ?? 'Captain'} ${captain.name}` : ''}</span>`}</div>
