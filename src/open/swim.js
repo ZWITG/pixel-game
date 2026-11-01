@@ -1,12 +1,18 @@
-// Swimming. Deep water always lets you in; what changes is how long you last.
-// Run out of breath and you wash back to the last dry ground, a little wiser.
+// Swimming. Water never stops you or sends you back: anyone can go anywhere. Skill decides how
+// well it goes. Effort drains while you swim; run out and you tire, slow right down and get
+// your breath back, and that struggle teaches more than easy strokes do.
 export const DEEP = -0.9;          // ground lower than this is over the hero's head
-const BREATH = [4, 8, 16, 32, 60, Infinity]; // seconds, by skill level (Endurance adds to this)
-const SPEED = [1.6, 2.6, 3.6, 4.6, 5.6, 7];  // tiles per second, by skill level (Speed adds to this)
-const FAIL_PRACTICE = 3;           // a failed attempt teaches more than the seconds it took
+export const SURFACE = -1.0;       // where a swimmer's feet hang
+const EFFORT = [8, 14, 24, 40, 70, Infinity]; // seconds of swimming, by skill level (Endurance adds to this)
+const SPEED = [4, 5, 6, 7, 8.5, 10];          // tiles per second, by skill level (Speed adds to this)
+const SPRINT = 1.5;                // R2 in the water: faster, but tiring twice as quickly
+const TIRED = 0.55;                // speed while getting your breath back
+const REST = 0.5;                  // share of full effort to recover before you're fresh again
+const RECOVER = 8;                 // seconds to recover from empty to full, in water
+const FAIL_PRACTICE = 3;           // tiring out teaches more than the seconds it took
 const TRIES = [
-  'You flail, swallow half the lake, and wash ashore.',
-  'Coughing on the sand. That went a little better.',
+  'You flail and swallow half the lake, but stay afloat.',
+  'Coughing and kicking. That went a little better.',
   'Almost had it. Your legs are starting to get the idea.',
 ];
 
@@ -17,57 +23,59 @@ export default class Swim {
     this.hud = hud;
     this.breath = this.maxBreath;
     this.inWater = false;
+    this.tired = false;
     this.fails = 0;
-    this.land = null;
   }
 
   get level() {
     return this.skills.level('swimming');
   }
 
-  get speed() {
-    return SPEED[this.level] * this.body.moveScale;
+  speed(sprint) {
+    return SPEED[this.level] * this.body.moveScale * (this.tired ? TIRED : sprint ? SPRINT : 1);
   }
 
   get maxBreath() {
-    return BREATH[this.level] * this.body.breathScale;
+    return EFFORT[this.level] * this.body.breathScale;
   }
 
   get flailing() {
-    return this.inWater && this.level === 0;
+    return this.inWater && (this.level === 0 || this.tired);
   }
 
-  // Returns the spot to wash up on when breath runs out, otherwise null.
-  update(dt, x, z, ground, moving) {
+  update(dt, ground, moving, sprint) {
     const max = this.maxBreath;
     if (ground >= DEEP) {
-      if (ground > 0.5) this.land = { x, z };
       this.inWater = false;
+      this.tired = false;
       this.breath = Math.min(max, this.breath + dt * 3);
       this.hud.setBreath(null);
-      return null;
+      return;
     }
-    if (!this.inWater && this.level === 0 && this.fails === 0) this.hud.message("You can't swim! Thrash your way back, or keep trying.");
+    if (!this.inWater && this.level === 0 && this.fails === 0) this.hud.message('You can barely swim. Keep at it, or head for the shore.');
     this.inWater = true;
     this.skills.add('swimming', dt * (moving ? 1 : 0.4));
     if (max === Infinity) {
       this.hud.setBreath(null);
-      return null;
+      return;
     }
-    this.breath = Math.min(this.breath, max) - dt;
-    this.hud.setBreath(this.breath / max);
-    if (this.breath > 0) return null;
+    if (this.tired || !moving) {
+      this.breath = Math.min(max, this.breath + (dt * max) / RECOVER);
+      if (this.breath >= max * REST) this.tired = false;
+    } else {
+      this.breath -= dt * (sprint ? 2 : 1);
+      if (this.breath <= 0) this.tire();
+    }
+    this.hud.setBreath(Math.max(0, this.breath) / max);
+  }
 
-    // Out of breath: the failure itself is practice.
+  tire() {
     const before = this.level;
+    this.tired = true;
+    this.breath = 0;
     this.skills.add('swimming', FAIL_PRACTICE);
-    // If this failure taught the skill, that news is the only message.
-    if (this.level === before) this.hud.message(before === 0 ? TRIES[Math.min(this.fails, TRIES.length - 1)] : 'Out of breath. You drag yourself ashore.');
+    // If this taught the skill, that news is the only message.
+    if (this.level === before) this.hud.message(before === 0 ? TRIES[Math.min(this.fails, TRIES.length - 1)] : 'Out of breath. Ease off for a moment.');
     this.fails++;
-    this.inWater = false;
-    this.breath = this.maxBreath;
-    this.hud.setBreath(null);
-    this.hud.gasp();
-    return this.land;
   }
 }

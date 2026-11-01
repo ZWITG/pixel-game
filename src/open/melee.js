@@ -134,7 +134,7 @@ export default class Melee {
 
   // Inside a cave the ground is the cave floor, whatever the land does above.
   height(x, z) {
-    return this.player.rooms.house ? this.player.state.y : landHeight(x, z);
+    return this.player.rooms.house ? this.player.state.y : Math.max(landHeight(x, z), -0.5); // the surface, over water
   }
 
   land(a, state) {

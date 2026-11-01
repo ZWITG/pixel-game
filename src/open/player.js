@@ -5,7 +5,7 @@ import { FEATURES } from '../config/features.js';
 import { height, SPAWN } from './terrain.js';
 import HeroSprite, { punchFrame, walkFrame, IDLE, JUMP, LOOKS } from './sprite.js';
 import Skills from './skills.js';
-import Swim, { DEEP } from './swim.js';
+import Swim, { DEEP, SURFACE } from './swim.js';
 import WorldHud from './skillPage.js';
 import Body, { ATTRIBUTES } from './body.js';
 import { Bag } from './work.js';
@@ -27,6 +27,7 @@ const FLY_TIME = [3, 6, 12, 25, 60, Infinity];
 const FLY_HEIGHT = [18, 35, 60, 100, 160, 260];
 const FLY_SPEED = [10, 13, 17, 22, 28, 36];
 const FLY_CLIMB = [8, 9, 11, 13, 16, 20];
+const WATER_JUMP = 0.75;
 const TAP = 0.16;            // holding the button this long turns a jump into flight
 const GLIDE = 0.35;          // gravity while falling, once you have wings
 const TIME_ORDER = ['morning', 'dusk', 'mist', 'night'];
@@ -106,7 +107,7 @@ export default class Player {
     }
     const door = !rooms.house && !swim.inWater && world.work.door(state);
     const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.people.spot(this);
-    if (FEATURES.punching && just.punch && !state.air && (!rooms.house || rooms.house.hostile) && !swim.inWater) melee.punch(state);
+    if (FEATURES.punching && just.punch && !state.air && (!rooms.house || rooms.house.hostile)) melee.punch(state);
     if (!spot) {
       hud.setAction('');
       return false;
@@ -174,8 +175,9 @@ export default class Player {
     }
     const used = this.act(just);
     const free = !hud.open && !this.frozen;
-    if (FEATURES.jump && just.jump && !used && free && !state.air && !swim.inWater && !melee.active) {
-      state.rise = body.jumpSpeed;
+    if (FEATURES.jump && just.jump && !used && free && !state.air && !melee.active) {
+      // A kick up out of the water is weaker than a jump off the ground, but it gets you out.
+      state.rise = body.jumpSpeed * (swim.inWater ? WATER_JUMP : 1);
       state.air = 0.01;
       skills.add('jumping', 1);
     }
@@ -195,13 +197,14 @@ export default class Player {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
       // Walking sideways slowly brings the camera round behind the hero.
       if (!world.together && !rooms.house && this.looked > LOOK_RESPECT) aim.yaw -= m.x * TURN_WITH_MOVE * dt;
-      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : swim.inWater ? swim.speed : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
+      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
       const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
       const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
       const rise = rooms.house ? 0 : height(nx, nz) - height(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
       const wet = !rooms.house && height(nx, nz) < DEEP;
       const steep = rise / Math.max(dist, 1e-3);
-      if (state.air > 2 || (steep < body.climbLimit && (FEATURES.swimming || !wet))) {
+      // Slopes only matter on foot: a swimmer can make for any bank, however steep the bed.
+      if (state.air > 2 || swim.inWater || (steep < body.climbLimit && (FEATURES.swimming || !wet))) {
         state.x = nx;
         state.z = nz;
         if (steep > CLIMB_START && !state.air) skills.add('climbing', dt);
@@ -218,19 +221,11 @@ export default class Player {
     state.moving = amount > 0.05;
     if (rooms.house) rooms.collide(state);
     else if (FEATURES.worldWork) world.work.collide(state);
-    let y = rooms.house ? rooms.floor : height(state.x, state.z);
+    const y = rooms.house ? rooms.floor : height(state.x, state.z);
     if (!world.paused) this.jump(dt, y);
     if (FEATURES.swimming && !world.paused && !rooms.house) {
-      const shore = swim.update(dt, state.x, state.z, state.air > 0 ? 0 : y, state.moving); // the air over a lake isn't the lake
-      if (shore) {
-        state.x = shore.x;
-        state.z = shore.z;
-        y = height(state.x, state.z);
-      }
-      if (swim.inWater) {
-        state.air = state.rise = 0;
-        world.splash(this, dt);
-      }
+      swim.update(dt, state.air > 0 ? 0 : y, state.moving, state.sprinting); // the air over a lake isn't the lake
+      if (swim.inWater) world.splash(this, dt);
     }
     // Swimming hides this bar every frame on land, so flight draws it afterward.
     if (state.flying && FLY_TIME[skills.level('flight')] !== Infinity) hud.setBreath(Math.max(0, this.wind) / FLY_TIME[skills.level('flight')]);
@@ -314,7 +309,7 @@ export default class Player {
     const ahead = -sy * dx - cy * dz, right = cy * dx - sy * dz;
     const view = Math.abs(right) > Math.abs(ahead) ? 2 : ahead > 0 ? 0 : 1;
     // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
-    const heroY = swim.inWater ? -1.25 + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.22 : 0.07) : Math.max(state.y, -0.9) + state.air;
+    const heroY = swim.inWater ? SURFACE + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : Math.max(state.y, SURFACE) + state.air;
     const pose = melee.pose, flip = pose && view !== 2 ? pose.chain === 1 : right < 0;
     hero.update(state.x, heroY, state.z, camera, view, flip, pose ? punchFrame(pose.t) : state.air ? JUMP : state.moving || swim.flailing ? walkFrame(time, swim.flailing ? 16 : state.sprinting ? 15 : 10) : IDLE);
     hero.punch(pose, flip ? -1 : 1);

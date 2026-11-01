@@ -163,7 +163,7 @@ const rings = Array.from({ length: 6 }, () => {
 });
 function splash(p, dt) {
   if ((p.ringTimer -= dt) > 0) return;
-  p.ringTimer = p.swim.flailing ? 0.16 : 0.5;
+  p.ringTimer = p.swim.flailing ? 0.2 : 0.5;
   const r = rings.reduce((a, b) => (a.age > b.age ? a : b));
   r.age = 0;
   r.ring.position.x = p.state.x;
