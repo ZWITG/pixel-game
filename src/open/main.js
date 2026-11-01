@@ -7,13 +7,14 @@ import { addLandmarks } from './landmarks.js';
 import { skyMaterial, waterMaterial, shared } from './materials.js';
 import { windTime } from '../render/wind.js';
 import Post from './post.js';
-import HeroSprite from './sprite.js';
+import HeroSprite, { punchFrame } from './sprite.js';
 import { FEATURES } from '../config/features.js';
 import Skills from './skills.js';
 import Swim, { DEEP } from './swim.js';
 import WorldHud from './skillPage.js';
 import Body, { ATTRIBUTES } from './body.js';
-import Work, { Bag, ITEMS, ROCKS } from './work.js';
+import Work, { Bag, ITEMS } from './work.js';
+import Melee, { PUNCHES } from './melee.js';
 import Rooms, { ROOM_Y } from './rooms.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
@@ -75,6 +76,7 @@ const swim = new Swim(skills, body, hud);
 const bag = new Bag(body);
 const work = new Work(scene, chunks, skills, body, bag, hud, marks);
 const rooms = new Rooms(scene);
+const melee = new Melee(scene, work, skills, body, hud);
 hud.setBag(bag);
 
 const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '', recenter: null, stop: 0, promptDevice: null, steepAt: 0, air: 0, rise: 0 };
@@ -139,9 +141,9 @@ function renderPrompts() {
   const pad = getPad();
   const status = pad ? `${(pad.id || 'Controller').split(' (')[0]} connected` : 'No controller yet: press any button on it';
   if (status !== state.padStatus) document.getElementById('pad-status').textContent = state.padStatus = status;
-  const d = controls.device;
-  if (d === state.promptDevice) return;
-  state.promptDevice = d;
+  const d = controls.device, key_ = `${d}${melee.stage}`;
+  if (key_ === state.promptDevice) return;
+  state.promptDevice = key_;
   const usePad = d === 'pad', btn = buttonHtml, key = keyHtml;
   const p = (action) => prompt(action, d);
   document.getElementById('help').innerHTML = [
@@ -149,6 +151,7 @@ function renderPrompts() {
     [usePad ? btn('R-stick') : key('Drag'), 'Look'],
     [usePad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
     [p('jump'), 'Jump'],
+    [p('punch'), PUNCHES[melee.stage].name],
     [p('recenter'), 'Recenter'],
     [p('camera'), 'Travel'],
     [p('pause'), 'Spirit Tree'],
@@ -186,21 +189,14 @@ function act(just) {
   }
   const door = !rooms.house && !swim.inWater && work.door(state);
   const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : null;
-  const thing = !spot && !rooms.house && !swim.inWater ? work.target(state) : null;
-  const d = controls.device;
-  if (spot) {
-    hud.setAction(`${prompt('interact', d)} ${spot.label}`);
-    if (just.interact) use(spot);
-    return just.interact;
+  if (FEATURES.punching && just.punch && !state.air && !rooms.house && !swim.inWater) melee.punch(state);
+  if (!spot) {
+    hud.setAction('');
+    return false;
   }
-  if (thing) {
-    const tough = thing.type === 'rock' && ROCKS[thing.size].need;
-    hud.setAction(`${prompt('attack', d)} ${thing.type === 'tree' ? 'Chop' : tough ? 'Mine boulder' : 'Mine'}`);
-    if (just.attack && !state.air) work.swing(thing, state);
-    return just.attack;
-  }
-  hud.setAction('');
-  return false;
+  hud.setAction(`${prompt('interact', controls.device)} ${spot.label}`);
+  if (just.interact) use(spot);
+  return just.interact;
 }
 
 function jump(dt, y) {
@@ -216,6 +212,11 @@ function jump(dt, y) {
 
 function step(dt) {
   dt = Math.min(dt, 0.05);
+  // Hit-stop: the world all but freezes for an instant, so a heavy blow feels heavy.
+  if (work.stop > 0) {
+    work.stop -= dt;
+    dt *= 0.08;
+  }
   shared.uTime.value += dt;
   windTime.value = shared.uTime.value;
   controls.update(dt);
@@ -234,7 +235,7 @@ function step(dt) {
     hud.map.update(dt);
   }
   const used = act(just);
-  if (FEATURES.jump && just.jump && !used && !hud.open && !state.air && !swim.inWater && !work.swinging) {
+  if (FEATURES.jump && just.jump && !used && !hud.open && !state.air && !swim.inWater && !melee.active) {
     state.rise = body.jumpSpeed;
     state.air = 0.01;
     skills.add('running', 0.3);
@@ -249,7 +250,7 @@ function step(dt) {
   }
   state.pitch = THREE.MathUtils.clamp(state.pitch + look.y, -0.25, 1.2);
 
-  const m = hud.open || work.swinging ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
+  const m = hud.open || melee.active ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
   if (amount > 0.05) {
     const sprint = controls.held.has('ShiftLeft') || controls.padHeld.R2;
     const s = Math.sin(state.yaw), c = Math.cos(state.yaw), speed = (swim.inWater ? swim.speed : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
@@ -298,7 +299,7 @@ function step(dt) {
   else tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
   camera.position.copy(tmp);
   camera.lookAt(state.x, eye + 1.7, state.z);
-  if (work.shake) camera.position.y += (Math.random() - 0.5) * work.shake;
+  if (work.shake) camera.position.addScaledVector(tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5), work.shake);
   if (state.drone) {
     // Preview only: a raised camera aimed at a landmark.
     const [up, lx, ly, lz] = state.drone;
@@ -306,7 +307,10 @@ function step(dt) {
     camera.lookAt(lx, ly, lz);
   }
 
-  if (!hud.open) work.update(dt, state);
+  if (!hud.open) {
+    melee.update(dt, state);
+    work.update(dt, state);
+  }
   hero.mesh.scale.setScalar(body.heroScale);
   // Pick the sprite's view from where the hero faces relative to the camera.
   const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw), [dx, dz] = state.dir;
@@ -315,9 +319,10 @@ function step(dt) {
   // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
   const time = shared.uTime.value;
   const heroY = swim.inWater ? -1.25 + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.22 : 0.07) : Math.max(y, -0.9) + state.air;
-  hero.update(state.x, heroY, state.z, camera, view, right < 0, state.air ? 1 : state.moving || swim.flailing ? Math.floor(time * (swim.flailing ? 12 : 6)) % 4 : 0);
+  const pose = melee.pose, flip = pose && view !== 2 ? pose.chain === 1 : right < 0;
+  hero.update(state.x, heroY, state.z, camera, view, flip, pose ? punchFrame(pose.t) : state.air ? 1 : state.moving || swim.flailing ? Math.floor(time * (swim.flailing ? 12 : 6)) % 4 : 0);
 
-  hero.swing(work.tool, right < 0 ? -1 : 1);
+  hero.punch(pose, flip ? -1 : 1);
 
   const dir = sky.material.uniforms.uSun.value;
   sun.target.position.set(state.x, y, state.z);
@@ -363,7 +368,7 @@ addEventListener('keydown', (e) => {
 });
 
 setTime('dusk');
-window.__world = { work, bag, rooms, marks, body, controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
+window.__world = { melee, PUNCHES, work, bag, rooms, marks, body, controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
   step((now - last) / 1000);

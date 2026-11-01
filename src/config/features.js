@@ -7,6 +7,7 @@ export const FEATURES = {
   lockOn: true,         // lock onto an enemy (Q / Tab / L2 or R3), switch with Z X / right-stick flick
   swimming: true,
   jump: true,            // open world: jump, height grows with Strength and Speed
+  punching: true,        // open world: Square punches, stages grow with practice and Strength
   worldWork: true,       // open world: solid trees and rocks, chopping, mining, house interiors       // open world: learn to swim by trying; shows on the Skills page
   dodgeRoll: true,      // roll with brief invincibility (Shift / K / Circle)
   topDownCamera: false, // angled top-down view you can switch to (C / Create); off = behind-the-hero camera only

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 
 // The hero as a hand-placed pixel sprite standing in the 3D world.
-// Atlas: rows back / front / side, four walking frames each, all drawn here in code.
-const W = 32, H = 38, FRAMES = 4, ROWS = 3;
+// Atlas: rows back / front / side, each with four walking frames, then wind-up and punch.
+const W = 32, H = 38, FRAMES = 6, ROWS = 3;
+const WINDUP = 4, PUNCH = 5;
 const C = {
   hair: '#3f4fd0', hairHi: '#7f90ff', hairDark: '#2a3398', skin: '#ffd2a8', skinDark: '#e8a884', eye: '#1b2233',
   tunic: '#f3ead8', tunicDark: '#c9b89e', cape: '#d0344a', capeDark: '#8e2036', pants: '#2b2f45',
@@ -10,7 +11,7 @@ const C = {
 };
 
 function drawFrame(g, row, frame, ox, oy) {
-  const step = [0, 1, 0, -1][frame], bob = frame % 2 ? 1 : 0;
+  const step = [0, 1, 0, -1, 0, 1][frame], bob = frame === 1 || frame === 3 ? 1 : 0;
   const r = (x, y, w, h, c) => {
     g.fillStyle = c;
     g.fillRect(ox + x, oy + y, w, h);
@@ -38,6 +39,7 @@ function drawFrame(g, row, frame, ox, oy) {
     r(19, 9 + body, 2, 4, C.eye);
     r(17, 15 + body, 3, 1, C.skinDark);
     r(10, 17 + body, 12, 3, C.cape);
+    punchArm(r, frame);
     return;
   }
   // legs and boots, shared by back and front
@@ -94,41 +96,22 @@ function drawFrame(g, row, frame, ox, oy) {
     r(8, 18 + body, 16, 3, C.cape);
     r(19, 20 + body, 4, 5, C.capeDark);
   }
+  punchArm(r, frame);
+}
+
+// The arm goes on last: drawn back on the wind-up, thrown out toward the right on the punch.
+function punchArm(r, frame) {
+  if (frame === WINDUP) {
+    r(6, 21, 8, 4, C.tunicDark);
+    r(4, 20, 5, 6, C.skin);
+  } else if (frame === PUNCH) {
+    r(18, 20, 8, 4, C.tunic);
+    r(25, 19, 6, 6, C.skin);
+    r(26, 20, 4, 1, C.skinDark);
+  }
 }
 
 // A one-pixel dark ink line around everything keeps the sprite readable on busy ground.
-function toolTexture(paint) {
-  const c = document.createElement('canvas');
-  c.width = 16;
-  c.height = 24;
-  paint((x, y, w, h, col) => {
-    const g = c.getContext('2d');
-    g.fillStyle = col;
-    g.fillRect(x, y, w, h);
-  });
-  outline(c.getContext('2d'), 16, 24);
-  const map = new THREE.CanvasTexture(c);
-  map.magFilter = map.minFilter = THREE.NearestFilter;
-  map.generateMipmaps = false;
-  map.colorSpace = THREE.SRGBColorSpace;
-  return map;
-}
-
-const TOOLS = {
-  axe: (r) => {
-    r(7, 3, 2, 20, C.boot);
-    r(8, 2, 6, 8, C.metal);
-    r(13, 1, 2, 10, '#ffffff');
-    r(6, 3, 2, 5, C.tunicDark);
-  },
-  pick: (r) => {
-    r(7, 4, 2, 19, C.boot);
-    r(2, 3, 12, 3, C.metal);
-    r(1, 5, 2, 3, C.metal);
-    r(13, 5, 2, 3, '#ffffff');
-  },
-};
-
 function outline(ctx, w, h) {
   const img = ctx.getImageData(0, 0, w, h), d = img.data, src = d.slice();
   const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < h && src[(y * w + x) * 4 + 3] > 0;
@@ -138,6 +121,29 @@ function outline(ctx, w, h) {
   }
   ctx.putImageData(img, 0, 0);
 }
+
+// A chunky eight-point star. White on black: the flash adds light, so black shows nothing.
+function burstTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 24;
+  const g = c.getContext('2d');
+  g.fillStyle = '#000000';
+  g.fillRect(0, 0, 24, 24);
+  g.fillStyle = '#ffffff';
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2, reach = k % 2 ? 7 : 11;
+    for (let d = 0; d < reach; d++) {
+      const w = Math.max(1, Math.round(4 * (1 - d / reach)));
+      g.fillRect(Math.round(12 + Math.cos(a) * d - w / 2), Math.round(12 + Math.sin(a) * d - w / 2), w, w);
+    }
+  }
+  const map = new THREE.CanvasTexture(c);
+  map.magFilter = map.minFilter = THREE.NearestFilter;
+  map.generateMipmaps = false;
+  return map;
+}
+
+export const punchFrame =(t) => (t < 0.35 ? WINDUP : PUNCH);
 
 export default class HeroSprite {
   constructor(scene) {
@@ -163,22 +169,20 @@ export default class HeroSprite {
     this.mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5 });
     scene.add(this.mesh);
 
-    // The tool in the hero's hands; it only shows during a swing.
-    this.tools = { axe: toolTexture(TOOLS.axe), pick: toolTexture(TOOLS.pick) };
-    this.tool = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 1.72).translate(0, 0.72, 0), new THREE.MeshBasicMaterial({ map: this.tools.axe, alphaTest: 0.5, side: THREE.DoubleSide }));
-    this.tool.visible = false;
-    this.mesh.add(this.tool);
+    // A flash on the fist as the punch lands; bigger and hotter at higher stages.
+    this.flash = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshBasicMaterial({ map: burstTexture(), transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+    this.flash.visible = false;
+    this.mesh.add(this.flash);
   }
 
-  // swing: { kind, t } with t from 0 to 1, or null. side 1 strikes toward screen right.
-  swing(swing, side) {
-    this.tool.visible = !!swing;
-    if (!swing) return;
-    const ease = Math.min(1, swing.t / 0.4);
-    this.tool.material.map = this.tools[swing.kind];
-    this.tool.position.set(side * 0.3, 1.1, 0.06);
-    this.tool.scale.x = side;
-    this.tool.rotation.z = side * (0.9 - ease * ease * 2.7);
+  // pose: { t, stage, color } from the melee system, or null. side 1 punches toward screen right.
+  punch(pose, side) {
+    this.flash.visible = !!pose && pose.t > 0.35 && pose.t < 0.7;
+    if (!this.flash.visible) return;
+    this.flash.material.color.set(pose.color);
+    this.flash.position.set(side * 1.0, 1.15, 0.1);
+    this.flash.scale.setScalar(0.6 + pose.stage * 0.5);
+    this.flash.rotation.z = pose.t * 9;
   }
 
   // view: 0 back, 1 front, 2 side; flip mirrors the side view to face left.

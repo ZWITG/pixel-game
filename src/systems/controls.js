@@ -22,7 +22,8 @@ export const ACTIONS = {
   spin: { keys: ['KeyF', 'KeyL'], pad: ['R2', 'TRIANGLE'] },
   dodge: { keys: ['ShiftLeft', 'ShiftRight', 'KeyK'], pad: ['CIRCLE'] },
   interact: { keys: ['KeyE'], pad: ['CROSS'] },
-  jump: { keys: ['Space'], pad: ['CROSS'] },             // open world; a door or a chop in reach goes first
+  punch: { keys: ['KeyJ'], pad: ['SQUARE'] },            // open world
+  jump: { keys: ['Space'], pad: ['CROSS'] },             // open world; a door in reach goes first
   lock: { keys: ['KeyQ', 'Tab'], pad: ['L2', 'R3'] },
   targetLeft: { keys: ['KeyZ'], pad: ['FLICK_LEFT'] },   // while locked on; otherwise Z / X turn the camera
   targetRight: { keys: ['KeyX'], pad: ['FLICK_RIGHT'] },

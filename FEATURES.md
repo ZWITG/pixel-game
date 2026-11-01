@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: Square is now a punch (keyboard J) with a three-hit chain; six punch stages from Jab to Worldbreaker need Punching practice plus Strength, adding force, hit-stop, shockwaves and ground cracks; new Punching skill and bough; axe and pick removed
 - 2026-11-01 prototype: interactive world. Trees, new rocks, houses and landmarks are solid; chop trees and mine rocks for Wood, Stone and Iron; Woodcutting and Mining skills; Strength sets bag size, blow force and which boulders crack; enter houses, sleep, store items in a chest; cut trees leave stumps and regrow after 15 minutes; jump (Cross / Space), higher with Strength and Speed, clears low rocks
 - 2026-10-30 prototype: body attributes (Strength, Speed, Endurance) grow from skill practice and change movement, breath, climbing and hero size; new Climbing and Running skills; skill map gains boughs and body gauges
 - 2026-10-30 prototype: PS5 prompts by default, L1 recenters the camera, touchpad travels between landmarks

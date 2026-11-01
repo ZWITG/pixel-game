@@ -18,13 +18,13 @@ export const ROCKS = [
 
 const REACH = 1.9;          // tiles past the object's edge
 const HERO_RADIUS = 0.4;
-const HIT_AT = 0.4;         // how far through the swing the blow lands
 const REGROW = 15 * 60000;  // ms
 const TREE_HP = 6;          // per unit of tree size
 const WOOD = 3;             // per unit of tree size
 const LEAVES = [['#2a7a55', '#46a06a'], ['#b81f2e', '#ff7a56'], ['#cf8f1e', '#ffe27a']];
 const BARK = ['#8a5236', '#c9a070'], DUST = ['#94808a', '#c9bcc4', '#6f6068'];
-const MAX_CHIPS = 240;
+const MAX_CHIPS = 400;
+const MAX_FALLING = 24;     // past this, a shockwave just blows trees apart
 const BAG_KEY = 'lumen.bag', WORLD_KEY = 'lumen.world';
 
 function load(key) {
@@ -80,7 +80,7 @@ export class Bag {
 export default class Work {
   constructor(scene, chunks, skills, body, bag, hud, marks) {
     Object.assign(this, { scene, chunks, skills, body, bag, hud, marks });
-    this.swinging = null;
+    this.stop = 0; // hit-stop: seconds of slowed time after a heavy blow
     this.hurt = new Map();
     this.shaking = null;
     this.falling = [];
@@ -145,48 +145,39 @@ export default class Work {
     return this.marks.houses.find((h) => Math.hypot(state.x - h.door.x, state.z - h.door.z) < 2.4);
   }
 
-  swing(target, state) {
-    if (this.swinging) return;
-    state.dir = [target.x - state.x, target.z - state.z];
-    this.swinging = { target, t: 0, time: this.body.swingTime, landed: false };
-  }
-
-  // Swing progress for the sprite: null when idle.
-  get tool() {
-    if (!this.swinging) return null;
-    return { kind: this.swinging.target.type === 'tree' ? 'axe' : 'pick', t: this.swinging.t / this.swinging.time };
-  }
-
-  land(o) {
+  // One blow on one object. `drops` gathers what comes loose; returns true if it broke.
+  // `quiet`: a passing shockwave, which doesn't announce what it couldn't crack.
+  hit(o, force, drops, quiet = false) {
     const y = o.y + (o.type === 'tree' ? 1.2 : o.sc * 0.6);
     if (o.type === 'rock' && ROCKS[o.size].need > this.body.strength) {
       // Too tough for now, but the effort still counts.
+      if (quiet) return false;
       this.skills.add('mining', 0.3);
       this.burst(o.x, y, o.z, DUST, 4, 3);
       this.shakeOff(o, 0.12);
       if (performance.now() - this.deniedAt > 4000) this.hud.message(`It won't crack. You need Strength ${ROCKS[o.size].need}.`);
       this.deniedAt = performance.now();
-      return;
+      return false;
     }
     const hp = o.type === 'tree' ? TREE_HP * o.sc : ROCKS[o.size].hp;
-    const done = (this.hurt.get(o.id) ?? 0) + this.body.damageScale;
-    this.skills.add(o.type === 'tree' ? 'woodcutting' : 'mining', 1);
-    this.burst(o.x, y, o.z, o.type === 'tree' ? BARK : DUST, 8, 5);
-    this.shake = 0.1;
+    const done = (this.hurt.get(o.id) ?? 0) + force;
+    this.burst(o.x, y, o.z, o.type === 'tree' ? BARK : DUST, 5, 5);
     if (done < hp) {
       this.hurt.set(o.id, done);
       this.shakeOff(o, o.type === 'tree' ? 0.05 : 0.02);
-      return;
+      return false;
     }
     this.hurt.delete(o.id);
     this.chunks.remove(o, Date.now() + REGROW);
-    save(WORLD_KEY, Object.fromEntries(this.chunks.gone));
+    const loot = o.type === 'tree' ? { wood: Math.round(WOOD * o.sc) } : ROCKS[o.size].drops;
+    for (const [id, n] of Object.entries(loot)) drops[id] = (drops[id] ?? 0) + n;
     if (o.type === 'tree') this.fell(o);
-    else {
-      this.burst(o.x, y, o.z, DUST, 30, 7);
-      this.shake = 0.25;
-      this.give(ROCKS[o.size].drops);
-    }
+    else this.burst(o.x, y, o.z, DUST, 24, 7);
+    return true;
+  }
+
+  saveGone() {
+    save(WORLD_KEY, Object.fromEntries(this.chunks.gone));
   }
 
   shakeOff(o, amount) {
@@ -205,6 +196,10 @@ export default class Work {
 
   // The tree comes down away from the hero, on its own copy so the forest needn't change.
   fell(o) {
+    if (this.falling.length >= MAX_FALLING) {
+      this.burst(o.x, o.y + 4, o.z, LEAVES[o.kind], 12, 6, true);
+      return;
+    }
     const away = Math.atan2(o.x - this.heroX, o.z - this.heroZ);
     const parts = ['crown', 'trunk'].map((name) => {
       const src = this.chunks.trees[o.kind][name];
@@ -216,7 +211,6 @@ export default class Work {
       return m;
     });
     this.falling.push({ o, parts, age: 0, away, landed: false });
-    this.skills.add('woodcutting', 3);
   }
 
   updateFalling(dt) {
@@ -229,8 +223,7 @@ export default class Work {
         f.landed = true;
         const reach = 9 * o.sc, x = o.x + Math.sin(f.away) * reach, z = o.z + Math.cos(f.away) * reach;
         this.burst(x, height(x, z) + 1, z, LEAVES[o.kind], 40, 6, true);
-        this.shake = 0.3;
-        this.give({ wood: Math.round(WOOD * o.sc) });
+        this.shake = Math.max(this.shake, 0.3);
       }
       const sink = Math.max(0, f.age - 2) * 3, s = Math.max(0.01, 1 - Math.max(0, f.age - 2));
       d.position.set(o.x, o.y - 0.2 - sink, o.z);
@@ -292,15 +285,6 @@ export default class Work {
     this.heroX = state.x;
     this.heroZ = state.z;
     this.shake = Math.max(0, this.shake - dt * 0.8);
-    if (this.swinging) {
-      const s = this.swinging;
-      s.t += dt;
-      if (!s.landed && s.t >= s.time * HIT_AT) {
-        s.landed = true;
-        this.land(s.target);
-      }
-      if (s.t >= s.time) this.swinging = null;
-    }
     if (this.shaking) {
       const s = this.shaking;
       s.t += dt;

@@ -98,6 +98,8 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Body attributes (built 2026-10-30):** Strength, Speed and Endurance start at 10 and grow from skill practice, never from menus (`src/open/skills.js`, `trains`). All their effects live in `src/open/body.js`. Strength is the long-term pillar: today it sets steepest climbable slope, hero size, jump height, blow force on trees and rocks (`damageScale`), bag size (`carry`) and which boulders crack (Strength 14). Combat reads the same `damageScale` when it moves over, and later Strength should also gate heavy weapons and armor, pushing objects, and hauling yourself up cliffs.
 
+**Punching (built 2026-11-01):** Square punches anywhere, in a three-hit chain (left, right, finisher at double force). The punch grows through six stages, Jab to Worldbreaker (`src/open/melee.js`, `PUNCHES`). Each needs both the Punching level and a Strength value, so practice alone or muscle alone isn't enough. From Heavy Blow on, a blow sends out a shockwave that cracks the ground and breaks what it reaches as it passes. Monsters should plug into the same blow: `force` from `land()`, reduced with distance along the wave.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

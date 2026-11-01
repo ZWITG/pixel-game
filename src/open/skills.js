@@ -40,14 +40,27 @@ export const SKILLS = {
       { at: 800, title: 'Windfoot', icon: 'star' },
     ],
   },
+  // These levels are also the punch stages in melee.js, which need Strength as well.
+  punching: {
+    name: 'Punching',
+    color: '#ff5a5a',
+    trains: { strength: 0.08, endurance: 0.01, speed: 0.01 },
+    levels: [
+      { at: 15, title: 'Solid Punch', icon: 'fist' },
+      { at: 50, title: 'Heavy Blow', icon: 'burst' },
+      { at: 130, title: 'Shockwave', icon: 'quake' },
+      { at: 300, title: 'Earthsplitter', icon: 'crack' },
+      { at: 650, title: 'Worldbreaker', icon: 'nova' },
+    ],
+  },
   woodcutting: {
     name: 'Woodcutting',
     color: '#8fd86a',
     trains: { strength: 0.05, endurance: 0.02 },
     levels: [
-      { at: 12, title: 'Kindling Gatherer', icon: 'axe' },
+      { at: 12, title: 'Kindling Gatherer', icon: 'stump' },
       { at: 40, title: 'Woodcutter', icon: 'log' },
-      { at: 100, title: 'Feller', icon: 'stump' },
+      { at: 100, title: 'Feller', icon: 'axe' },
       { at: 220, title: 'Forester', icon: 'pine' },
       { at: 450, title: 'Forest Breaker', icon: 'oak' },
     ],
