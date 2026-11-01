@@ -32,6 +32,7 @@ const HILL_SAMPLES = 8;
 const WALL_SAMPLES = 12;
 const WALL_GAP = 0.8;      // how close it may pass a wall, in tiles
 const WALL_RISE = 5;       // tiles it rises when a wall forces it in
+const HOP = 4;             // tiles up before the camera follows into the air
 const TELEPORT = 25;       // tiles moved in one frame that count as a jump
 const MAX_SHAKE = 0.45;
 const SHAKE_REACH = 70;
@@ -309,7 +310,9 @@ function personal(p, dt) {
   p.camX = s.x;
   p.camZ = s.z;
   p.camY = p.camY === undefined || Math.abs(p.camY - eyeY) > 30 ? eyeY : p.camY + (eyeY - p.camY) * Math.min(1, dt * CAMERA_LIFT);
-  const lookY = p.camY + LOOK_HEIGHT * big, inside = !!p.rooms.house;
+  // A jump leaves the camera where it is; real flight takes it along.
+  p.camAir = (p.camAir ?? 0) + ((s.air > HOP ? s.air : 0) - (p.camAir ?? 0)) * Math.min(1, dt * 6);
+  const lookY = p.camY + p.camAir + LOOK_HEIGHT * big, inside = !!p.rooms.house;
   // Eased, so starting and stopping don't bump the camera.
   p.camRun = (p.camRun ?? 0) + ((s.moving ? 1 : 0) - (p.camRun ?? 0)) * Math.min(1, dt * 2);
   const room = players.length > 1 ? split.amount : 0;
@@ -327,14 +330,14 @@ function personal(p, dt) {
   if (inside) p.rooms.clampCamera(tmp, s.x, s.z);
   else tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
   p.camPos.copy(tmp);
-  p.camLook.set(s.x, lookY + AIM_ABOVE * Math.min(1, d / CAMERA_DIST) + s.air * 0.5, s.z);
+  p.camLook.set(s.x, lookY + AIM_ABOVE * Math.min(1, d / CAMERA_DIST) + (s.air - p.camAir) * 0.5, s.z);
 }
 
 // One camera behind both heroes, pulling back as they drift apart.
 const sharedPos = new THREE.Vector3(), sharedLook = new THREE.Vector3();
 function together(a, b, span, dt) {
   const { yaw, pitch } = shared2, far = CAMERA_DIST + span * 0.8, cp = Math.cos(pitch);
-  const x = (a.state.x + b.state.x) / 2, z = (a.state.z + b.state.z) / 2, eye = (a.camY + b.camY) / 2 + LOOK_HEIGHT;
+  const x = (a.state.x + b.state.x) / 2, z = (a.state.z + b.state.z) / 2, eye = (a.camY + a.camAir + b.camY + b.camAir) / 2 + LOOK_HEIGHT;
   const reachX = x + Math.sin(yaw) * cp * far, reachZ = z + Math.cos(yaw) * cp * far;
   const dist = far * Math.max(0.4, solidStop(x, z, reachX, reachZ));
   sharedPos.set(x + Math.sin(yaw) * cp * dist, eye + Math.sin(pitch) * dist, z + Math.cos(yaw) * cp * dist);

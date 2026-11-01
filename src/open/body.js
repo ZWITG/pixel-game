@@ -47,7 +47,7 @@ export default class Body {
   get damageScale() { return (1 + (this.strength - 10) * 0.03) * (1 + this.bonus('force')); }
   get carry() { return 20 + (this.strength - 10) * 2 + this.bonus('carry'); }
   // Strong legs jump higher: about 1.3 tiles at the start, past 3 when fully trained.
-  get jumpSpeed() { return 7.5 + (this.strength - 10) * 0.05 + (this.speed - 10) * 0.03; }
+  get jumpSpeed() { return 7.5 + (this.strength - 10) * 0.05 + (this.speed - 10) * 0.03 + this.skills.level('jumping') * 0.4; }
   // Stronger arms snap back from a punch sooner.
   get punchTime() { return 0.34 / (1 + (this.strength - 10) * 0.01); }
 }

@@ -248,7 +248,7 @@ export default class Monsters {
         if (!e.air) e.rise = 0;
       }
       e.group.position.y = (e.cave ? CAVE_FLOOR : height(e.x, e.z)) + e.air;
-      if (hero && !e.dying && e.air < 1 && far < e.radius + 0.7) this.hurt(hero, e.def.damage, e.x, e.z);
+      if (hero && !e.dying && e.air < 1 && hero.state.air < 3 && far < e.radius + 0.7) this.hurt(hero, e.def.damage, e.x, e.z);
     }
     for (const o of this.orbs) {
       o.life -= dt;

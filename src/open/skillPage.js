@@ -14,10 +14,14 @@ export default class WorldHud {
     this.map = new SkillMap($('skill-map'), $('skill-tag'));
     this.pack = new PackPage(this.$('pack-page'), this.$('pack-tag'), this.$('pack-info'), this.$('pack-hints'));
     this.timer = null;
+    this.keepUntil = 0;
     this.point = new THREE.Vector3();
   }
 
-  message(text, big = false) {
+  // `keep`: milliseconds nothing else may replace this message, for news that mustn't be missed.
+  message(text, big = false, keep = 0) {
+    if (performance.now() < this.keepUntil) return;
+    this.keepUntil = performance.now() + keep;
     const el = this.$('toast');
     el.textContent = text;
     el.className = big ? 'show big' : 'show';

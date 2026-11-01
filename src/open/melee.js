@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { height as landHeight, PLACES, TOWNS } from './terrain.js';
+import { height as landHeight, dentAt, PLACES, TOWNS } from './terrain.js';
 import { FEATURES } from '../config/features.js';
 
 // Punching. Square throws a three-hit chain anywhere, at anything. The punch itself grows in
@@ -24,6 +24,9 @@ const WAVE_SPEED = 45;       // tiles per second; things break as the wave reach
 const AIR_PRACTICE = 0.1;
 const RINGS = 4, CRATERS = 8, CRATER_GRID = 10, CRATER_LIFE = 40;
 const CRATER_MARK = 34;      // largest crack mark, in tiles; past this the dent speaks for itself
+const HARD_LANDING = 10;      // tiles fallen before a stomp breaks the ground
+const HOP_STOMP = 0.25;      // an ordinary jump's landing reaches this share of a hard one
+const DEEPEST_PIT = 8;      // the land can't be pushed down further than this
 const CRATER_DEPTH = 0.28;   // of its radius
 const MONSTER_REACH = 2.5;   // a plain punch still clips what's in front of it
 const HOUSE_REACH = 1.5;
@@ -155,10 +158,10 @@ export default class Melee {
   }
 
   // Landing from a jump: mass alone is enough to shake the ground.
-  stomp(state) {
-    const reach = this.body.stompReach;
+  stomp(state, fell) {
+    const hard = fell > HARD_LANDING, reach = this.body.stompReach * (hard ? 1 : HOP_STOMP);
     if (!reach) return;
-    this.blast(state.x, state.z, this.body.massScale * this.body.damageScale, reach, reach > 6 ? reach * 0.6 : 0, '#c9a0ff', null);
+    this.blast(state.x, state.z, this.body.massScale * this.body.damageScale, reach, hard ? reach * 0.6 : 0, '#c9a0ff', null);
     this.work.shake = Math.max(this.work.shake, Math.min(0.6, reach * 0.06));
     this.work.shakeAt = state;
   }
@@ -197,7 +200,7 @@ export default class Melee {
   // Tears the ground open, except right under the great landmarks.
   tear(x, z, size) {
     const safe = [PLACES.spire, { ...PLACES.ribs, r: 260 }, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 90 }, ...TOWNS];
-    if (safe.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + size)) return;
+    if (safe.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + size) || dentAt(x, z) > DEEPEST_PIT) return;
     this.work.chunks.deform(x, z, size, size * CRATER_DEPTH);
     this.crater(x, z, Math.min(CRATER_MARK, size * 1.1));
   }

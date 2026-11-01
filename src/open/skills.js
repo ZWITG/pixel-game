@@ -40,6 +40,31 @@ export const SKILLS = {
       { at: 800, title: 'Windfoot', icon: 'star' },
     ],
   },
+  jumping: {
+    name: 'Jumping',
+    color: '#9fd0ff',
+    trains: { speed: 0.02, strength: 0.02 },
+    levels: [
+      { at: 5, title: 'Hopper', icon: 'boot' },
+      { at: 20, title: 'Leaper', icon: 'hill' },
+      { at: 50, title: 'Bounder', icon: 'peak' },
+      { at: 110, title: 'Skyvaulter', icon: 'dash' },
+      { at: 220, title: 'Sky-Touched', icon: 'star' },
+    ],
+  },
+  // Flight can't be practised until Jumping is maxed; then it grows like any other skill.
+  flight: {
+    name: 'Flight',
+    color: '#fff0a0',
+    trains: { speed: 0.03, endurance: 0.03 },
+    levels: [
+      { at: 8, title: 'Fledgling', icon: 'feather' },
+      { at: 35, title: 'Glider', icon: 'wing' },
+      { at: 90, title: 'Cloudrider', icon: 'cloud' },
+      { at: 220, title: 'Skydancer', icon: 'comet' },
+      { at: 480, title: 'Skyborn', icon: 'nova' },
+    ],
+  },
   // These levels are also the punch stages in melee.js, which need Strength as well.
   punching: {
     name: 'Punching',

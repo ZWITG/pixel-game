@@ -21,6 +21,14 @@ const CLIMB_START = 0.45; // slopes steeper than this count as climbing practice
 const TURN_WITH_MOVE = 0.4; // radians per second the camera eases round when walking sideways
 const LOOK_RESPECT = 1.2;    // seconds after the player steers the camera before it eases again
 const REGEN_DELAY = 6, REGEN = 2; // seconds out of a fight, then health per second
+const JUMP_MAX = 5;          // the Jumping level that opens Flight
+// By Flight level: seconds aloft, top height, and tiles per second across and upward.
+const FLY_TIME = [3, 6, 12, 25, 60, Infinity];
+const FLY_HEIGHT = [18, 35, 60, 100, 160, 260];
+const FLY_SPEED = [10, 13, 17, 22, 28, 36];
+const FLY_CLIMB = [8, 9, 11, 13, 16, 20];
+const TAP = 0.16;            // holding the button this long turns a jump into flight
+const GLIDE = 0.35;          // gravity while falling, once you have wings
 const TIME_ORDER = ['morning', 'dusk', 'mist', 'night'];
 
 export default class Player {
@@ -32,7 +40,8 @@ export default class Player {
     this.controls.device = 'pad'; // PS5 prompts by default; pressing a key switches them to keyboard
     const hud = this.hud = new WorldHud(prefix);
     this.skills = new Skills((skill, level) => {
-      if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
+      if (skill.name === 'Jumping' && level === JUMP_MAX) hud.message('Jumping has evolved into Flight! Jump and hold X to fly.', true, 5000);
+      else if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
       else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
     }, (name, value) => hud.gain(ATTRIBUTES[name], value), `${save}skills`);
     this.body = new Body(this.skills);
@@ -49,6 +58,7 @@ export default class Player {
     this.guard = 0;
     this.calm = 0;
     this.ringTimer = 0;
+    this.wind = 0;             // seconds of flight left; refills on the ground
     this.looked = 9;
     this.level = this.body.level;
     hud.setLevel(this.level);
@@ -106,15 +116,38 @@ export default class Player {
     return just.interact;
   }
 
+  get wings() {
+    return FEATURES.flight && this.skills.level('jumping') >= JUMP_MAX;
+  }
+
   jump(dt, y) {
-    const { state } = this;
-    if (state.air <= 0 && state.rise <= 0) return;
-    state.rise -= GRAVITY * dt;
+    const { state, skills, hud, controls } = this, level = skills.level('flight'), most = FLY_TIME[level];
+    const hold = controls.padHeld.CROSS || controls.held.has('Space');
+    state.held = hold && state.air > 0 ? (state.held ?? 0) + dt : 0;
+    state.flying = this.wings && !this.rooms.house && this.wind > 0 && state.held > TAP;
+    if (state.flying) {
+      // Climb while there's height left, then hold there.
+      const goal = state.air < FLY_HEIGHT[level] ? FLY_CLIMB[level] : 0;
+      state.rise += Math.max(-dt * 30, Math.min(dt * 30, goal - state.rise));
+      state.air += state.rise * dt;
+      state.peak = Math.max(state.peak ?? 0, state.air);
+      if (most !== Infinity) this.wind -= dt;
+      skills.add('flight', dt);
+      return;
+    }
+    if (state.air <= 0 && state.rise <= 0) {
+      if (this.wings) this.wind = most === Infinity ? 1 : Math.min(most, this.wind + (dt * most) / 3);
+      return;
+    }
+    const falling = this.wings && state.rise < 0 && state.air > 2;
+    state.rise = Math.max(state.rise - GRAVITY * (falling ? GLIDE : 1) * dt, falling ? -14 : -60);
     state.air += state.rise * dt;
+    state.peak = Math.max(state.peak ?? 0, state.air);
     if (state.air > 0) return;
-    state.air = state.rise = 0;
+    const fell = state.peak;
+    state.air = state.rise = state.peak = 0;
     this.world.work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], 5, 2);
-    if (!this.rooms.house) this.melee.stomp(state);
+    if (!this.rooms.house) this.melee.stomp(state, fell);
   }
 
   // Input, movement and everything that moves this hero, for one frame.
@@ -144,7 +177,7 @@ export default class Player {
     if (FEATURES.jump && just.jump && !used && free && !state.air && !swim.inWater && !melee.active) {
       state.rise = body.jumpSpeed;
       state.air = 0.01;
-      skills.add('running', 0.3);
+      skills.add('jumping', 1);
     }
     const look = free ? controls.look() : { x: 0, y: 0 };
     aim.yaw -= look.x;
@@ -162,17 +195,17 @@ export default class Player {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
       // Walking sideways slowly brings the camera round behind the hero.
       if (!world.together && !rooms.house && this.looked > LOOK_RESPECT) aim.yaw -= m.x * TURN_WITH_MOVE * dt;
-      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (swim.inWater ? swim.speed : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
+      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : swim.inWater ? swim.speed : (sprint ? SPRINT : RUN) * body.moveScale) * amount;
       const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
       const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
       const rise = rooms.house ? 0 : height(nx, nz) - height(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
       const wet = !rooms.house && height(nx, nz) < DEEP;
       const steep = rise / Math.max(dist, 1e-3);
-      if (steep < body.climbLimit && (FEATURES.swimming || !wet)) {
+      if (state.air > 2 || (steep < body.climbLimit && (FEATURES.swimming || !wet))) {
         state.x = nx;
         state.z = nz;
-        if (steep > CLIMB_START) skills.add('climbing', dt);
-        if (sprint && !swim.inWater && !wet) skills.add('running', dt);
+        if (steep > CLIMB_START && !state.air) skills.add('climbing', dt);
+        if (sprint && !swim.inWater && !wet && !state.air) skills.add('running', dt);
       } else if (!wet) {
         // Too steep for now, but straining against it still builds the arms.
         skills.add('climbing', dt * 0.5);
@@ -188,7 +221,7 @@ export default class Player {
     let y = rooms.house ? rooms.floor : height(state.x, state.z);
     if (!world.paused) this.jump(dt, y);
     if (FEATURES.swimming && !world.paused && !rooms.house) {
-      const shore = swim.update(dt, state.x, state.z, y, state.moving);
+      const shore = swim.update(dt, state.x, state.z, state.air > 0 ? 0 : y, state.moving); // the air over a lake isn't the lake
       if (shore) {
         state.x = shore.x;
         state.z = shore.z;
@@ -199,6 +232,8 @@ export default class Player {
         world.splash(this, dt);
       }
     }
+    // Swimming hides this bar every frame on land, so flight draws it afterward.
+    if (state.flying && FLY_TIME[skills.level('flight')] !== Infinity) hud.setBreath(Math.max(0, this.wind) / FLY_TIME[skills.level('flight')]);
     state.y = y;
     this.hero.mesh.scale.setScalar(body.heroScale);
 

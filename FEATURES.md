@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: Jumping skill, which evolves into a Flight skill at its top level; jump and hold X to fly, glide when released, more time, height and speed as Flight levels
 - 2026-11-01 prototype: split-screen shows more: wider lens, camera further back, extra room while moving
 - 2026-11-01 prototype: removed the item list from the game screen; items show in the Satchel, with brief +1 notes when picked up
 - 2026-11-01 prototype: explorable places: 2 walled cities, 5 villages, 6 bandit camps with new human bandits and chiefs, 3 ruined keeps, 9 caves to walk through; townsfolk talk, heal and trade

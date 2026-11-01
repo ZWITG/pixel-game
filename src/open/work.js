@@ -15,6 +15,7 @@ const REACH = 1.9;          // tiles past the object's edge
 const HERO_RADIUS = 0.4;
 const REGROW = 15 * 60000;  // ms
 const HOUSE_HP = 50;
+const CLEAR_OF_ALL = 22;    // tiles up, above everything that blocks the way
 const TREE_HP = 6;          // per unit of tree size
 const WOOD = 3;             // per unit of tree size
 const LEAVES = [['#2a7a55', '#46a06a'], ['#b81f2e', '#ff7a56'], ['#cf8f1e', '#ffe27a']];
@@ -161,6 +162,7 @@ export default class Work {
 
   // Stops the hero at trees, rocks, houses and landmarks; they slide around the edge.
   collide(state) {
+    if (state.air > CLEAR_OF_ALL) return; // flying over the rooftops and treetops
     for (const o of this.chunks.near(state.x, state.z, 6)) {
       if (o.type === 'tree' || state.air < o.sc) this.pushCircle(state, o.x, o.z, o.r); // rocks can be jumped
     }
