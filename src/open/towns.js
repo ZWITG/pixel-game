@@ -236,7 +236,7 @@ export class People {
   }
 
   blocked(x, z) {
-    return this.world.marks.solids.some((s) => (s.r ? Math.hypot(x - s.x, z - s.z) < s.r + 1 : !s.off && x > s.x0 - 1 && x < s.x1 + 1 && z > s.z0 - 1 && z < s.z1 + 1));
+    return this.world.marks.solids.some((s) => !s.off && (s.r ? Math.hypot(x - s.x, z - s.z) < s.r + 1 : x > s.x0 - 1 && x < s.x1 + 1 && z > s.z0 - 1 && z < s.z1 + 1));
   }
 
   update(dt) {

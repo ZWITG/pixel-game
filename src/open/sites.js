@@ -1,4 +1,5 @@
 import { fortMesh } from './doctrines.js';
+import { raises, raiseWorks, razeWorks, strike, settleWorks, restoreWorks, standing, workDuties, explode, fury, dishearten } from './raze.js';
 import * as THREE from 'three';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
 import { height, biome, riverDistance, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
@@ -12,8 +13,8 @@ import { ITEMS } from './items.js';
 //  land(y): where one may stand. `first` of each kind is placed near the start.
 export const CATEGORIES = {
   shrine: { name: 'Dim Shrine', color: '#9fe8ff', count: 12, goal: 'hold', secs: 4, verb: 'Rekindle', text: 'Hold to rekindle its flame', land: (y) => y > 6 && y < 220, reward: { perk: { health: 5 } } },
-  camp: { name: 'Monster Camp', color: '#ff8a4c', count: 12, goal: 'clear', mobs: ['slime', 'boar', 'fireSlime', 'puffcap'], size: 5, text: 'Defeat everything in the camp', land: (y) => y > 4 && y < 160, reward: { items: { hide: 3, tusk: 1, gel: 3 } } },
-  den: { name: 'Elder Den', color: '#ff5a5a', count: 7, goal: 'boss', mobs: ['boar', 'puffcap', 'fireSlime'], text: 'Slay the Elder that lairs here', land: (y) => y > 10 && y < 240, reward: { items: { tusk: 3, pearl: 1 }, perk: { force: 0.03 } } },
+  camp: { name: 'Monster Camp', color: '#ff8a4c', count: 12, goal: 'raze', mobs: ['slime', 'boar', 'fireSlime', 'puffcap'], size: 5, text: 'Tear the camp down', land: (y) => y > 4 && y < 160, reward: { items: { hide: 3, tusk: 1, gel: 3 } } },
+  den: { name: 'Elder Den', color: '#ff5a5a', count: 7, goal: 'raze', size: 3, mobs: ['boar', 'puffcap', 'fireSlime'], text: 'Smash the idols of this den', land: (y) => y > 10 && y < 240, reward: { items: { tusk: 3, pearl: 1 }, perk: { force: 0.03 } } },
   vault: { name: 'Sealed Vault', color: '#c9a0ff', count: 9, goal: 'break', hits: 24, text: 'Punch through the seal stones', land: (y) => y > 5 && y < 200, reward: { items: { iron: 6, pearl: 1, dust: 2 } } },
   vein: { name: 'Crystal Vein', color: '#7fe3c0', count: 10, goal: 'break', hits: 16, text: 'Smash the crystal for its ore', land: (y) => y > 30 && y < 400, reward: { items: { iron: 12, stone: 6 }, practice: { mining: 25 } } },
   trial: { name: 'Trial Ring', color: '#ffe27a', count: 7, goal: 'survive', secs: 30, verb: 'Begin the trial', text: 'Stay in the ring and survive', land: (y) => y > 5 && y < 150, reward: { practice: { fighting: 60 }, perk: { guard: 0.01 } } },
@@ -21,8 +22,8 @@ export const CATEGORIES = {
   wreck: { name: 'Sunken Cache', color: '#5fd8f0', count: 7, goal: 'hold', secs: 3, verb: 'Dive', text: 'Dive down and pull it up', land: (y) => y < -4 && y > -30, reward: { items: { pearl: 2, dust: 2 }, practice: { swimming: 60 } } },
   hermit: { name: 'Hermit Camp', color: '#8fd86a', count: 8, goal: 'trade', pay: { wood: 8, stone: 4 }, verb: 'Trade', text: 'Bring 8 Wood and 4 Stone', land: (y) => y > 5 && y < 180, reward: { items: { salve: 3, tonic: 1 } } },
   cave: { name: 'Cave', color: '#b08cff', count: 9, goal: 'cave', verb: 'Enter the cave', text: 'Go in and find its treasure', steep: 9, land: (y) => y > 15 && y < 300, reward: { items: { pearl: 1, iron: 5, dust: 2 }, perk: { health: 3 } } },
-  bandit: { name: 'Bandit Camp', color: '#ff6f6f', count: 0, goal: 'clear', mobs: ['chief', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit'], size: 7, built: true, text: 'Drive out the bandits', reward: { items: { iron: 4, hide: 4, tusk: 1, tonic: 1 } } },
-  keep: { name: 'Ruined Keep', color: '#c9bcc4', count: 0, goal: 'clear', mobs: ['boar', 'fireSlime', 'puffcap', 'fireSlime'], size: 9, built: true, text: 'Clear the ruins of what nests there', reward: { items: { iron: 8, pearl: 2 }, perk: { force: 0.02 } } },
+  bandit: { name: 'Bandit Camp', color: '#ff6f6f', count: 0, goal: 'raze', mobs: ['chief', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit', 'bandit'], size: 7, built: true, text: 'Burn this camp to the ground', reward: { items: { iron: 4, hide: 4, tusk: 1, tonic: 1 } } },
+  keep: { name: 'Ruined Keep', color: '#c9bcc4', count: 0, goal: 'raze', mobs: ['boar', 'fireSlime', 'puffcap', 'fireSlime'], size: 9, built: true, text: 'Break what holds these ruins', reward: { items: { iron: 8, pearl: 2 }, perk: { force: 0.02 } } },
   city: { name: 'City', color: '#e8c050', count: 0, goal: 'boss', built: true, guards: 5, text: 'Overthrow the ruler of this city', reward: { items: { pearl: 3, iron: 12 }, practice: { fighting: 200 } } },
   lair: { name: 'Lair', color: '#ff3a6a', count: 0, goal: 'boss', built: true, text: 'Bring down what rules here', reward: { items: { pearl: 3, iron: 12, tusk: 4 }, perk: { force: 0.1, health: 15 }, practice: { fighting: 200 } } },
   cache: { name: 'Lost Cache', color: '#ffb547', count: 12, goal: 'open', verb: 'Open', text: 'Open the old chest', land: (y) => y > 3 && y < 260, reward: { items: { salve: 1, iron: 2, wood: 4 } } },
@@ -96,6 +97,7 @@ export default class Sites {
     let seed = 2741;
     const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const done = new Set(this.load());
+    this.live = [];     // places with works standing and a hero close enough to matter
     this.list = [];
     for (const [key, cat] of Object.entries(CATEGORIES)) {
       for (let n = 0; n < cat.count; n++) {
@@ -194,13 +196,44 @@ export default class Sites {
   }
 
   // A blow landed nearby: seals and crystals take it, more from a bigger punch.
-  struck(x, z, reach, stage, p) {
+  struck(x, z, reach, stage, p, force = 0) {
     for (const s of this.list) {
+      if (s.works && !s.done && Math.hypot(s.x - x, s.z - z) < reach + 60) this.strikeWorks(s, x, z, reach, force, p);
       if (s.done || s.cat.goal !== 'break' || Math.hypot(s.x - x, s.z - z) > Math.max(reach, 2) + 5) continue;
       s.hits += 1 + stage;
       this.work.burst(s.x, s.y + 2, s.z, [s.cat.color, '#ffffff'], 10, 6);
       if (s.hits >= s.cat.hits) this.finish(s, p);
     }
+  }
+
+  // Everything a blow reaches takes it; the last work standing ends the place.
+  strikeWorks(s, x, z, reach, force, p) {
+    if (this.sealed?.(s, p)) return;
+    for (const w of standing(s)) {
+      if (Math.hypot(w.x - x, w.z - z) > reach + w.def.size) continue;
+      const fell = strike(w, force, p, this.world.fx, this.work.burst.bind(this.work));
+      if (!fell) continue;
+      p.hud.message(`${w.def.name} destroyed. ${standing(s).length} left standing.`);
+      this.work.shake = Math.max(this.work.shake, 0.35);
+      this.work.shakeAt = p.state;
+      if (w.kind === 'banner') dishearten(s);
+      if (w.kind === 'supply') explode(w, this, p, this.world);
+      if (!standing(s).length && s.cat.goal === 'boss') p.hud.message('The way is open. The ruler comes.', true, 4000);
+    }
+    if (!s.done && !standing(s).length && s.cat.goal === 'raze') this.finish(s, p);
+  }
+
+  nearby(w, reach) {
+    return this.live.flatMap((s) => standing(s).filter((o) => o !== w && Math.hypot(o.x - w.x, o.z - w.z) < reach));
+  }
+
+  // Fire on the ground eats whatever stands in it, and frost makes it brittle.
+  scorch(x, z, force, p) {
+    for (const s of this.live) if (Math.hypot(s.x - x, s.z - z) < 90) this.strikeWorks(s, x, z, 1, force, p);
+  }
+
+  chill(x, z) {
+    for (const s of this.live) for (const w of standing(s)) if (Math.hypot(w.x - x, w.z - z) < w.def.size + 3) w.brittle = 6;
   }
 
   finish(s, p) {
@@ -218,7 +251,7 @@ export default class Sites {
   // A nation raises a fort: a place like any other, held by its own troops and machine.
   addFort(n, doctrine, x, z, name, done) {
     if (this.list.length >= this.beams.count) return null;
-    const cat = { name, color: n.color, count: 0, goal: 'clear', built: true, fort: true, mobs: [doctrine.machine, ...doctrine.troops], size: 5, text: `Tear down this fort of ${n.name}`, reward: { items: { iron: 4, wood: 4 }, practice: { fighting: 30 } } };
+    const cat = { name, color: n.color, count: 0, goal: 'raze', built: true, fort: true, mobs: [doctrine.machine, ...doctrine.troops], size: 5, text: `Tear down this fort of ${n.name}`, reward: { items: { iron: 4, wood: 4 }, practice: { fighting: 30 } } };
     const s = { id: `fort-${name}`, key: 'fort', cat, x, y: height(x, z), z, done, seen: false, hits: 0, held: 0, mobs: null, timer: 0, runner: null, wave: 0, mesh: null, index: this.list.length };
     this.list.push(s);
     this.beams.setColorAt(s.index, new THREE.Color(n.color));
@@ -231,6 +264,7 @@ export default class Sites {
     s.done = false;
     s.mobs = null;
     s.hits = 0;
+    restoreWorks(s);
     if (s.mesh && !s.cat.fort) s.mesh.material.color.set('#ffffff');
     if (s.mesh && s.cat.fort) s.mesh.visible = true;
     this.save();
@@ -239,6 +273,7 @@ export default class Sites {
   dismantle(s) {
     s.done = true;
     this.dismiss(s);
+    razeWorks(s);
     if (s.mesh) s.mesh.visible = false;
   }
 
@@ -266,6 +301,10 @@ export default class Sites {
   }
 
   showProp(s) {
+    if (raises(s.key) && !s.works) {
+      raiseWorks(s, this.scene, this.work.marks.solids);
+      if (s.done) razeWorks(s);
+    }
     if (s.cat.fort && !s.mesh) {
       s.mesh = fortMesh(s.cat.color);
       s.mesh.position.set(s.x, s.y, s.z);
@@ -287,7 +326,8 @@ export default class Sites {
     s.mobs = [];
     for (let i = 0; i < count; i++) {
       const reach = s.cat.built ? 20 : 12, a = (i / count) * 6.28, x = s.x + Math.cos(a) * reach, z = s.z + Math.sin(a) * reach;
-      const e = this.monsters.add(cat.mobs[i % cat.mobs.length], x, z, this.monsters.danger(s.x, s.z), cat.goal === 'boss' && !cat.built);
+      const e = this.monsters.add(cat.mobs[i % cat.mobs.length], x, z, this.monsters.danger(s.x, s.z), cat.goal === 'boss' && !cat.built || (s.key === 'den' && !i));
+      e.def.damage *= fury(s);
       s.mobs.push(e);
     }
     for (let i = 0; i < (cat.guards ?? 0); i++) {
@@ -303,7 +343,9 @@ export default class Sites {
 
   status(s, p) {
     const { cat } = s;
+    if (cat.goal === 'boss' && standing(s).length) return `Break what guards it: ${standing(s).length} left standing`;
     if (cat.goal === 'clear' || cat.goal === 'boss') return `${cat.text}: ${s.mobs ? this.alive(s).length : '?'} left`;
+    if (cat.goal === 'raze') return `${cat.text}: ${standing(s).length} of ${s.works?.length ?? '?'} left standing`;
     if (cat.goal === 'break') return `${cat.text}: ${Math.min(100, Math.floor((s.hits / cat.hits) * 100))}%`;
     if (cat.goal === 'survive' && s.timer) return `Survive ${Math.ceil(s.timer)}s`;
     if (cat.goal === 'hold' && s.held) return `${cat.verb}... ${Math.floor((s.held / cat.secs) * 100)}%`;
@@ -373,20 +415,30 @@ export default class Sites {
         if (best.held >= best.cat.secs) this.finish(best, p);
       }
     }
+    this.live.length = 0;
+    const nearestTo = (s) => out.reduce((a, b) => (Math.hypot(a.state.x - s.x, a.state.z - s.z) < Math.hypot(b.state.x - s.x, b.state.z - s.z) ? a : b));
     for (const s of this.list) {
       const near = out.reduce((m, p) => Math.min(m, Math.hypot(s.x - p.state.x, s.z - p.state.z)), 1e9);
       if (near < SHOW_PROP) this.showProp(s);
+      if (s.works) settleWorks(s, dt);
       if (s.done) continue;
       if (s.timer) this.updateSurvive(s, dt);
+      const up = standing(s).length > 0;
+      if (up && near < SEEN_AT * 2 && !this.sealed?.(s, nearestTo(s))) {
+        this.live.push(s);
+        workDuties(s, dt, this, nearestTo(s));
+      }
+      if (s.cat.goal === 'raze') {
+        if (!s.mobs && near < SEEN_AT) this.rally(s);
+        else if (s.mobs && near > SEEN_AT * 3) this.dismiss(s);
+        continue;
+      }
       if (s.cat.goal !== 'clear' && s.cat.goal !== 'boss') continue;
       if (!s.mobs && near < SEEN_AT) {
-        if (!this.sealed?.(s, out.reduce((a, b) => (Math.hypot(a.state.x - s.x, a.state.z - s.z) < Math.hypot(b.state.x - s.x, b.state.z - s.z) ? a : b)))) this.rally(s);
+        if (!up && !this.sealed?.(s, nearestTo(s))) this.rally(s);
       }
       else if (s.mobs && near > SEEN_AT * 3) this.dismiss(s);
-      else if (s.mobs && !this.alive(s).length) {
-        const p = out.reduce((a, b) => (Math.hypot(a.state.x - s.x, a.state.z - s.z) < Math.hypot(b.state.x - s.x, b.state.z - s.z) ? a : b));
-        this.finish(s, p);
-      }
+      else if (s.mobs && !this.alive(s).length) this.finish(s, nearestTo(s));
     }
   }
 }

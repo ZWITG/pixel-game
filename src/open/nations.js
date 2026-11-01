@@ -19,7 +19,7 @@ export const NATIONS = [
 export const COUNTRY = 'The Country of Vael';
 const SAVE_KEY = 'lumen.nations';
 const SHARE = 0.6, MIN_NEEDED = 2;   // of a nation's strongholds that must fall
-const STRONGHOLD = ['camp', 'den', 'bandit', 'keep', 'fort'];
+const STRONGHOLD = ['camp', 'den', 'bandit', 'keep', 'fort']; // taken by destroying their works (raze.js)
 const FREE_LAKE = 840, FREE_HOLLOW = 420; // the middle of the world belongs to no one
 const YOURS = '#f7efdf';
 const BANNERS = 2;           // per town

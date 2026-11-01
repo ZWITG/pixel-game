@@ -64,11 +64,13 @@ It grows feature by feature with the user, who plays and tests with a controller
 - `realm.js`: the living country: each nation's gold, troops, captains and choices (utility scores with `weights` in `doctrines.js`), wars, borders, growth, Chronicle. `settlements.js`: places grow by people through `TIERS`, meshes only near a hero. `doctrines.js`: each nation's character, machines, forts and field attacks. `realm.nations`, `.settlements`, `.outposts` save to `lumen.realm`.
 - `kit.js`: the toon shapes, ink and glow every figure uses. `figures.js`: people, one skeleton with an outfit per look (`OUTFITS`). `creatures.js`: monsters and bosses (`CREATURES`), replacing the old models through `MODELS` in monsters.js. `architecture.js`: buildings by nation (`STYLES`), each a painted sheet plus four house shapes, one draw call each, windows lit at night.
 - `fortress.js`: walls, round towers, gatehouses, citadels, ruins and tents as painted parts for one masonry mesh; `STONEWORK` is each nation's palette. Hero gear is `signature()` in hero3d.js; `STAGES` in player.js shows Mastery on the body through `ascend()`.
+- `raze.js`: destruction sites. `WORKS` are the structures, `LAYOUTS` what each site has; `sites.struck` feeds them from any blast, `scars` from fire and frost.
 - Debug handle: `window.__world`. Testing while the user plays: use a separate pane tab, stub `Storage.prototype.setItem` and
   `navigator.getGamepads`, set `__world.world.skipRender = true`, and render only captured frames, or the save changes or the tab crashes.
 
 ## Rules
 - New enemy types need an entry in `FIGHTERS` (foes.js) or `keepAway`. Before shipping, sweep every type in `ENEMIES` at point-blank range for a few seconds of real fighting: spawning and removing them proves nothing.
+- Balance lives in `ROLES` (evolve.js: hits to kill, bite), `level` on NATIONS, and `body.might` for powers and monsters. Tune those before touching anything else.
 - Keep everything original. Genre conventions are fine; don't copy characters, maps, names or assets from existing games.
 - After a feature change, update `FEATURES.md` (table, backlog, changelog), test in the browser, commit and push to GitHub.
 - Bump `version` in package.json for each playable milestone.

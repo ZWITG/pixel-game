@@ -16,6 +16,7 @@ const STAY = 170;            // tiles from a hero before a cell is forgotten
 const MAX_CELLS = 2600, MAX_BURNING = 420;
 const BURN_SECS = 4, FROST_SECS = 45, ROT_SECS = 40, CHARGE_SECS = 1.6, RUPTURE_SECS = 0.7, CHAR_SECS = 150;
 const SPREAD = { fire: 0.42, ice: 0.34, void: 0.14, storm: 0.3, earth: 0.5 };
+const BURN_WORKS = 0.06;      // of a hero's might, per burning cell, per tick
 const BITE = 0.55;           // how hard the ground bites, as a share of a blow per second
 const HOSTILE_BITE = 0.006;   // share of health a tick on a nation's fire or rot takes
 const SLOW = 0.42;           // how fast anything crosses ice
@@ -228,6 +229,16 @@ export default class Scars {
     }
   }
 
+  // Timber burns, and frost leaves anything standing brittle.
+  eatWorks() {
+    const { sites } = this.world;
+    for (const c of this.cells.values()) {
+      if (!c.owner) continue;
+      if (c.burn > 0 || c.rupture > 0) sites.scorch(c.x, c.z, c.owner.body.might * BURN_WORKS, c.owner);
+      else if (c.frost > 0.5) sites.chill(c.x, c.z);
+    }
+  }
+
   // Fire and rot set by a nation hurt the heroes who stand in them.
   harmHeroes() {
     for (const p of this.world.players) {
@@ -275,6 +286,7 @@ export default class Scars {
     }
     this.rise(fx);
     this.harm();
+    this.eatWorks();
     this.harmHeroes();
     this.paint();
   }

@@ -131,6 +131,7 @@ world.fx = new PowerFx(scene);
 world.scars = new Scars(world);
 world.pick = new ConquerorPick();
 world.sites = new Sites(scene, monsters, work, players);
+world.sites.world = world;
 world.people = new People(scene, world);
 world.nations = new Nations(scene, world);
 monsters.world = world;

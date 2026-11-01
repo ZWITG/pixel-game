@@ -560,6 +560,7 @@ export default class PowerSet {
       for (const e of melee.monsters.within(x, z, def.blast)) this.afflict(b.pid, e, def, rank);
     }
     this.fx.impact(this.element, x, y - 1, z, def.blast ?? 2);
+    if (!def.blast) this.player.world.sites.struck(x, z, 2, 0, this.player, b.force);
     this.scar(b, x, z, Math.max(3, (def.blast ?? 2) * 0.8), 1 + rank);
     if (!def.blast) this.fx.glow(x, y, z, 2.4, color, 0.3, 1.6);
   }
