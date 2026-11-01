@@ -88,6 +88,8 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 prototype: world generation: four rivers with fords, roads to every town, red terraced badlands, pooled swamp, stone fields, giant trees
+- 2026-11-01 prototype: fixed long freezes when loading new areas; terrain builds in small slices; monsters stop at walls and no longer shrink when hit; skill progress saves on close; chopped-object save stays small; start area stays dry; beds heal; door and charge edge cases
 - 2026-11-01 prototype: Destructive Blow escalates with charge and skill: staged poses, rising hero, cracking ground, orbiting boulders; at the top it shatters the earth with pillars, fissures, flung stone, a flash and a long rumble
 - 2026-11-01 prototype: many more animations: idle, run, dash, swim, fly, glide, rising, falling, landing, uppercut finisher, charging, hit recoil, body lean, sprint dust; monsters squash when hit and rear up close to you; townsfolk stop and wave
 - 2026-11-01 prototype: Destructive Blow, evolved from maxed Punching: hold Square to charge, release to explode, stronger with its own skill. Speed now has diminishing returns

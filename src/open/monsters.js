@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import Enemy from '../entities/Enemy.js';
 import { ENEMIES } from '../data/enemies.js';
 import { makeOrb } from '../render/models.js';
@@ -61,11 +60,20 @@ export default class Monsters {
       // Land only, so nothing wades in after a swimmer.
       move: (e, dx, dz) => {
         const x = e.group.position.x + dx, z = e.group.position.z + dz;
-        if (e.cave ? !e.cave.walk(x - e.cave.x, z - e.cave.z) : height(x, z) < 0.5) return;
+        if (e.cave ? !e.cave.walk(x - e.cave.x, z - e.cave.z) : height(x, z) < 0.5 || this.walled(x, z, e)) return;
         e.group.position.x = x;
         e.group.position.z = z;
       },
     };
+  }
+
+  // Walls and buildings stop monsters too.
+  walled(x, z, e) {
+    const r = e.radius * 0.6;
+    return this.work.marks.solids.some((s) => {
+      if (s.r) return Math.hypot(x - s.x, z - s.z) < s.r + r;
+      return !s.off && x > s.x0 - r && x < s.x1 + r && z > s.z0 - r && z < s.z1 + r;
+    });
   }
 
   // The rest of what Enemy asks of its game. Damage numbers show on the striker's screen.
@@ -118,6 +126,7 @@ export default class Monsters {
     e.air = 0;
     e.rise = 0;
     e.cave = cave;
+    e.rootScale = e.model.root.scale.x;
     e.group.position.y = cave ? CAVE_FLOOR : height(x, z);
     const hero = this.nearest(e) ?? this.players[0];
     setTier(e, Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
@@ -247,13 +256,13 @@ export default class Monsters {
       // A blow squashes it, and it springs back.
       if (e.recoil > 0 && !e.dying) {
         e.recoil = Math.max(0, e.recoil - dt * 5);
-        const k = Math.sin(e.recoil * Math.PI) * 0.3;
-        e.model.root.scale.multiply(new THREE.Vector3(1 + k, 1 - k, 1 + k));
+        const k = Math.sin(e.recoil * Math.PI) * 0.3, root = e.model.root;
+        // Slimes reset their own scale every frame; other models hold theirs, so set it outright.
+        const base = e.def.model === 'slime' || e.def.model === 'mushroom' ? root.scale.y : e.rootScale;
+        root.scale.set(base * (1 + k), base * (1 - k), base * (1 + k));
       }
       // Lunging: a monster about to bite rears up at its target.
-      if (hero && !e.dying && !e.evolving && far < e.radius + 5) {
-        e.model.root.rotation.x = -0.25 * (1 - far / (e.radius + 5));
-      }
+      e.model.root.rotation.x = hero && !e.dying && e.evolving === undefined && far < e.radius + 5 ? -0.25 * (1 - far / (e.radius + 5)) : 0;
       if (e.air > 0 || e.rise > 0) {
         e.rise -= 40 * dt;
         e.air = Math.max(0, e.air + e.rise * dt);

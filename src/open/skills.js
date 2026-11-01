@@ -159,6 +159,9 @@ export default class Skills {
     try {
       this.practice = JSON.parse(localStorage.getItem(saveKey)) ?? {};
     } catch { /* no saved skills: start fresh */ }
+    // Practice saves every couple of seconds; this catches the last of it when the page goes.
+    addEventListener('pagehide', () => this.save());
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.save(); });
   }
 
   level(id) {

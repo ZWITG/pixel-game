@@ -34,13 +34,38 @@ export const TOWNS = [
   { kind: 'keep', name: 'Greywatch', x: 5600, z: 6400, r: 85, y: 30 },
 ];
 
+// Every town can be walked to by road; city roads end at their gates.
 const ROADS = [
   [[2900, 5300], [3200, 5120], [3470, 4960], [3560, 4700], [3700, 4000]],
   [[3700, 4000], [4000, 3360], [4700, 3280], [5300, 3050], [5640, 2860]],
-  [[2900, 5300], [2500, 4500], [2180, 3640]],
-  [[3470, 4960], [4200, 5380], [5200, 5500], [6050, 5660]],
+  [[2900, 5300], [2600, 4640], [2250, 4190]],
+  [[2250, 3810], [2500, 3480], [3050, 3250], [3700, 3650], [3700, 4000]],
+  [[3470, 4960], [4200, 5380], [5120, 5480], [5400, 5210]],
+  [[5120, 5480], [5560, 5560], [6050, 5660]],
+  [[3470, 4960], [3300, 5420], [3350, 5840]],
+  [[4200, 5380], [4420, 5760], [4650, 5990]],
+  [[4650, 6210], [5100, 6320], [5520, 6380]],
+  [[2600, 4640], [2100, 4860], [1810, 5050]],
+  [[4700, 3280], [5150, 3440], [5350, 3600]],
+  [[5580, 3690], [5500, 4300], [5400, 4790]],
+  [[4700, 3280], [4780, 2900], [4900, 2640]],
+  [[2250, 3810], [2020, 3200], [1950, 2740]],
+  [[3350, 6060], [2800, 6140], [2330, 6150]],
 ];
 const SEGMENTS = ROADS.flatMap((r) => r.slice(1).map((b, i) => [r[i], b]));
+
+// Rivers run from the high ground to the lake or the sea. [x, z, half width].
+const RIVERS = [
+  [[3300, 1900, 7], [3520, 2550, 10], [3320, 3120, 13], [3760, 3560, 18]],
+  [[5250, 1850, 7], [5120, 2500, 10], [4960, 3180, 13], [4830, 3740, 17]],
+  [[1250, 2350, 7], [1500, 3050, 10], [1280, 3800, 14], [820, 4620, 18], [470, 5260, 24]],
+  [[4320, 5060, 12], [4500, 5720, 14], [4020, 6420, 17], [3720, 7260, 22], [3700, 7960, 28]],
+];
+const STREAMS = RIVERS.flatMap((r) => r.slice(1).map((b, i) => [r[i], b]));
+
+// Two lands with their own shape and color. `r` is reached with a noisy edge.
+const BADLANDS = { x: 6850, z: 4250, r: 900 };
+const SWAMP = { x: 1950, z: 5950, r: 720 };
 
 // ---- noise ----
 const P = new Uint8Array(512);
@@ -107,6 +132,33 @@ export function roadDistance(x, z) {
 
 const near = (p, x, z) => Math.hypot(x - p.x, z - p.z) / p.r;
 
+// How close to a river's bed, and how wide it is there: [distance past the bank, half width].
+function riverAt(x, z) {
+  let best = 1e9, wide = 0;
+  const wander = x + noise(x * 0.004, z * 0.004) * 60, drift = z + noise(x * 0.004 + 9, z * 0.004) * 60;
+  for (const [[ax, az, aw], [bx, bz, bw]] of STREAMS) {
+    if (wander < Math.min(ax, bx) - 90 || wander > Math.max(ax, bx) + 90 || drift < Math.min(az, bz) - 90 || drift > Math.max(az, bz) + 90) continue;
+    const dx = bx - ax, dz = bz - az;
+    const t = Math.min(1, Math.max(0, ((wander - ax) * dx + (drift - az) * dz) / (dx * dx + dz * dz)));
+    const d = Math.hypot(wander - ax - dx * t, drift - az - dz * t), w = aw + (bw - aw) * t;
+    if (d - w < best) {
+      best = d - w;
+      wide = w;
+    }
+  }
+  return [best, wide];
+}
+
+// How far into the badlands and the swamp a point is, each 0..1.
+export function region(x, z) {
+  const edge = fbm(x * 0.0015 + 3, z * 0.0015, 3) * 0.45;
+  return [sstep(1, 0.72, near(BADLANDS, x, z) + edge), sstep(1, 0.7, near(SWAMP, x, z) + edge)];
+}
+
+export function riverDistance(x, z) {
+  return riverAt(x, z)[0];
+}
+
 function baseHeight(x, z) {
   const cx = x / WORLD - 0.5, cz = z / WORLD - 0.5;
   const edge = Math.hypot(cx, cz) * 2 + fbm(x * 0.0006, z * 0.0006, 3) * 0.35;
@@ -123,6 +175,19 @@ function baseHeight(x, z) {
   // Rolling highlands in the east.
   h += ridged(x * 0.0024, z * 0.0024, 4) * 130 * sstep(4300, 6200, x) * land;
 
+  const [bad, marsh] = region(x, z);
+  if (bad > 0) {
+    // Badlands: the land steps up in flat-topped red terraces.
+    const v = h * 1.25 + 26, band = 24, f = v / band - Math.floor(v / band);
+    h = mix(h, (Math.floor(v / band) + sstep(0.72, 0.94, f)) * band, bad);
+  }
+  // Swamp: low and level, with black pools where it dips below the water.
+  if (marsh > 0) h = mix(h, 2.2 + fbm(x * 0.009, z * 0.009, 3) * 11, marsh);
+
+  // Rivers cut down to the water before towns level the ground back over them.
+  const [bank, wide] = riverAt(x, z);
+  if (bank < 34) h = mix(h, Math.min(h, -2.6), sstep(30, -wide * 0.5, bank));
+
   // Places carve the land.
   const L = PLACES.lake, ld = near(L, x, z) + fbm(x * 0.002, z * 0.002, 3) * 0.3;
   h = mix(h, -26, sstep(1.0, 0.72, ld));
@@ -134,15 +199,17 @@ function baseHeight(x, z) {
   h = mix(h, T.y + (1 - near(T, x, z)) * 60, sstep(1.0, 0.45, near(T, x, z)));
   const R = PLACES.ribs;
   h = mix(h, R.y, sstep(1.0, 0.6, near(R, x, z)) * 0.8);
+
+  // Roads smooth out the land they cross, and bank up across rivers as fords.
+  if (h > 2 || bank < 8) {
+    const rd = roadDistance(x, z);
+    if (rd < 34) h = mix(h, Math.max(3, Math.min(h + 14, soft)), sstep(30, 6, rd));
+    if (bank < 8 && rd < 9) h = Math.max(h, 1.2);
+  }
+  // Towns last: their ground stays level whatever runs through it.
   for (const T of TOWNS) {
     const d = near(T, x, z);
     if (d < 1) h = mix(h, T.y, sstep(1.0, 0.6, d));
-  }
-
-  // Roads smooth out the land they cross.
-  if (h > 2) {
-    const rd = roadDistance(x, z);
-    if (rd < 34) h = mix(h, Math.max(3, Math.min(h + 14, soft)), sstep(30, 6, rd));
   }
   return h;
 }

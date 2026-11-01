@@ -116,6 +116,8 @@ export default class Player {
       hud.gasp();
       const next = TIME_ORDER[(TIME_ORDER.indexOf(world.time) + 1) % TIME_ORDER.length];
       world.setTime(next);
+      this.hp = this.body.maxHealth;
+      hud.setHealth(1);
       hud.message(`You sleep until ${next === 'mist' ? 'the mist rises' : next === 'night' ? 'nightfall' : next}.`);
     } else if (spot.action === 'store') {
       const moved = Object.entries(bag.store());
@@ -270,7 +272,7 @@ export default class Player {
     const m = !free || melee.active ? { x: 0, y: 0 } : controls.move(), amount = Math.min(1, Math.hypot(m.x, m.y));
     if (!world.paused) {
       this.updateSuper(dt, !!(controls.held.has('ShiftLeft') || controls.padHeld.R2), amount > 0.05 && free);
-      melee.updateCharge(dt, state, free && !!(controls.held.has('KeyJ') || controls.padHeld.SQUARE));
+      melee.updateCharge(dt, state, !!(controls.held.has('KeyJ') || controls.padHeld.SQUARE), free);
     }
     if (amount > 0.05) {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
@@ -339,6 +341,7 @@ export default class Player {
       this.level = body.level;
       hud.setLevel(this.level);
     }
+    this.hp = Math.min(this.hp, body.maxHealth); // gear or a bonus that lifted the limit can go
     if (world.paused) return;
     for (const b of this.bag.buffs) {
       if ((b.left -= dt) <= 0) hud.message(`${ITEMS[b.id].name} wore off.`);

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { height as landHeight, dentAt, PLACES, TOWNS } from './terrain.js';
+import { height as landHeight, dentAt, PLACES, SPAWN, TOWNS } from './terrain.js';
+import { SPAWN_CLEAR } from './work.js';
 import { FEATURES } from '../config/features.js';
 
 // Punching. Square throws a three-hit chain anywhere, at anything. The punch itself grows in
@@ -155,8 +156,16 @@ export default class Melee {
   }
 
   // Holding punch gathers a Destructive Blow; letting go sets it off.
-  updateCharge(dt, state, held) {
+  updateCharge(dt, state, held, free) {
     const { house } = this.player.rooms, { quake } = this.player.world;
+    if (!free) {
+      // A menu opened: drop what was gathered, and don't count it as a punch.
+      this.heldFor = 0;
+      this.charging = false;
+      this.charge = 0;
+      this.orb.visible = this.orbAge < 9;
+      return;
+    }
     // Once the Blow is open a punch throws when the button comes up, so holding never punches.
     if (!held && this.heldFor > 0 && !this.charging && this.blowReady && !state.air && (!house || house.hostile)) this.punch(state);
     this.heldFor = held ? this.heldFor + dt : 0;
@@ -315,7 +324,7 @@ export default class Melee {
   // Tears the ground open, except right under the great landmarks.
   canTear(x, z, size, deepest = DEEPEST_PIT) {
     const safe = [PLACES.spire, { ...PLACES.ribs, r: 260 }, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 90 }, PLACES.hollow, ...TOWNS];
-    return !safe.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + size) && dentAt(x, z) <= deepest;
+    return !safe.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + size) && Math.hypot(x - SPAWN.x, z - SPAWN.z) > SPAWN_CLEAR + size && dentAt(x, z) <= deepest;
   }
 
   tear(x, z, size, deepest) {

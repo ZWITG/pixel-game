@@ -16,13 +16,13 @@ export function terrainMaterial({ far = false } = {}) {
   mat.onBeforeCompile = (s) => {
     s.uniforms.uHole = shared.uHole;
     s.uniforms.uHole2 = shared.uHole2;
-    s.vertexShader = `attribute vec3 aBiome; attribute float aRoad;
-      varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR;\n${s.vertexShader}`.replace(
+    s.vertexShader = `attribute vec3 aBiome; attribute float aRoad; attribute vec2 aLand;
+      varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL;\n${s.vertexShader}`.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
-       vP=(modelMatrix*vec4(position,1.)).xyz; vN=normal; vB=aBiome; vR=aRoad;`,
+       vP=(modelMatrix*vec4(position,1.)).xyz; vN=normal; vB=aBiome; vR=aRoad; vL=aLand;`,
     );
-    s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; uniform vec3 uHole,uHole2;
+    s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL; uniform vec3 uHole,uHole2;
       ${HASH}\n${s.fragmentShader}`.replace(
       '#include <color_fragment>',
       /* glsl */`
@@ -48,6 +48,15 @@ export function terrainMaterial({ far = false } = {}) {
         col=mix(vec3(.1,.27,.17),vec3(.2,.38,.16),patchy);
         if(n>.94) col=vec3(.45,.24,.42);
       }
+      // the two far lands take over, with the same broken pixel edge
+      float edgeNoise=(n-.5)*.3*detail+(patchy-.5)*.35;
+      if(vL.x+edgeNoise>.5){ // badlands: red dust and pale salt
+        col=mix(vec3(.66,.32,.18),vec3(.84,.55,.3),patchy);
+        if(n>.92) col=vec3(.9,.78,.6);
+      } else if(vL.y+edgeNoise>.5){ // swamp: black peat and sour moss
+        col=mix(vec3(.13,.17,.13),vec3(.27,.31,.15),patchy);
+        if(n>.93) col=vec3(.42,.46,.2);
+      }
       col*=.82+n2*.3*detail;
       // pale shore and dark seabed
       float sand=1.-smoothstep(1.5,5.+n*3.,vP.y);
@@ -57,6 +66,7 @@ export function terrainMaterial({ far = false } = {}) {
       if(rocky>.5){
         float strata=vn(vec2(floor(vP.y*1.3)*.37,(vP.x+vP.z)*.02));
         col=mix(vec3(.44,.42,.44),vec3(.7,.67,.62),strata)*(.85+n*.25);
+        if(vL.x>.4) col=mix(vec3(.5,.2,.14),vec3(.86,.52,.3),strata)*(.85+n*.25); // banded red rock
       }
       // snow on the heights
       float snow=smoothstep(300.,380.,vP.y+n*30.)*(1.-rocky*.6);

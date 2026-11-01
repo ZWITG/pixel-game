@@ -122,6 +122,8 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Destructive Blow (built 2026-11-01):** the top level of Punching evolves into it. Hold Square to gather it, walking slowly, and let go to explode around the hero. Its own skill, practised by using it, sets charge time, force and reach (`BLOW_*` in melee.js); a longer charge is stronger, and force and Mass add on top. It breaks and craters like other blows. `might` (charge and skill level together) drives its build-up: poses, rising hero, cracking ground, orbiting boulders. Past 0.4 it erupts rock pillars and fissures (`src/open/quake.js`); near 1 it is earth-shattering, with a white flash, flung stone and a long rumble.
 
+**World generation (improved 2026-11-01):** four rivers run down to the lake and sea, a road network reaches every town with fords where it crosses water, and two new lands join the three forests: red terraced badlands in the east and low pooled swamp in the southwest (`region()` in terrain.js). Stones gather in fields and old giant trees stand among the rest. Grass is made only near a hero, from a coarse land grid, and terrain builds in timed slices, so moving fast doesn't stall.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
-import { height, biome, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
+import { height, biome, riverDistance, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
 import { ITEMS } from './items.js';
 
 // Places worth finding. Every category has its own goal and its own kind of reward, and a
@@ -138,7 +138,7 @@ export default class Sites {
       if (!cat.land(y) || Math.hypot(x - PLACES.hollow.x, z - PLACES.hollow.z) < SAFE) continue;
       if (y > 0 && Math.max(Math.abs(height(x + 8, z) - y), Math.abs(height(x, z + 8) - y)) > (cat.steep ?? 5)) continue; // not on a cliff face
       if (Math.hypot(x - PLACES.spire.x, z - PLACES.spire.z) < 260 || biome(x, z)[0] === undefined) continue;
-      if (TOWNS.some((T) => Math.hypot(x - T.x, z - T.z) < T.r + 60)) continue;
+      if (TOWNS.some((T) => Math.hypot(x - T.x, z - T.z) < T.r + 60) || (y > 0 && riverDistance(x, z) < 14)) continue;
       if (this.list.some((s) => Math.hypot(s.x - x, s.z - z) < SPACING)) continue;
       return { x, y: Math.max(y, 0), z };
     }

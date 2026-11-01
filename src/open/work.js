@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { height, dents, addDent } from './terrain.js';
+import { height, dents, addDent, SPAWN } from './terrain.js';
 import { ITEMS } from './items.js';
 
 // Hands on the world: trees and rocks stand in the way, and can be chopped and mined for
@@ -15,6 +15,7 @@ const REACH = 1.9;          // tiles past the object's edge
 const HERO_RADIUS = 0.4;
 const REGROW = 15 * 60000;  // ms
 const HOUSE_HP = 50;
+export const SPAWN_CLEAR = 120; // tiles around the start the land can't be broken
 const CLEAR_OF_ALL = 22;    // tiles up, above everything that blocks the way
 const TREE_HP = 6;          // per unit of tree size
 const WOOD = 3;             // per unit of tree size
@@ -140,8 +141,9 @@ export default class Work {
     this.shake = 0;
     this.deniedAt = 0;
     const gone = load(WORLD_KEY) ?? {};
-    for (const [id, at] of Object.entries(gone)) chunks.gone.set(id, at);
-    for (const d of load(DENT_KEY) ?? []) addDent(...d);
+    for (const [id, at] of Object.entries(gone)) if (at > Date.now()) chunks.gone.set(id, at);
+    // The start of the world heals, so waking up there never means waking in a flooded pit.
+    for (const d of load(DENT_KEY) ?? []) if (Math.hypot(d[0] - SPAWN.x, d[1] - SPAWN.z) > SPAWN_CLEAR + d[2]) addDent(...d);
     for (const h of marks.houses) this.showHouse(h);
     this.houseCheck = 0;
 
@@ -204,7 +206,7 @@ export default class Work {
   }
 
   door(state) {
-    return this.marks.houses.find((h) => !h.solid.off && Math.hypot(state.x - h.door.x, state.z - h.door.z) < 2.4);
+    return state.air > 2 ? undefined : this.marks.houses.find((h) => !h.solid.off && Math.hypot(state.x - h.door.x, state.z - h.door.z) < 2.4);
   }
 
   // One blow on one object. `drops` gathers what comes loose; returns true if it broke.
@@ -239,6 +241,8 @@ export default class Work {
   }
 
   saveGone() {
+    const now = Date.now();
+    for (const [id, at] of this.chunks.gone) if (at <= now) this.chunks.gone.delete(id);
     save(WORLD_KEY, Object.fromEntries(this.chunks.gone));
     save(DENT_KEY, dents);
   }
