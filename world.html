@@ -26,6 +26,10 @@
       @keyframes gain { 0% { opacity: 0; transform: translateY(10px); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
       #act { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); color: #f3ead8; font: 700 18px 'Zen Maru Gothic', sans-serif; text-shadow: 0 2px 0 #141a28; white-space: nowrap; pointer-events: none; }
       #bag { position: fixed; right: 12px; bottom: 10px; color: #f3ead8; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
+      #hp { position: fixed; left: 12px; top: 32px; width: 200px; height: 10px; background: #141a28; }
+      #hp-fill { height: 100%; width: 100%; background: #ff6f6f; }
+      .float { position: fixed; transform: translateX(-50%); font: 700 18px 'Zen Maru Gothic', sans-serif; text-shadow: 0 2px 0 #141a28; pointer-events: none; animation: float 0.8s forwards; }
+      @keyframes float { to { opacity: 0; margin-top: -30px; } }
       #breath { position: fixed; left: 50%; bottom: 44px; width: 220px; height: 10px; transform: translateX(-50%); background: #141a28; }
       #breath-fill { height: 100%; width: 100%; background: #9fe8ff; }
       #blink { position: fixed; inset: 0; background: #141a28; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
@@ -39,6 +43,7 @@
   <body>
     <div id="game"></div>
     <div id="where"></div>
+    <div id="hp"><div id="hp-fill"></div></div>
     <div id="pad-status"></div>
     <div id="help"></div>
     <div id="blink"></div>

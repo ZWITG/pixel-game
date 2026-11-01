@@ -4,6 +4,7 @@ export const ATTRIBUTES = {
   strength: { name: 'Strength', color: '#ff8a4c', icon: 'fist' },
   speed: { name: 'Speed', color: '#ffe27a', icon: 'boot' },
   endurance: { name: 'Endurance', color: '#7fe38a', icon: 'heart' },
+  mass: { name: 'Mass', color: '#c9a0ff', icon: 'anvil', full: 300 },
 };
 
 const BASE_CLIMB = 1.0;  // steepest slope (rise per tile) a beginner can walk up
@@ -16,6 +17,7 @@ export default class Body {
   get strength() { return this.skills.attribute('strength'); }
   get speed() { return this.skills.attribute('speed'); }
   get endurance() { return this.skills.attribute('endurance'); }
+  get mass() { return this.skills.attribute('mass'); }
 
   // Movement: every point of Speed is 1.5% faster, on land and in water.
   get moveScale() { return 1 + (this.speed - 10) * 0.015; }
@@ -23,8 +25,13 @@ export default class Body {
   get breathScale() { return 1 + (this.endurance - 10) * 0.03; }
   // Strength lets the hero haul up steeper ground.
   get climbLimit() { return BASE_CLIMB + (this.strength - 10) * 0.03; }
-  // The hero fills out as they get stronger.
-  get heroScale() { return 1 + Math.min(0.2, (this.strength - 10) * 0.004); }
+  // Mass is how much hero there is. Compared to a beginner's 60: it multiplies every blow,
+  // spreads shockwaves, softens hits and shrugs off knockback, and the hero visibly grows.
+  get massScale() { return this.mass / 60; }
+  get heroScale() { return 1 + Math.min(0.6, (this.mass - 60) * 0.004); }
+  // Heavy enough, and just landing from a jump shakes the ground. Tiles of reach, 0 for none.
+  get stompReach() { return Math.max(0, (this.mass - 90) * 0.06); }
+  get maxHealth() { return 20 + (this.endurance - 10) * 2.5; }
 
   // Each point of Strength is 3% more force behind every blow (melee.js multiplies this)
   // and 2 more units of carrying.

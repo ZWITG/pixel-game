@@ -87,7 +87,7 @@ export function roadDistance(x, z) {
 
 const near = (p, x, z) => Math.hypot(x - p.x, z - p.z) / p.r;
 
-export function height(x, z) {
+function baseHeight(x, z) {
   const cx = x / WORLD - 0.5, cz = z / WORLD - 0.5;
   const edge = Math.hypot(cx, cz) * 2 + fbm(x * 0.0006, z * 0.0006, 3) * 0.35;
   const land = sstep(1.0, 0.8, edge);
@@ -121,6 +121,50 @@ export function height(x, z) {
     if (rd < 34) h = mix(h, Math.max(3, Math.min(h + 14, soft)), sstep(30, 6, rd));
   }
   return h;
+}
+
+// Damage to the land: bowls pressed into the height function, saved with the world.
+// Each is [x, z, radius, depth]. A grid keeps the lookup cheap, since height() runs constantly.
+const DENT_CELL = 64, MAX_DENTS = 300;
+export const dents = [];
+let dentGrid = new Map();
+const cellKey = (i, j) => i * 100000 + j;
+
+function indexDent(d) {
+  const [x, z, r] = d;
+  for (let j = Math.floor((z - r) / DENT_CELL); j <= Math.floor((z + r) / DENT_CELL); j++) {
+    for (let i = Math.floor((x - r) / DENT_CELL); i <= Math.floor((x + r) / DENT_CELL); i++) {
+      const k = cellKey(i, j);
+      if (!dentGrid.has(k)) dentGrid.set(k, []);
+      dentGrid.get(k).push(d);
+    }
+  }
+}
+
+export const dentShape = (d, r) => (d >= r ? 0 : (1 - (d / r) ** 2) ** 2);
+
+export function addDent(x, z, r, depth) {
+  const d = [x, z, r, depth];
+  dents.push(d);
+  indexDent(d);
+  if (dents.length > MAX_DENTS) {
+    dents.shift();
+    dentGrid = new Map();
+    dents.forEach(indexDent);
+  }
+}
+
+// How far the land has been pushed down at a point.
+export function dentAt(x, z) {
+  const list = dentGrid.get(cellKey(Math.floor(x / DENT_CELL), Math.floor(z / DENT_CELL)));
+  if (!list) return 0;
+  let sum = 0;
+  for (const [dx, dz, r, depth] of list) sum += dentShape(Math.hypot(x - dx, z - dz), r) * depth;
+  return sum;
+}
+
+export function height(x, z) {
+  return dents.length ? baseHeight(x, z) - dentAt(x, z) : baseHeight(x, z);
 }
 
 // How much of each ground type: [golden meadow, crimson autumn wood, deep pine wood].

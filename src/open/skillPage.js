@@ -1,4 +1,6 @@
+import * as THREE from 'three';
 import SkillMap from './skillMap.js';
+import { height } from './terrain.js';
 import { ITEMS } from './work.js';
 
 const $ = (id) => document.getElementById(id);
@@ -9,6 +11,7 @@ export default class WorldHud {
     this.open = false;
     this.map = new SkillMap($('skill-map'), $('skill-tag'));
     this.timer = null;
+    this.point = new THREE.Vector3();
   }
 
   message(text, big = false) {
@@ -39,6 +42,27 @@ export default class WorldHud {
     el.style.color = attribute.color;
     $('gains').appendChild(el);
     setTimeout(() => el.remove(), 2600);
+  }
+
+  setHealth(amount) {
+    $('hp-fill').style.width = `${Math.max(0, amount) * 100}%`;
+  }
+
+  // What monsters call for their damage numbers; `y` is above the ground there.
+  floatText(x, y, z, text, color) {
+    this.float(text, x, height(x, z) + y * 3, z, color);
+  }
+
+  // A number that pops up over a point in the world.
+  float(text, x, y, z, color) {
+    const p = this.point.set(x, y, z).project(this.camera);
+    if (p.z > 1) return;
+    const el = document.createElement('div');
+    el.className = 'float';
+    el.textContent = text;
+    el.style.cssText = `left:${(p.x * 0.5 + 0.5) * 100}%;top:${(0.5 - p.y * 0.5) * 100}%;color:${color}`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 800);
   }
 
   // The word and button for what the hero could do right now.

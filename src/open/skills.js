@@ -53,6 +53,18 @@ export const SKILLS = {
       { at: 650, title: 'Worldbreaker', icon: 'nova' },
     ],
   },
+  fighting: {
+    name: 'Fighting',
+    color: '#ff6fb0',
+    trains: { endurance: 0.06, strength: 0.03, speed: 0.01 },
+    levels: [
+      { at: 20, title: 'Scrapper', icon: 'heart' },
+      { at: 70, title: 'Brawler', icon: 'fist' },
+      { at: 180, title: 'Veteran', icon: 'burst' },
+      { at: 400, title: 'Monster Bane', icon: 'crack' },
+      { at: 850, title: 'Living Siege', icon: 'nova' },
+    ],
+  },
   woodcutting: {
     name: 'Woodcutting',
     color: '#8fd86a',
@@ -80,6 +92,8 @@ export const SKILLS = {
 };
 
 export const ATTRIBUTE_START = 10;
+// Mass isn't trained directly: it builds on a stronger, tougher body and on time spent fighting.
+const MASS = { start: 60, strength: 1.5, endurance: 1.2, fighting: 0.3 };
 const SAVE_KEY = 'lumen.skills';
 const SAVE_EVERY = 2000; // ms; practice ticks every frame
 
@@ -103,6 +117,10 @@ export default class Skills {
 
   // Attributes are worked out from practice, so they can never drift from what you've done.
   attribute(name) {
+    if (name === 'mass') {
+      return MASS.start + (this.attribute('strength') - ATTRIBUTE_START) * MASS.strength
+        + (this.attribute('endurance') - ATTRIBUTE_START) * MASS.endurance + (this.practice.fighting ?? 0) * MASS.fighting;
+    }
     let value = ATTRIBUTE_START;
     for (const [id, skill] of Object.entries(SKILLS)) value += (this.practice[id] ?? 0) * (skill.trains[name] ?? 0);
     return value;
@@ -110,7 +128,7 @@ export default class Skills {
 
   add(id, amount) {
     const skill = SKILLS[id], before = this.level(id);
-    const whole = Object.keys(skill.trains).map((a) => [a, Math.floor(this.attribute(a))]);
+    const whole = [...Object.keys(skill.trains), 'mass'].map((a) => [a, Math.floor(this.attribute(a))]);
     this.practice[id] = (this.practice[id] ?? 0) + amount;
     const after = this.level(id);
     if (after > before) this.onLevel(skill, after);

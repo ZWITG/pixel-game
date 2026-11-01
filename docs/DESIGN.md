@@ -100,6 +100,10 @@ Each region: one landmark visible from its entrance, one shrine to rekindle, one
 
 **Punching (built 2026-11-01):** Square punches anywhere, in a three-hit chain (left, right, finisher at double force). The punch grows through six stages, Jab to Worldbreaker (`src/open/melee.js`, `PUNCHES`). Each needs both the Punching level and a Strength value, so practice alone or muscle alone isn't enough. From Heavy Blow on, a blow sends out a shockwave that cracks the ground and breaks what it reaches as it passes. Monsters should plug into the same blow: `force` from `land()`, reduced with distance along the wave.
 
+**Mass (built 2026-11-01):** Mass starts at 60 and builds on Strength, Endurance and Fighting practice (`src/open/skills.js`), never directly. Compared to 60, it multiplies every blow, spreads shockwaves by its square root, softens hits and knockback, makes the hero bigger, and past 90 turns jump landings into stomps. Fighting monsters is the fastest route: hits, kills and getting hurt all count.
+
+**Destruction (built 2026-11-01):** the land takes real damage: dents sit on top of the height function (`addDent`, saved in `lumen.dents`), shown by editing live chunks in place. Heavy punches press craters, tear up grass, and can flood when dug below water level. Houses lean, then collapse into rubble and rebuild with the trees. The Spire, Ribs and Spirit Tree stay unbroken, with no craters right beside them, because their models sit at fixed heights.
+
 ## 7. UI direction (from the taste rules)
 
 - **One typeface** with anime-fantasy warmth that reads at all sizes (candidate: *Zen Maru Gothic*, rounded), replacing the pixel font. Two sizes do the work: large numbers/titles, small text.

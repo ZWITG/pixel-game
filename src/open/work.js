@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { height } from './terrain.js';
+import { height, dents, addDent } from './terrain.js';
+import { LOOT } from '../data/items.js';
 
 // Hands on the world: trees and rocks stand in the way, and can be chopped and mined for
 // materials. What is gone stays gone until it regrows, so the world remembers you were there.
@@ -8,6 +9,7 @@ export const ITEMS = {
   stone: { name: 'Stone', weight: 2, color: '#b7a9b4' },
   iron: { name: 'Iron', weight: 3, color: '#e8a06a' },
 };
+for (const [id, loot] of Object.entries(LOOT)) ITEMS[id] = { name: loot.name, weight: 1, color: loot.color };
 
 // `need`: Strength needed before a strike does anything.
 export const ROCKS = [
@@ -19,13 +21,14 @@ export const ROCKS = [
 const REACH = 1.9;          // tiles past the object's edge
 const HERO_RADIUS = 0.4;
 const REGROW = 15 * 60000;  // ms
+const HOUSE_HP = 50;
 const TREE_HP = 6;          // per unit of tree size
 const WOOD = 3;             // per unit of tree size
 const LEAVES = [['#2a7a55', '#46a06a'], ['#b81f2e', '#ff7a56'], ['#cf8f1e', '#ffe27a']];
 const BARK = ['#8a5236', '#c9a070'], DUST = ['#94808a', '#c9bcc4', '#6f6068'];
 const MAX_CHIPS = 400;
 const MAX_FALLING = 24;     // past this, a shockwave just blows trees apart
-const BAG_KEY = 'lumen.bag', WORLD_KEY = 'lumen.world';
+const BAG_KEY = 'lumen.bag', WORLD_KEY = 'lumen.world', DENT_KEY = 'lumen.dents';
 
 function load(key) {
   try {
@@ -88,6 +91,9 @@ export default class Work {
     this.deniedAt = 0;
     const gone = load(WORLD_KEY) ?? {};
     for (const [id, at] of Object.entries(gone)) chunks.gone.set(id, at);
+    for (const d of load(DENT_KEY) ?? []) addDent(...d);
+    for (const h of marks.houses) this.showHouse(h);
+    this.houseCheck = 0;
 
     // Flying wood chips, stone dust and leaves.
     const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), new THREE.MeshBasicMaterial(), MAX_CHIPS);
@@ -107,7 +113,7 @@ export default class Work {
     }
     for (const s of this.marks.solids) {
       if (s.r) this.pushCircle(state, s.x, s.z, s.r);
-      else this.pushRect(state, s);
+      else if (!s.off) this.pushRect(state, s);
     }
   }
 
@@ -142,7 +148,7 @@ export default class Work {
   }
 
   door(state) {
-    return this.marks.houses.find((h) => Math.hypot(state.x - h.door.x, state.z - h.door.z) < 2.4);
+    return this.marks.houses.find((h) => !h.solid.off && Math.hypot(state.x - h.door.x, state.z - h.door.z) < 2.4);
   }
 
   // One blow on one object. `drops` gathers what comes loose; returns true if it broke.
@@ -178,6 +184,40 @@ export default class Work {
 
   saveGone() {
     save(WORLD_KEY, Object.fromEntries(this.chunks.gone));
+    save(DENT_KEY, dents);
+  }
+
+  // Houses in reach of a blow at (x, z), whichever wall it lands on.
+  housesAt(x, z, reach) {
+    return this.marks.houses.filter(({ solid: s }) => {
+      if (s.off) return false;
+      return Math.hypot(Math.max(s.x0 - x, 0, x - s.x1), Math.max(s.z0 - z, 0, z - s.z1)) < reach;
+    });
+  }
+
+  hitHouse(h, force) {
+    const done = (this.hurt.get(h.id) ?? 0) + force, y = h.mesh.position.y + 3;
+    this.burst(h.x, y, h.z, ['#e8d5b0', '#7a5230', '#b13e53'], 10, 6);
+    if (done < HOUSE_HP) {
+      this.hurt.set(h.id, done);
+      h.mesh.rotation.z = (done / HOUSE_HP) * 0.05; // it starts to lean
+      return false;
+    }
+    this.hurt.delete(h.id);
+    this.chunks.gone.set(h.id, Date.now() + REGROW);
+    this.showHouse(h);
+    this.burst(h.x, y, h.z, ['#e8d5b0', '#c9b89e', '#7a5230', '#8a8a8a'], 50, 10);
+    this.shake = Math.max(this.shake, 0.5);
+    return true;
+  }
+
+  // Standing or rubble, from whether it's gone; it comes back with the trees.
+  showHouse(h) {
+    const gone = this.chunks.isGone(h.id);
+    h.mesh.visible = !gone;
+    h.mesh.rotation.z = 0;
+    h.rubble.visible = gone;
+    h.solid.off = gone;
   }
 
   shakeOff(o, amount) {
@@ -291,6 +331,10 @@ export default class Work {
       const lean = s.t < 0.35 ? Math.sin(s.t * 40) * s.amount * (1 - s.t / 0.35) : 0;
       this.chunks.pose(s.o, lean);
       if (s.t >= 0.35) this.shaking = null;
+    }
+    if ((this.houseCheck -= dt) <= 0) {
+      this.houseCheck = 5;
+      for (const h of this.marks.houses) if (h.solid.off) this.showHouse(h);
     }
     this.updateFalling(dt);
     this.updateChips(dt);

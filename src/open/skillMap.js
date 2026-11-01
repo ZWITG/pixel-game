@@ -41,7 +41,7 @@ const ICONS = {
   heart: ['.........', '.##...##.', '####.####', '#########', '#########', '.#######.', '..#####..', '...###...', '....#....'],
 };
 const DIGITS = ['###,#.#,#.#,#.#,###', '.#.,##.,.#.,.#.,###', '###,..#,###,#..,###', '###,..#,.##,..#,###', '#.#,#.#,###,..#,..#', '###,#..,###,..#,###', '###,#..,###,#.#,###', '###,..#,.#.,.#.,.#.', '###,#.#,###,#.#,###', '###,#.#,###,..#,###'].map((d) => d.split(','));
-const ATTR_ORDER = ['strength', 'speed', 'endurance'];
+const ATTR_ORDER = ['strength', 'speed', 'endurance', 'mass'];
 const ATTR_FULL = 100; // gauges fill at this value, for now
 
 // Bough paths on the 320 x 180 map. `out`: which way left/right moves toward the tip.
@@ -51,6 +51,7 @@ const BOUGHS = {
   climbing: { path: [[161, 106], [190, 96], [216, 78], [244, 74], [268, 52], [292, 46], [302, 26]], out: 1 },
   running: { path: [[159, 118], [124, 128], [92, 114], [60, 122], [28, 104], [14, 84]], out: -1 },
   punching: { path: [[161, 132], [190, 142], [222, 138], [252, 146], [284, 136], [308, 124]], out: 1 },
+  fighting: { path: [[159, 132], [128, 144], [98, 138], [68, 148], [38, 136], [14, 128]], out: -1 },
   woodcutting: { path: [[160, 102], [146, 84], [172, 68], [146, 50], [172, 34], [158, 14]], out: 1 },
   mining: { path: [[160, 118], [196, 124], [226, 112], [258, 118], [288, 100], [304, 84]], out: 1 },
 };
@@ -249,7 +250,7 @@ export default class SkillMap {
   drawBody() {
     const g = this.g, reveal = Math.min(1, this.age / REVEAL);
     ATTR_ORDER.forEach((name, i) => {
-      const a = ATTRIBUTES[name], value = this.body[name], x = 94 + i * 48, y = 170;
+      const a = ATTRIBUTES[name], value = this.body[name], x = 70 + i * 48, y = 170;
       g.fillStyle = INK;
       g.fillRect(x - 7, y - 7, 46, 14);
       g.fillStyle = a.color;
@@ -257,7 +258,7 @@ export default class SkillMap {
       g.fillStyle = '#242a4c';
       g.fillRect(x + 7, y - 4, 30, 3);
       g.fillStyle = a.color;
-      g.fillRect(x + 7, y - 4, Math.max(1, Math.round((Math.min(ATTR_FULL, value) / ATTR_FULL) * 30 * reveal)), 3);
+      g.fillRect(x + 7, y - 4, Math.max(1, Math.round((Math.min(a.full ?? ATTR_FULL, value) / (a.full ?? ATTR_FULL)) * 30 * reveal)), 3);
       number(g, Math.floor(value), x + 7, y + 1);
     });
   }

@@ -15,6 +15,7 @@ import WorldHud from './skillPage.js';
 import Body, { ATTRIBUTES } from './body.js';
 import Work, { Bag, ITEMS } from './work.js';
 import Melee, { PUNCHES } from './melee.js';
+import Monsters from './monsters.js';
 import Rooms, { ROOM_Y } from './rooms.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
@@ -77,6 +78,18 @@ const bag = new Bag(body);
 const work = new Work(scene, chunks, skills, body, bag, hud, marks);
 const rooms = new Rooms(scene);
 const melee = new Melee(scene, work, skills, body, hud);
+const monsters = new Monsters(scene, {
+  work, skills, body, hud,
+  onDown() {
+    hud.gasp();
+    hud.message('You came to by the water.', true);
+    state.x = SPAWN.x;
+    state.z = SPAWN.z;
+    state.air = state.rise = 0;
+  },
+});
+melee.monsters = monsters;
+hud.camera = camera;
 hud.setBag(bag);
 
 const state = { x: SPAWN.x, z: SPAWN.z, yaw: 2.6, pitch: 0.16, phase: 0, moving: false, dir: [0, -1], time: 0, lit: '', recenter: null, stop: 0, promptDevice: null, steepAt: 0, air: 0, rise: 0 };
@@ -206,6 +219,7 @@ function jump(dt, y) {
     if (state.air <= 0) {
       state.air = state.rise = 0;
       work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], 5, 2);
+      if (!rooms.house) melee.stomp(state);
     }
   }
 }
@@ -308,6 +322,8 @@ function step(dt) {
   }
 
   if (!hud.open) {
+    state.y = y;
+    if (FEATURES.monsters) monsters.update(dt, state, !!rooms.house);
     melee.update(dt, state);
     work.update(dt, state);
   }
@@ -368,7 +384,7 @@ addEventListener('keydown', (e) => {
 });
 
 setTime('dusk');
-window.__world = { melee, PUNCHES, work, bag, rooms, marks, body, controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
+window.__world = { monsters, height, melee, PUNCHES, work, bag, rooms, marks, body, controls, skills, swim, hud, camera, post, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
   step((now - last) / 1000);

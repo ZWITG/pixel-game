@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { height, biome, roadDistance, forest, WORLD, PLACES } from './terrain.js';
+import { height, biome, roadDistance, forest, addDent, dentAt, dentShape, WORLD, PLACES } from './terrain.js';
 import { terrainMaterial, shared } from './materials.js';
 import { makeTreeMeshes, makeGrass, makeRocks } from './foliage.js';
 
@@ -128,7 +128,7 @@ export default class Chunks {
       const r = rnd(cx, cz, i + 11000);
       if (r < 0.25) continue;
       const y = height(x, z);
-      if (y < 2.5 || y > 280 || Math.abs(height(x + 1, z) - y) > 0.8 || roadDistance(x, z) < 4.5) continue;
+      if (y < 2.5 || y > 280 || Math.abs(height(x + 1, z) - y) > 0.8 || roadDistance(x, z) < 4.5 || dentAt(x, z) > 0.2) continue;
       const pick = r > 0.97 ? 5 : r > 0.92 ? 4 : p > m && p > a ? 3 : a > m ? 2 : r > 0.6 ? 1 : 0;
       blades.push([x, y, z, 0.8 + r * 0.7, col[pick]]);
     }
@@ -236,6 +236,7 @@ export default class Chunks {
 
   build(c) {
     const mesh = new THREE.Mesh(gridGeometry(c.cx * CHUNK, c.cz * CHUNK, CHUNK, c.step, true), this.mat);
+    mesh.userData.cell = { x0: c.cx * CHUNK, z0: c.cz * CHUNK, step: c.step };
     mesh.receiveShadow = true;
     mesh.frustumCulled = true;
     mesh.geometry.computeBoundingSphere();
@@ -250,6 +251,40 @@ export default class Chunks {
       }
       shared.uHole.value.y = (RING + 0.5) * CHUNK - 1;
     }
+  }
+
+  // Presses a bowl into the land. The shown ground is edited in place rather than rebuilt,
+  // which would stall the punch; anything standing there settles or is torn up with it.
+  deform(x, z, r, depth) {
+    addDent(x, z, r, depth);
+    for (const mesh of this.live.values()) this.patch(mesh, x, z, r, depth);
+    const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+      const s = this.spots(cx + i, cz + j);
+      s.blades = s.blades.filter(([bx, , bz]) => Math.hypot(bx - x, bz - z) > r * 0.8);
+      for (const o of s.things) if (Math.hypot(o.x - x, o.z - z) < r) o.y = height(o.x, o.z);
+    }
+    const [hx, hz] = this.center.split(',').map(Number);
+    this.scatter(hx, hz);
+  }
+
+  patch(mesh, x, z, r, depth) {
+    const { x0, z0, step } = mesh.userData.cell, n = Math.round(CHUNK / step), v = n + 1;
+    const i0 = Math.max(0, Math.floor((x - r - x0) / step)), i1 = Math.min(n, Math.ceil((x + r - x0) / step));
+    const j0 = Math.max(0, Math.floor((z - r - z0) / step)), j1 = Math.min(n, Math.ceil((z + r - z0) / step));
+    if (i0 > i1 || j0 > j1) return;
+    const pos = mesh.geometry.attributes.position, nor = mesh.geometry.attributes.normal;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const k = j * v + i;
+      pos.setY(k, pos.getY(k) - dentShape(Math.hypot(pos.getX(k) - x, pos.getZ(k) - z), r) * depth);
+    }
+    const y = (i, j) => pos.getY(Math.min(n, Math.max(0, j)) * v + Math.min(n, Math.max(0, i)));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const nx = y(i - 1, j) - y(i + 1, j), nz = y(i, j - 1) - y(i, j + 1), ny = 2 * step, l = Math.hypot(nx, ny, nz);
+      nor.setXYZ(j * v + i, nx / l, ny / l, nz / l);
+    }
+    pos.needsUpdate = true;
+    nor.needsUpdate = true;
   }
 
   // Refill the instanced trees and grass around the new center chunk.

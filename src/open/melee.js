@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { height } from './terrain.js';
+import { height, PLACES } from './terrain.js';
 
 // Punching. Square throws a three-hit chain anywhere, at anything. The punch itself grows in
 // stages: each needs both practice (`level` of the Punching skill) and Strength, so the hero
@@ -22,6 +22,10 @@ const LUNGE = 3;             // tiles per second, stepping into the punch
 const WAVE_SPEED = 45;       // tiles per second; things break as the wave reaches them
 const AIR_PRACTICE = 0.1;
 const RINGS = 4, CRATERS = 8, CRATER_GRID = 10, CRATER_LIFE = 40;
+const CRATER_MARK = 34;      // largest crack mark, in tiles; past this the dent speaks for itself
+const CRATER_DEPTH = 0.28;   // of its radius
+const MONSTER_REACH = 2.5;   // a plain punch still clips what's in front of it
+const HOUSE_REACH = 1.5;
 
 // Which punch the hero has right now.
 export function punchStage(skills, body) {
@@ -29,24 +33,26 @@ export function punchStage(skills, body) {
   return PUNCHES.reduce((best, p, i) => (level >= p.level && body.strength >= p.strength ? i : best), 0);
 }
 
+// Thin cracks and scattered scorch: the crater's shape comes from the dented land under it.
 function crackTexture() {
   const c = document.createElement('canvas');
-  c.width = c.height = 64;
+  c.width = c.height = 128;
   const g = c.getContext('2d');
   let seed = 53;
   const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  g.fillStyle = '#1b1620';
-  for (let i = 0; i < 700; i++) {
-    const a = r() * 6.28, d = Math.sqrt(r()) * 13;
-    g.fillRect(Math.floor(32 + Math.cos(a) * d), Math.floor(32 + Math.sin(a) * d), 2, 2);
+  g.fillStyle = '#2a2024';
+  for (let i = 0; i < 500; i++) {
+    const a = r() * 6.28, d = r() * r() * 46;
+    g.fillRect(Math.floor(64 + Math.cos(a) * d), Math.floor(64 + Math.sin(a) * d), 2, 2);
   }
-  for (let k = 0; k < 11; k++) {
-    let a = (k / 11) * 6.28, x = 32, y = 32;
-    for (let i = 0; i < 26; i++) {
-      a += (r() - 0.5) * 0.7;
-      x += Math.cos(a) * 1.05;
-      y += Math.sin(a) * 1.05;
-      g.fillRect(Math.floor(x), Math.floor(y), i < 12 ? 2 : 1, i < 12 ? 2 : 1);
+  for (let k = 0; k < 16; k++) {
+    let a = (k / 16) * 6.28, x = 64, y = 64;
+    const reach = 34 + r() * 26;
+    for (let i = 0; i < reach; i++) {
+      a += (r() - 0.5) * 0.6;
+      x += Math.cos(a);
+      y += Math.sin(a);
+      g.fillRect(Math.floor(x), Math.floor(y), i < reach * 0.4 ? 2 : 1, i < reach * 0.4 ? 2 : 1);
     }
   }
   const t = new THREE.CanvasTexture(c);
@@ -82,7 +88,8 @@ export default class Melee {
     this.queued = false;
     this.chain = 0;
     this.idle = CHAIN_WINDOW; // the first punch starts a fresh chain
-    this.wave = null;
+    this.waves = [];
+    this.monsters = null;
     this.stage = punchStage(skills, body);
     this.promised = this.stage; // the stage we've already said is waiting on Strength
     this.rings = Array.from({ length: RINGS }, () => {
@@ -101,7 +108,7 @@ export default class Melee {
       this.queued = true; // remembered, so mashing Square keeps the chain going
       return;
     }
-    const target = this.work.target(state);
+    const target = this.monsters.target(state) ?? this.work.target(state);
     if (target) state.dir = [target.x - state.x, target.z - state.z];
     const len = Math.hypot(...state.dir) || 1;
     this.chain = this.idle < CHAIN_WINDOW ? (this.chain + 1) % CHAIN.length : 0;
@@ -115,34 +122,62 @@ export default class Melee {
   }
 
   land(a, state) {
-    const p = PUNCHES[this.stage], finisher = a.chain === 2;
-    const force = p.power * CHAIN[a.chain] * this.body.damageScale;
-    const t = a.target && !this.work.chunks.gone.has(a.target.id) ? a.target : null;
-    const x = t ? t.x - a.fx * t.r : state.x + a.fx * 1.2, z = t ? t.z - a.fz * t.r : state.z + a.fz * 1.2;
-    const ground = height(x, z);
-    const reach = p.radius * (finisher ? FINISHER_REACH : 1);
+    const p = PUNCHES[this.stage], finisher = a.chain === 2, heavy = this.body.massScale, spread = Math.sqrt(heavy);
+    const force = p.power * CHAIN[a.chain] * this.body.damageScale * heavy;
+    const t = a.target && !a.target.dying && !this.work.chunks.gone.has(a.target.id) ? a.target : null;
+    const r = t ? (t.r ?? t.radius) : 0;
+    const x = t ? t.x - a.fx * r : state.x + a.fx * 1.2, z = t ? t.z - a.fz * r : state.z + a.fz * 1.2;
+    const reach = p.radius * (finisher ? FINISHER_REACH : 1) * spread;
+    const crater = finisher || this.stage >= 3 ? p.crater * spread * (finisher ? FINISHER_REACH : 1) : 0;
 
-    const queue = t ? [{ o: t, at: 0, force }] : [];
+    const struck = this.blast(x, z, force, reach, crater, p.color, t);
+    this.skills.add('punching', struck ? 1 : AIR_PRACTICE);
+    if (t && !t.def) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);
+    if (struck || reach) {
+      this.work.burst(x, height(x, z) + 1.1, z, [p.color, '#fff8ea', '#94808a'], p.chips, 4 + this.stage * 1.5);
+      this.work.stop = p.stop * (finisher ? 1.6 : 1);
+    }
+    this.work.shake = Math.max(this.work.shake, (struck || reach ? p.shake : 0) * (finisher ? 1.5 : 1));
+    this.refreshStage();
+  }
+
+  // Landing from a jump: mass alone is enough to shake the ground.
+  stomp(state) {
+    const reach = this.body.stompReach;
+    if (!reach) return;
+    this.blast(state.x, state.z, this.body.massScale * this.body.damageScale, reach, reach > 6 ? reach * 0.6 : 0, '#c9a0ff', null);
+    this.work.shake = Math.max(this.work.shake, Math.min(0.6, reach * 0.06));
+  }
+
+  // One blow going out from a point. Returns true if it met anything.
+  blast(x, z, force, reach, crater, color, target) {
+    const queue = [];
+    if (target) queue.push(target.def ? { m: target, at: 0, force } : { o: target, at: 0, force });
+    const falloff = (d) => force * (1 - 0.6 * Math.min(1, d / Math.max(reach, 1)));
+    for (const m of this.monsters.within(x, z, Math.max(reach, MONSTER_REACH))) {
+      const d = Math.hypot(m.x - x, m.z - z);
+      if (m !== target) queue.push({ m, at: d / WAVE_SPEED, force: falloff(d) });
+    }
     if (reach) {
       for (const o of this.work.chunks.near(x, z, reach)) {
         const d = Math.hypot(o.x - x, o.z - z);
-        if (o !== t && d < reach) queue.push({ o, at: d / WAVE_SPEED, force: force * (1 - 0.6 * (d / reach)) });
+        if (o !== target && d < reach) queue.push({ o, at: d / WAVE_SPEED, force: falloff(d) });
       }
-      queue.sort((m, n) => m.at - n.at);
-      this.ring(x, ground, z, reach, p.color);
-      if (finisher) this.ring(x, ground, z, reach * 0.6, '#ffffff');
-      this.crater(x, z, p.crater * (finisher ? 1.3 : 1));
+      this.ring(x, height(x, z), z, reach, color);
     }
-    this.wave = { queue, t: 0, drops: {}, broke: false };
+    for (const h of this.work.housesAt(x, z, Math.max(reach, HOUSE_REACH))) queue.push({ h, at: Math.hypot(h.x - x, h.z - z) / WAVE_SPEED, force: falloff(0) });
+    queue.sort((m, n) => m.at - n.at);
+    if (crater) this.tear(x, z, crater);
+    this.waves.push({ queue, x, z, t: 0, drops: {}, broke: false });
+    return queue.length > 0;
+  }
 
-    this.skills.add('punching', t ? 1 : AIR_PRACTICE);
-    if (t) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);
-    if (t || reach) {
-      this.work.burst(x, ground + 1.1, z, [p.color, '#fff8ea', '#94808a'], p.chips, 4 + this.stage * 1.5);
-      this.work.stop = p.stop * (finisher ? 1.6 : 1);
-    }
-    this.work.shake = Math.max(this.work.shake, (t || reach ? p.shake : 0) * (finisher ? 1.5 : 1));
-    this.refreshStage();
+  // Tears the ground open, except right under the great landmarks.
+  tear(x, z, size) {
+    const safe = [PLACES.spire, { ...PLACES.ribs, r: 260 }, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 90 }];
+    if (safe.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + size)) return;
+    this.work.chunks.deform(x, z, size, size * CRATER_DEPTH);
+    this.crater(x, z, Math.min(CRATER_MARK, size * 1.1));
   }
 
   refreshStage() {
@@ -183,21 +218,19 @@ export default class Melee {
     c.mesh.material.opacity = 1;
   }
 
-  updateWave(dt) {
-    const w = this.wave;
+  updateWave(w, dt) {
     w.t += dt;
     while (w.queue.length && w.queue[0].at <= w.t) {
-      const { o, force, at } = w.queue.shift();
-      if (this.work.chunks.gone.has(o.id)) continue;
-      const broke = this.work.hit(o, force, w.drops, at > 0);
-      w.broke = w.broke || broke;
+      const { o, m, h, force, at } = w.queue.shift();
+      if (m) this.monsters.hit(m, force, w.x, w.z);
+      else if (h) w.broke = this.work.hitHouse(h, force) || w.broke;
+      else if (!this.work.chunks.gone.has(o.id)) w.broke = this.work.hit(o, force, w.drops, at > 0) || w.broke;
     }
     if (w.queue.length) return;
     if (w.broke) {
       this.work.give(w.drops);
       this.work.saveGone();
     }
-    this.wave = null;
   }
 
   update(dt, state) {
@@ -220,7 +253,8 @@ export default class Melee {
         this.queued = false;
       }
     }
-    if (this.wave) this.updateWave(dt);
+    for (const w of this.waves) this.updateWave(w, dt);
+    this.waves = this.waves.filter((w) => w.queue.length);
     for (const r of this.rings) {
       if (!r.ring.visible) continue;
       r.age += dt;

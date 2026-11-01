@@ -75,6 +75,24 @@ function isle(rand) {
   return mesh;
 }
 
+// What's left of a house, hidden until it comes down.
+function rubble(scene, x, z, seed) {
+  const b = new VoxelBuilder();
+  let s = seed * 97 + 13;
+  const rand = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const cols = ['#e8d5b0', '#c9b89e', '#7a5230', '#8a8a8a', '#b13e53'];
+  for (let i = 0; i < 40; i++) {
+    const w = 0.5 + rand() * 1.6, h = 0.3 + rand() * 0.9, a = rand() * 6.28, d = rand() * rand() * 5;
+    b.box(Math.cos(a) * d, h / 2 + rand() * (2.2 - d * 0.4), Math.sin(a) * d, w, h, 0.5 + rand() * 1.6, cols[i % 5], 0.06);
+  }
+  const mesh = new THREE.Mesh(b.build(), vmat());
+  mesh.castShadow = true;
+  mesh.position.set(x, height(x, z), z);
+  mesh.visible = false;
+  scene.add(mesh);
+  return mesh;
+}
+
 export function addLandmarks(scene) {
   // `solids` stop the hero: { x, z, r } circles or { x0, x1, z0, z1 } boxes.
   const out = { isles: [], houses: [], solids: [] };
@@ -130,8 +148,9 @@ export function addLandmarks(scene) {
     const rot = house.rotation.y, ox = Math.sin(rot), oz = Math.cos(rot);
     const quarter = Math.abs(Math.round(rot / (Math.PI / 2))) % 2 === 1;
     const sx = quarter ? HOUSE.z : HOUSE.x, sz = quarter ? HOUSE.x : HOUSE.z;
-    out.houses.push({ x: hx, z: hz, rot, door: { x: hx + ox * HOUSE.door, z: hz + oz * HOUSE.door } });
-    out.solids.push({ x0: hx - sx, x1: hx + sx, z0: hz - sz, z1: hz + sz });
+    const solid = { x0: hx - sx, x1: hx + sx, z0: hz - sz, z1: hz + sz };
+    out.houses.push({ id: `h${i}`, mesh: house, solid, rubble: rubble(scene, hx, hz, i), x: hx, z: hz, rot, door: { x: hx + ox * HOUSE.door, z: hz + oz * HOUSE.door } });
+    out.solids.push(solid);
   }
   return out;
 }
