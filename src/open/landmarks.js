@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
 import { makeSpiritTree, makeHouse } from '../render/models.js';
 import { PLACES, height } from './terrain.js';
+import { masonry } from './materials.js';
+
+const houseWalls = masonry();
 
 const HOUSE = { x: 3.1, z: 2.95, door: 3.8 }; // half size and door distance at the scale used here
 
@@ -28,7 +31,7 @@ function spire() {
   for (const [x, z, h] of [[-40, -30, 76], [40, -30, 84], [-46, 26, 66], [44, 28, 60], [0, -38, 92]]) tower(x, z, 19, h, 8);
   tower(0, 0, 30, 118, 8);
   for (let i = 0; i < 9; i++) b.box(-60 + i * 15, 46, 37.5, 4, 9, 1, '#ffd98a', 0);
-  const mesh = new THREE.Mesh(b.build(), vmat());
+  const mesh = new THREE.Mesh(b.build(), masonry());
   mesh.castShadow = true;
   const g = new THREE.Group();
   g.add(mesh);
@@ -100,6 +103,7 @@ export function placeHouse(scene, out, id, hx, hz, rot, roof) {
   house.scale.setScalar(3.4);
   house.rotation.y = rot;
   house.castShadow = true;
+  house.traverse((o) => { if (o.isMesh) o.material = houseWalls; });
   scene.add(house);
   const ox = Math.sin(rot), oz = Math.cos(rot), turned = Math.abs(Math.round(rot / (Math.PI / 2))) % 2 === 1;
   const sx = turned ? HOUSE.z : HOUSE.x, sz = turned ? HOUSE.x : HOUSE.z;

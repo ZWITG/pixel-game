@@ -28,6 +28,7 @@ export const CATEGORIES = {
 
 const SAVE_KEY = 'lumen.sites';
 const SEEN_AT = 70, REACH = 6, SHOW_PROP = 450, FIRST_FROM = 160, FIRST_TO = 520, SPACING = 140;
+const BEAMS = 3, BEAM_EVERY = 1; // beams shown per hero, and seconds between choosing them
 const SAFE = 280;            // no sites in the middle of the Hollow
 const SURVIVE_RING = 40;     // tiles
 const WAVE_EVERY = 6;
@@ -105,13 +106,13 @@ export default class Sites {
       this.list.push({ id, key: T.kind, cat, x: T.x, y: T.y, z: T.z, done: done.has(id), seen: false, hits: 0, held: 0, mobs: null, timer: 0, runner: null, wave: 0, mesh: null });
     }
     // One beam per site, all in one draw.
-    const geo = new THREE.CylinderGeometry(1.6, 1.6, 500, 6, 1, true).translate(0, 250, 0);
-    this.beams = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }), this.list.length);
+    const geo = new THREE.CylinderGeometry(0.7, 2.2, 260, 8, 1, true).translate(0, 130, 0);
+    this.beams = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide }), this.list.length);
     this.beams.frustumCulled = false;
     const m = new THREE.Matrix4(), c = new THREE.Color();
     this.list.forEach((s, i) => {
       s.index = i;
-      this.beams.setMatrixAt(i, s.done ? m.makeScale(0, 0, 0) : m.makeTranslation(s.x, s.y, s.z));
+      this.beams.setMatrixAt(i, m.makeScale(0, 0, 0));
       this.beams.setColorAt(i, c.set(s.cat.color));
     });
     scene.add(this.beams);
@@ -121,9 +122,8 @@ export default class Sites {
         if (Math.hypot(s.x - x, s.z - z) > r + 8) continue;
         s.y = Math.max(height(s.x, s.z), 0);
         if (s.mesh) s.mesh.position.y = s.y;
-        if (!s.done) this.beams.setMatrixAt(s.index, new THREE.Matrix4().makeTranslation(s.x, s.y, s.z));
-        this.beams.instanceMatrix.needsUpdate = true;
       }
+      this.beamWait = 0;
     });
   }
 
@@ -252,11 +252,6 @@ export default class Sites {
     s.mobs = null;
   }
 
-  arrow(p, s) {
-    const a = Math.atan2(s.x - p.state.x, s.z - p.state.z) - p.world.viewYaw(p) + Math.PI;
-    return ['↑', '↖', '←', '↙', '↓', '↘', '→', '↗'][((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
-  }
-
   status(s, p) {
     const { cat } = s;
     if (cat.goal === 'clear' || cat.goal === 'boss') return `${cat.text}: ${s.mobs ? this.alive(s).length : '?'} left`;
@@ -288,7 +283,21 @@ export default class Sites {
     if (s.timer <= 0) this.finish(s, p);
   }
 
+  // Only the few places nearest a hero show a beam; the compass finds the rest.
+  showBeams(dt) {
+    if ((this.beamWait -= dt) > 0) return;
+    this.beamWait = BEAM_EVERY;
+    const at = new THREE.Matrix4(), near = new Set();
+    for (const p of this.players) {
+      const open = this.list.filter((s) => !s.done).map((s) => [Math.hypot(s.x - p.state.x, s.z - p.state.z), s]).sort((a, b) => a[0] - b[0]);
+      for (const [, s] of open.slice(0, BEAMS)) near.add(s);
+    }
+    for (const s of this.list) this.beams.setMatrixAt(s.index, near.has(s) ? at.makeTranslation(s.x, s.y, s.z) : at.makeScale(0, 0, 0));
+    this.beams.instanceMatrix.needsUpdate = true;
+  }
+
   update(dt) {
+    this.showBeams(dt);
     const out = this.players.filter((p) => !p.rooms.house);
     for (const p of this.players) {
       let best = null, d = 1e9;
@@ -307,7 +316,7 @@ export default class Sites {
         best.seen = true;
         p.hud.message(`${best.cat.name}: ${best.cat.text}`, true);
       }
-      p.hud.setGoal(d < SEEN_AT ? `${best.cat.name}: ${this.status(best, p)}` : `${best.cat.name} ${this.arrow(p, best)} ${Math.round(d)} m`, best.cat.color);
+      p.hud.setGoal(d < SEEN_AT ? `${best.cat.name}: ${this.status(best, p)}` : '', best.cat.color);
       if (best.cat.goal === 'reach' && d < REACH) this.finish(best, p);
       if (best.cat.goal === 'hold') {
         const holding = d < REACH + 2 && (p.controls.padHeld.CROSS || p.controls.held.has('KeyE'));

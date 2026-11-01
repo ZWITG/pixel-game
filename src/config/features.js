@@ -14,6 +14,8 @@ export const FEATURES = {
   friendlyFire: true,    // open world: heroes' blows hurt each other
   evolution: true,       // open world: monsters change form as the heroes level
   sites: true,           // open world: places with their own goals and rewards
+  dayCycle: true,        // open world: the sky turns from night through day to dusk, 16 minutes a day
+  compass: true,         // open world: compass strip with the next goal and nearby towns, names when you arrive
   flight: true,          // open world: maxing Jumping opens Flight, hold X in the air
   superspeed: true,      // open world: maxing Running opens Superspeed, press sprint again
   blow: true,            // open world: maxing Punching opens Destructive Blow, hold and release Square

@@ -49,10 +49,11 @@ It grows feature by feature with the user, who plays and tests with a controller
 - One loop: while a menu is open, only the HUD gets input; the world is paused.
 
 ## Open-world prototype (`/world.html`, `src/open/`)
-- `main.js`: the shared world, cameras, join and leave, the adaptive split. `player.js`: one hero (input, body, skills, bag, HUD, sprite).
+- `main.js`: the shared world, cameras, join and leave, the adaptive split, day cycle (`CLOCK`), resolution control (`LEVELS`; `?level=N` pins one). `player.js`: one hero (input, body, skills, bag, HUD). `hero3d.js`: the jointed toon hero; new poses go in `POSES`, picked by `Player.motion`.
 - `work.js`: solid objects, chopping and mining; `work.actor` is the player whose blow is being worked out. `melee.js`: punches and blasts.
   `monsters.js`: adapter around `entities/Enemy.js`. `rooms.js`: house interiors. `splitView.js`: puts two views on screen.
-- `terrain.js`: pure height plus saved dents. `chunks.js`: streaming around every hero, `deform()` edits live ground.
+- `terrain.js`: pure height plus saved dents. `ground.js`: land, tree and grass data as plain arrays, run off the frame in `groundWorker.js`. `chunks.js`: streaming around every hero (near trees, far picture trees, per-chunk water), `deform()` edits live ground; dents go to the workers too. Use `chunks.settle()` after a teleport.
+- `post.js`: own picture pipeline (scene, glow, shafts, tone curve). `materials.js`: terrain, water, sky, `masonry()`, shared noise texture, fog chunks. `foliage.js`: leaf and grass cards. `compass.js`: compass strip and place names.
 - Debug handle: `window.__world`. Testing while the user plays: use a separate pane tab, stub `Storage.prototype.setItem` and
   `navigator.getGamepads`, set `__world.world.skipRender = true`, and render only captured frames, or the save changes or the tab crashes.
 

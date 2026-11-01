@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { VoxelBuilder, vmat } from '../render/voxel.js';
+import { VoxelBuilder } from '../render/voxel.js';
+import { masonry } from './materials.js';
 import { makeHumanoid, walkPose } from '../render/models.js';
 import { LOOKS } from '../art/looks.js';
 import { TOWNS } from './terrain.js';
@@ -174,7 +175,7 @@ export function addTowns(scene, marks) {
       rect: (x0, x1, z0, z1) => marks.solids.push({ x0: T.x + x0, x1: T.x + x1, z0: T.z + z0, z1: T.z + z1 }),
       circle: (x, z, r) => marks.solids.push({ x: T.x + x, z: T.z + z, r }),
     }, rand);
-    const mesh = new THREE.Mesh(b.build(), vmat());
+    const mesh = new THREE.Mesh(b.build(), masonry());
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.position.set(T.x, T.y, T.z);

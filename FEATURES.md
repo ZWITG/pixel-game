@@ -88,6 +88,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [ ] Mobile touch controls
 
 ## Changelog
+- 2026-11-01 v0.7.0 open world rebuilt for looks and speed: smooth HD renderer (no pixel grid or screen-wide dither), new terrain, water with shallows and foam, soft clouds, low fog, painted trees with far picture trees, tuft grass that fades out, stone walls; real 3D toon heroes with streaming scarves replace the sprites; land builds in background workers (worst frame while running 309 ms to 14 ms); resolution adapts to hold the frame rate; day cycle (16 minutes); compass with goals and towns, place names on arrival, button list hides itself, only the 3 nearest beams show
 - 2026-11-01 prototype: six new enemies by land and four huge bosses with powers in their own lairs
 - 2026-11-01 prototype: split-screen camera fixed for flight and Superspeed: follows heroes into the air and across water, splits by real height, splits faster at speed, never flickers
 - 2026-11-01 prototype: combat rebuilt: enemy tells, moves, turn-taking, stagger; roll, guard, parry, counter, grab, throw, slam, air dive, lock-on, enemy health bar

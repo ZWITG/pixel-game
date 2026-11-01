@@ -26,7 +26,12 @@ const RUSH_TRACK = 40;     // how much harder it follows the ground
 const SPLIT_FOV = 72;      // a half-height picture needs a wider lens to show as much
 const SPLIT_PULL = 0.35;   // and the camera sits this much further back
 const SPLIT_RUN = 3;       // plus this many tiles while the hero is on the move
-const PIXEL = Number(new URLSearchParams(location.search).get('px') ?? 1.5); // screen pixels per game pixel
+const QUERY = new URLSearchParams(location.search);
+// What the picture gives up, in turn, to hold the frame rate: smoothing first, then resolution.
+const LEVELS = [{ scale: 1, aa: 4 }, { scale: 1, aa: 0 }, { scale: 0.85, aa: 0 }, { scale: 0.72, aa: 0 }, { scale: 0.6, aa: 0 }, { scale: 0.5, aa: 0 }];
+const SLOW = 0.021, FAST = 0.0178;        // seconds per frame that lower or raise the resolution
+const PAUSED_FRAME = 0.1;                 // a frame this long is a hidden tab or a stall, not slowness
+const SCALE_WAIT = 2.5;                   // seconds between changes, since each one costs a hitch
 const CAMERA_DIST = 9.5;   // tiles behind the hero
 const CAMERA_GROWTH = 5;   // extra distance per unit of hero scale, so a huge hero still fits
 const CAMERA_LIFT = 7;     // how fast the camera follows the ground up and down
@@ -52,29 +57,40 @@ const SPLIT_SETTLE = 1;   // seconds before it can change back, so it never flic
 const SHIFT = 0.25;       // how far each picture slides, as a share of the screen height
 const LEAVE_HOLD = 2;     // seconds P2 holds OPTIONS to leave
 
+const SUN_REACH = 85;      // tiles of shadow each way from the hero
+
 const TIMES = {
-  morning: { top: '#6f9bd8', mid: '#bcd2ea', low: '#efe0cc', fog: '#c6d3e0', sun: [0.5, 0.42, 0.6], sunCol: '#fff0d0', cloud: '#f6f2ea', light: 2.8, amb: 1.8, density: 0.0007, shaft: 0.35, shadow: '#2a3a6a', sat: 1.2, bloom: 0.22 },
-  dusk: { top: '#7f7fb8', mid: '#b79ac4', low: '#f0b4b8', fog: '#c0a4c6', sun: [-0.55, 0.13, 0.82], sunCol: '#ffc4b0', cloud: '#f4cdd2', light: 2.4, amb: 1.9, density: 0.0011, shaft: 0.8, shadow: '#5a2a6a', sat: 1.25, bloom: 0.4 },
-  mist: { top: '#7f94a4', mid: '#a4b4bc', low: '#c0ccce', fog: '#b0bec4', sun: [0.3, 0.6, 0.4], sunCol: '#f4f0e4', cloud: '#d6dedd', light: 1.5, amb: 1.7, density: 0.003, shaft: 0.5, shadow: '#2a4a5a', sat: 1.1, bloom: 0.25 },
-  night: { top: '#0c1436', mid: '#1c2a58', low: '#384a78', fog: '#26345c', sun: [0.4, 0.6, -0.5], sunCol: '#b8c8ff', cloud: '#34457a', light: 1.3, amb: 1.5, density: 0.0012, shaft: 0, shadow: '#1a2a6a', sat: 1.1, bloom: 0.5 },
+  day: { top: '#3674cc', mid: '#86b6e6', low: '#dfe6e6', fog: '#c6dae8', sun: [0.25, 0.85, 0.42], sunCol: '#fff6e6', cloud: '#ffffff', light: 3, amb: 2.1, density: 0.00036, shaft: 0.08, shadow: '#2a3a6a', sat: 1.08, bloom: 0.12, night: 0 },
+  morning: { top: '#3f7fd0', mid: '#8fbce6', low: '#e6e4d8', fog: '#c9d8e2', sun: [0.5, 0.42, 0.6], sunCol: '#fff0d6', cloud: '#fbf8f2', light: 2.9, amb: 2, density: 0.00042, shaft: 0.25, shadow: '#2a3a6a', sat: 1.08, bloom: 0.16, night: 0 },
+  dusk: { top: '#4a5ba8', mid: '#c48aa8', low: '#f8bc94', fog: '#dcaea2', sun: [-0.55, 0.26, 0.82], sunCol: '#ffb88a', cloud: '#f8cdb8', light: 3.1, amb: 1.9, density: 0.00062, shaft: 0.55, shadow: '#5a2a6a', sat: 1.12, bloom: 0.3, night: 0.15 },
+  mist: { top: '#7f94a4', mid: '#a4b4bc', low: '#c0ccce', fog: '#b4c2c6', sun: [0.3, 0.6, 0.4], sunCol: '#f4f0e4', cloud: '#d6dedd', light: 1.6, amb: 2.2, density: 0.0021, shaft: 0.3, shadow: '#2a4a5a', sat: 1, bloom: 0.2, night: 0 },
+  night: { top: '#060b24', mid: '#101c46', low: '#22325e', fog: '#1a2648', sun: [0.4, 0.6, -0.5], sunCol: '#b8c8ff', cloud: '#2a3a68', light: 1.2, amb: 1.25, density: 0.0007, shaft: 0, shadow: '#1a2a6a', sat: 1.05, bloom: 0.4, night: 1 },
 };
+
+// The turn of a day: each stop has a share of the day, and the sky blends between them.
+const DAY_LENGTH = 960;     // seconds
+const CLOCK = [['night', 0], ['night', 0.18], ['morning', 0.3], ['day', 0.46], ['day', 0.6], ['dusk', 0.74], ['night', 0.84], ['night', 1]];
+const TIME_EVERY = 0.4;     // seconds between sky updates
+const MIST_HOLD = 180;      // seconds a bank of mist stays before the day moves on
+const QUIET_AFTER = 14000;  // ms the button list stays up after the last change of device
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true });
 renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.domElement.style.cssText = 'width:100%;height:100%;display:block;image-rendering:pixelated';
+renderer.toneMapping = THREE.NoToneMapping; // post.js shapes the picture itself
+renderer.domElement.style.cssText = 'width:100%;height:100%;display:block';
 document.getElementById('game').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2('#c0a4c6', 0.0007);
 const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.3, 9000);
-const hemi = new THREE.HemisphereLight('#ffffff', '#7a6a70', 1.4);
+const hemi = new THREE.HemisphereLight('#ffffff', '#8a7f78', 1.4);
 const sun = new THREE.DirectionalLight('#fff', 2.4);
 sun.castShadow = true;
+sun.shadow.autoUpdate = false; // redrawn every other frame, which the eye can't tell from every frame
 sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 400 });
+Object.assign(sun.shadow.camera, { left: -SUN_REACH, right: SUN_REACH, top: SUN_REACH, bottom: -SUN_REACH, near: 1, far: 400 });
 sun.shadow.bias = -0.0006;
 sun.shadow.normalBias = 0.05;
 scene.add(hemi, sun, sun.target);
@@ -83,18 +99,19 @@ const sky = new THREE.Mesh(new THREE.SphereGeometry(4000, 32, 16), skyMaterial()
 sky.frustumCulled = false;
 scene.add(sky);
 
-const water = new THREE.Mesh(new THREE.PlaneGeometry(WORLD * 3, WORLD * 3).rotateX(-Math.PI / 2), waterMaterial());
-water.position.set(WORLD / 2, 0, WORLD / 2);
+const water = new THREE.Mesh(new THREE.PlaneGeometry(WORLD * 3, WORLD * 3).rotateX(-Math.PI / 2), waterMaterial({ plane: true }));
+water.frustumCulled = false;
+water.position.set(WORLD / 2, -0.06, WORLD / 2);
 scene.add(water);
 
-const chunks = new Chunks(scene);
+const chunks = new Chunks(scene, renderer);
 const marks = addLandmarks(scene);
 addTowns(scene, marks);
 const work = new Work(scene, chunks, marks);
 const players = [];
 const monsters = new Monsters(scene, work, players);
 const shared2 = { yaw: 0, pitch: 0.2, recenter: null }; // the camera both heroes steer while together
-const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'dusk', setTime, travel, splash };
+const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'morning', clock: 0.3, clockHold: 0, setTime, travel, splash };
 
 world.sites = new Sites(scene, monsters, work, players);
 world.people = new People(scene, world);
@@ -120,10 +137,41 @@ p1.hud.camera = camera;
 p1.hud.setHealth(1);
 const state = p1.state;
 const tmp = new THREE.Vector3();
-const stopWatch = { stop: 0, lit: '', promptDevice: null, padStatus: '', leaving: 0, joinHeld: {} };
+const stopWatch = { stop: 0, promptDevice: null, padStatus: '', leaving: 0, joinHeld: {}, sky: 0, quietAt: performance.now() + QUIET_AFTER };
 
+function blend(a, b, k) {
+  const mixColor = (key) => new THREE.Color(a[key]).lerp(new THREE.Color(b[key]), k);
+  const out = {};
+  for (const key of Object.keys(a)) out[key] = typeof a[key] === 'string' ? mixColor(key) : typeof a[key] === 'number' ? a[key] + (b[key] - a[key]) * k : a[key].map((v, i) => v + (b[key][i] - v) * k);
+  return out;
+}
+
+function skyAt(clock) {
+  const next = CLOCK.findIndex(([, at]) => at > clock), [from, start] = CLOCK[next - 1], [to, end] = CLOCK[next], k = (clock - start) / (end - start);
+  return blend(TIMES[from], TIMES[to], k * k * (3 - 2 * k));
+}
+
+// Jumps to a time of day; mist holds the clock for a while.
 function setTime(name) {
-  const t = TIMES[name];
+  world.time = name;
+  world.clockHold = name === 'mist' ? MIST_HOLD : 0;
+  const stop = CLOCK.find(([n]) => n === name);
+  if (stop) world.clock = name === 'night' ? 0.05 : stop[1];
+  applySky(TIMES[name]);
+}
+
+function moveClock(dt) {
+  if (world.clockHold > 0) {
+    world.clockHold -= dt;
+    return;
+  }
+  world.clock = (world.clock + dt / DAY_LENGTH) % 1;
+  if ((stopWatch.sky -= dt) > 0) return;
+  stopWatch.sky = TIME_EVERY;
+  applySky(skyAt(world.clock));
+}
+
+function applySky(t) {
   const u = sky.material.uniforms;
   u.uTop.value.set(t.top);
   u.uMid.value.set(t.mid);
@@ -131,6 +179,13 @@ function setTime(name) {
   u.uSunCol.value.set(t.sunCol);
   u.uCloud.value.set(t.cloud);
   u.uSun.value.set(...t.sun).normalize();
+  u.uFog.value.set(t.fog);
+  u.uNight.value = t.night;
+  shared.uSunDir.value.copy(u.uSun.value);
+  shared.uSunCol.value.set(t.sunCol);
+  shared.uSkyTop.value.set(t.mid);
+  shared.uSkyLow.value.set(t.fog);
+  shared.uNight.value = t.night;
   scene.fog.color.set(t.fog);
   scene.fog.density = t.density;
   sun.color.set(t.sunCol);
@@ -138,17 +193,35 @@ function setTime(name) {
   hemi.intensity = t.amb;
   hemi.color.set(t.mid);
   for (const v of views) v.post.setTime(t);
-  world.time = name;
-  monsters.nightfall = name === 'night';
+  world.light = t;
+  monsters.nightfall = t.night > 0.6;
+}
+
+// Holds the frame rate on any machine by trading resolution for speed, never the other way.
+const pace = { level: Number(QUERY.get('level') ?? 0), avg: FAST, wait: SCALE_WAIT, held: 0 };
+function holdPace(dt) {
+  if (QUERY.has('level') || dt > PAUSED_FRAME) return;
+  pace.avg += (dt - pace.avg) * 0.05;
+  pace.wait -= dt;
+  if (pace.wait > 0) return;
+  const down = pace.avg > SLOW && pace.level < LEVELS.length - 1, up = pace.avg < FAST && pace.level > 0 && pace.level > pace.held;
+  if (!down && !up) return;
+  // A level that proved too slow stays off limits for a good while.
+  pace.held = down ? pace.level + 1 : pace.held;
+  pace.level += down ? 1 : -1;
+  pace.wait = down ? SCALE_WAIT : SCALE_WAIT * 8;
+  if (down) setTimeout(() => { pace.held = 0; }, 60000);
+  resize();
 }
 
 function resize() {
-  const w = Math.ceil(innerWidth / PIXEL), h = Math.ceil(innerHeight / PIXEL);
+  const { scale, aa } = LEVELS[pace.level], k = scale * Math.min(devicePixelRatio, 1.5);
+  const w = Math.ceil(innerWidth * k), h = Math.ceil(innerHeight * k);
   renderer.setSize(w, h, false);
   for (const v of views) {
     v.camera.aspect = innerWidth / innerHeight;
     v.camera.updateProjectionMatrix();
-    v.post.resize(w, h);
+    v.post.resize(w, h, aa);
   }
 }
 addEventListener('resize', resize);
@@ -186,10 +259,15 @@ function renderPrompts() {
   const status = two ? `P1 ${names(p1.controls)}  ·  P2 ${names(extra.controls)}`
     : pad ? `${names(controls)} connected${FEATURES.coop ? '  ·  Player 2: press OPTIONS on a second controller' : ''}`
       : 'No controller yet: press any button on it';
-  if (status !== stopWatch.padStatus) document.getElementById('pad-status').textContent = stopWatch.padStatus = status;
+  if (status !== stopWatch.padStatus) {
+    document.getElementById('pad-status').textContent = stopWatch.padStatus = status;
+    stopWatch.quietAt = performance.now() + QUIET_AFTER;
+  }
   const d = controls.device, key_ = `${d}${melee.stage}`;
+  document.body.classList.toggle('quiet', performance.now() > stopWatch.quietAt);
   if (key_ === stopWatch.promptDevice) return;
   stopWatch.promptDevice = key_;
+  stopWatch.quietAt = performance.now() + QUIET_AFTER;
   const usePad = d === 'pad', btn = buttonHtml, key = keyHtml;
   const p = (action) => prompt(action, d);
   document.getElementById('help').innerHTML = [
@@ -223,9 +301,9 @@ function join() {
     extra.hud.camera = camera2;
     views.push({ camera: camera2, post: new Post(renderer, scene, camera2) });
     resize();
-    setTime(world.time);
+    applySky(world.light);
   }
-  extra.hero.mesh.visible = true;
+  extra.hero.show(true);
   extra.state.x = state.x + 2.5;
   extra.state.z = state.z + 1;
   extra.state.dir = [...state.dir];
@@ -245,7 +323,7 @@ function leave() {
   if (extra.rooms.house) extra.rooms.leave(extra.state);
   players.pop();
   world.checkPause();
-  extra.hero.mesh.visible = false;
+  extra.hero.show(false);
   extra.controls.padIndex = null;
   p1.controls.avoid = null;
   state.yaw = shared2.yaw;
@@ -443,17 +521,21 @@ function renderView(v, p, dir) {
     const s = (split.amount > 0 ? p : players[i] ?? p).state;
     u.value.set(s.x, s.y + 1.4 + s.air, s.z);
   }
-  sun.target.position.set(p.state.x, p.state.y, p.state.z);
+  // Snapped to the shadow map's texels, so shadow edges hold still while the hero moves.
+  const texel = (SUN_REACH * 2) / sun.shadow.mapSize.x;
+  sun.target.position.set(Math.round(p.state.x / texel) * texel, Math.round(p.state.y / texel) * texel, Math.round(p.state.z / texel) * texel);
   sun.position.copy(sun.target.position).addScaledVector(dir, 180);
+  sun.shadow.needsUpdate = split.amount > 0 || (stopWatch.frame = (stopWatch.frame ?? 0) + 1) % 2 === 0;
   sky.position.copy(v.camera.position);
   water.position.x = v.camera.position.x;
   water.position.z = v.camera.position.z;
   v.post.indoors = !!p.rooms.house;
-  hemi.intensity = TIMES[world.time].amb * (p.rooms.house?.dark ? CAVE_LIGHT : 1);
+  hemi.intensity = world.light.amb * (p.rooms.house?.dark ? CAVE_LIGHT : 1);
   v.post.render(dir);
 }
 
 function step(dt) {
+  holdPace(dt);
   dt = Math.min(dt, 0.05);
   // Hit-stop: the world all but freezes for an instant, so a heavy blow feels heavy.
   if (work.stop > 0) {
@@ -467,7 +549,11 @@ function step(dt) {
   renderPrompts();
   world.checkPause();
   if (players.length > 1) updateSplit(dt);
-  for (const p of players) p.update(dt);
+  for (const p of players) {
+    p.update(dt);
+    if (FEATURES.compass) p.compass.update(p, world.viewYaw(p), dt);
+  }
+  if (!world.paused && FEATURES.dayCycle) moveClock(dt);
 
   chunks.update(players.map((p) => [p.state.x, p.state.z]));
   aimCameras(dt);
@@ -502,8 +588,6 @@ function step(dt) {
     views[0].post.toScreen = true;
     renderView(views[0], a, dir);
   }
-  const text = p1.rooms.house ? 'Inside a house' : `${nearestPlace()}   |   ${(state.x / 1000).toFixed(2)} km, ${(state.z / 1000).toFixed(2)} km   |   height ${Math.round(state.y)}`;
-  if (text !== stopWatch.lit) document.getElementById('where').textContent = stopWatch.lit = text;
 }
 
 // Previews: stand somewhere, look at something, at a time of day.
@@ -519,7 +603,7 @@ function goto(x, z, lookX, lookZ, time) {
   if (time) setTime(time);
   const points = players.map((p) => [p.state.x, p.state.z]);
   chunks.update(points);
-  while (chunks.pending) chunks.update(points);
+  chunks.settle();
   step(0.016);
 }
 const SHOTS = {
@@ -535,7 +619,7 @@ addEventListener('keydown', (e) => {
   if (s) goto(...s);
 });
 
-setTime('dusk');
+setTime('morning');
 window.__world = { players, world, split, views, join, leave, monsters, height, PUNCHES, work, marks, melee: p1.melee, bag: p1.bag, rooms: p1.rooms, body: p1.body, controls: p1.controls, skills: p1.skills, swim: p1.swim, hud: p1.hud, camera, step, goto, SHOTS, setTime, state, renderer, chunks };
 let last = performance.now();
 const loop = (now) => {
@@ -543,5 +627,5 @@ const loop = (now) => {
   last = now;
   requestAnimationFrame(loop);
 };
-goto(SPAWN.x, SPAWN.z, PLACES.spire.x, PLACES.spire.z, 'dusk');
+goto(SPAWN.x, SPAWN.z, PLACES.spire.x, PLACES.spire.z);
 requestAnimationFrame(loop);

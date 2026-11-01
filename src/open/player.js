@@ -3,7 +3,8 @@ import Controls from '../systems/controls.js';
 import { prompt } from '../ui/glyphs.js';
 import { FEATURES } from '../config/features.js';
 import { height, SPAWN } from './terrain.js';
-import HeroSprite, { FRAME, LOOKS } from './sprite.js';
+import HeroModel, { LOOKS } from './hero3d.js';
+import Compass from './compass.js';
 import Skills from './skills.js';
 import Swim, { DEEP, SURFACE } from './swim.js';
 import WorldHud from './skillPage.js';
@@ -76,7 +77,8 @@ export default class Player {
     this.cave = new Cave(world.scene, this);
     this.melee = new Melee(world.scene, this, world.work);
     this.melee.monsters = world.monsters;
-    this.hero = new HeroSprite(world.scene, LOOKS[index]);
+    this.hero = new HeroModel(world.scene, LOOKS[index]);
+    this.compass = new Compass(index ? 'p2-' : '');
     this.state = { x: SPAWN.x, z: SPAWN.z, y: 0, yaw: 2.6, pitch: 0.16, recenter: null, phase: 0, moving: false, dir: [0, -1], steepAt: 0, air: 0, rise: 0 };
     this.hp = this.body.maxHealth;
     this.guard = 0;
@@ -435,41 +437,35 @@ export default class Player {
     this.guard = 3;
   }
 
-  // What the body is doing now, as [atlas frame, forward lean]; the first thing that applies wins.
+  // What the body is doing now, as [pose name, forward lean, options]; the first thing that applies wins.
   motion(pose, time) {
     const { state, swim, melee } = this, pace = state.pace ?? 0;
-    if (this.flinch) return [FRAME.hurt, -0.15];
-    if (pose) return [FRAME.punch(pose.t, pose.chain), 0];
-    if (melee.rolling > 0) return [FRAME.roll(1 - melee.rolling / 0.42), (1 - melee.rolling / 0.42) * Math.PI * 2];
-    if (melee.held) return [FRAME.hold, 0];
-    if (melee.slam > 0) return [state.moving ? FRAME.throw : FRAME.slam, 0.25];
-    if (melee.guarding) return [FRAME.guard, 0.05];
-    if (melee.charging) return [FRAME.charge(time, melee.charge), 0.08 - melee.charge * 0.18];
-    if (state.flying) return [FRAME.fly(time), state.moving ? 1.25 : 0.2];
+    if (this.flinch) return ['hurt', -0.15];
+    if (pose) return [pose.t < 0.35 ? 'windup' : pose.chain === 2 ? 'uppercut' : 'punch', 0, { arm: pose.chain === 1 ? 1 : 0 }];
+    if (melee.rolling > 0) return ['roll', (1 - melee.rolling / 0.42) * Math.PI * 2];
+    if (melee.held) return ['hold', 0];
+    if (melee.slam > 0) return [state.moving ? 'throw' : 'slam', 0.25];
+    if (melee.guarding) return ['guard', 0.05];
+    if (melee.charging) return [melee.charge < 0.4 ? 'charge' : melee.charge < 0.8 ? 'gather' : 'peak', 0.08 - melee.charge * 0.18];
+    if (state.flying) return ['fly', state.moving ? 1.25 : 0.2];
     if (state.air > 0.4) {
-      if (state.rise > 1) return [FRAME.rising, 0.1];
-      return [this.wings && state.air > 2 ? FRAME.glide : FRAME.falling, this.wings && state.air > 2 ? 0.5 : 0];
+      if (state.rise > 1) return ['rising', 0.1];
+      return this.wings && state.air > 2 ? ['glide', 0.5] : ['falling', 0];
     }
-    if (this.landed) return [FRAME.landing, 0.12];
-    if (swim.inWater) return [FRAME.swim(time, swim.flailing ? 13 : state.moving ? 7 : 3), state.moving ? 0.75 : 0.2];
-    if (pace > 0.15) return [FRAME.dash(time), 0.15 + pace * 0.3];
-    if (state.moving) return state.sprinting ? [FRAME.run(time, 14), 0.1] : [FRAME.walk(time), 0];
-    return [FRAME.idle(time), 0];
+    if (this.landed) return ['landing', 0.12];
+    if (swim.inWater) return ['swim', state.moving ? 1.05 : 0.2, { run: swim.flailing ? 2 : state.moving ? 1 : 0.45 }];
+    if (pace > 0.15) return ['dash', 0.15 + pace * 0.3];
+    if (state.moving) return state.sprinting ? ['run', 0.08] : ['walk', 0];
+    return ['idle', 0];
   }
 
-  // Turns the sprite to face one camera. Runs once per view, so each screen sees it correctly.
+  // Poses the figure. Runs once per view; the model works it out on the first of them.
   pose(camera, time) {
     const { state, swim, melee, hero } = this;
-    const yaw = Math.atan2(camera.position.x - state.x, camera.position.z - state.z);
-    const sy = Math.sin(yaw), cy = Math.cos(yaw), [dx, dz] = state.dir;
-    const ahead = -sy * dx - cy * dz, right = cy * dx - sy * dz;
-    const view = Math.abs(right) > Math.abs(ahead) ? 2 : ahead > 0 ? 0 : 1;
     // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
-    const heroY = swim.inWater ? SURFACE + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air + melee.lift;
-    const pose = melee.pose, flip = pose && view !== 2 ? pose.chain === 1 : right < 0;
-    const [frame, lean] = this.motion(pose, time);
-    hero.update(state.x, heroY, state.z, camera, view, flip, frame, lean);
-    hero.trailFrom(camera);
-    hero.punch(pose, flip ? -1 : 1);
+    const heroY = swim.inWater ? -1.2 * this.body.heroScale + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air + melee.lift;
+    const pose = melee.pose, [name, lean, options] = this.motion(pose, time);
+    hero.update(state.x, heroY, state.z, state.dir, name, lean, time, options);
+    hero.punch(pose, pose?.chain === 1 ? 1 : 0);
   }
 }

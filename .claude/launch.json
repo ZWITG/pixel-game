@@ -4,8 +4,22 @@
     {
       "name": "pixel-rpg",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5180
+    },
+    {
+      "name": "pixel-rpg-build",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "5183"
+      ],
+      "port": 5183
     }
   ]
 }
