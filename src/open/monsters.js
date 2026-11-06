@@ -91,6 +91,11 @@ export default class Monsters {
     };
   }
 
+  // The ground a monster stands on: the land, or the floor of a pit or tunnel dug there.
+  groundY(x, z, y = height(x, z)) {
+    return this.world.digs?.floor(x, z, y) ?? height(x, z);
+  }
+
   // Walls and buildings stop monsters too.
   walled(x, z, e) {
     const r = e.radius * 0.6;
@@ -189,7 +194,7 @@ export default class Monsters {
       e.model.root.visible = false;
       e.group.add(machineMesh(e.def.machine));
     }
-    e.group.position.y = cave ? CAVE_FLOOR : height(x, z);
+    e.group.position.y = cave ? CAVE_FLOOR : this.groundY(x, z);
     const hero = this.nearest(e) ?? this.players[0];
     e.tough = this.toughness(x, z, hero);
     setTier(e, e.def.boss ? 0 : Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
@@ -431,7 +436,7 @@ export default class Monsters {
         e.air = Math.max(0, e.air + e.rise * dt);
         if (!e.air) e.rise = 0;
       }
-      e.group.position.y = (e.cave ? CAVE_FLOOR : height(e.x, e.z)) + e.air;
+      e.group.position.y = (e.cave ? CAVE_FLOOR : this.groundY(e.x, e.z, e.group.position.y)) + e.air;
       if (e.heldBy) e.heldBy.melee.carry(e);
       // A thrown monster hits the ground like a bomb.
       if (e.thrown && !e.air && e.thrown.melee) {

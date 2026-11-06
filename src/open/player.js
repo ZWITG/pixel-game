@@ -385,7 +385,15 @@ export default class Player {
     if (rooms.house) rooms.collide(state);
     else if (FEATURES.worldWork) world.work.collide(state);
     // Rubble, ledges and rooftops can be stood on.
-    const y = rooms.house ? rooms.floor : Math.max(world.scars.floor(state.x, state.z, height(state.x, state.z)), world.voxels?.floor(state.x, state.z, state.y + state.air) ?? -Infinity);
+    // Dug ground is its own floor; elsewhere the land, frozen water, rubble, ledges and rooftops.
+    const dug = rooms.house ? null : world.digs?.floor(state.x, state.z, state.y + state.air);
+    const y = rooms.house ? rooms.floor : dug ?? Math.max(world.scars.floor(state.x, state.z, height(state.x, state.z)), world.voxels?.floor(state.x, state.z, state.y + state.air) ?? -Infinity);
+    // Walking off an edge into a pit: fall, don't drop.
+    if (!state.air && !state.flying && y < state.y - 1.2) {
+      state.air = state.y - y;
+      state.rise = 0;
+      state.peak = state.air;
+    }
     if (!world.paused) this.jump(dt, y);
     if (FEATURES.swimming && !world.paused && !rooms.house) {
       swim.update(dt, state.air > 0 || (state.super && state.onWater) ? 0 : y, state.moving, state.sprinting); // the air over a lake isn't the lake

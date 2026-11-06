@@ -35,7 +35,7 @@ export const SCAR_GLSL = `uniform sampler2D uScars; uniform vec2 uScarAt;
 
 export const shared = {
   uScars: { value: scarTexture() }, uScarAt: { value: new THREE.Vector2() },
-  uTime: { value: 0 }, uNoise: { value: noiseTexture() }, uHole: { value: new THREE.Vector3(0, 0, 0) }, uHole2: { value: new THREE.Vector3(0, 0, 0) },
+  uTime: { value: 0 }, uNoise: { value: noiseTexture() }, uHole: { value: new THREE.Vector3(0, 0, 0) }, uHole2: { value: new THREE.Vector3(0, 0, 0) }, uDigs: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) }, uDigMask: { value: digMask() },
   uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color() }, uSkyTop: { value: new THREE.Color() }, uSkyLow: { value: new THREE.Color() }, uNight: { value: 0 },
 };
 
@@ -63,11 +63,27 @@ THREE.ShaderChunk.shadowmap_pars_fragment = THREE.ShaderChunk.shadowmap_pars_fra
   'return mix(shadow, 1.0, smoothstep(0.7, 0.98, max(abs(shadowCoord.x - 0.5), abs(shadowCoord.y - 0.5)) * 2.0));',
 );
 
+// Where the land has been dug into voxels (digs.js), the smooth ground and its grass give way.
+// `bare`: where a patch's surface was actually dug away (a mask, one row of 64 per patch), so its
+// grass goes only there.
+export const DIG_GLSL = `uniform vec4 uDigs[6]; uniform sampler2D uDigMask;
+  bool dug(vec2 p){ for(int i=0;i<6;i++){ vec4 d=uDigs[i]; if(d.z>0. && abs(p.x-d.x)<d.z && abs(p.y-d.y)<d.z) return true; } return false; }
+  bool bare(vec2 p){ for(int i=0;i<6;i++){ vec4 d=uDigs[i]; if(d.z>0. && abs(p.x-d.x)<d.z && abs(p.y-d.y)<d.z){
+    vec2 uv=(p-d.xy)/(2.*d.z)+.5; return texture2D(uDigMask,vec2(uv.x,(float(i)+uv.y)/6.)).r>.5; } } return false; }`;
+
+function digMask() {
+  const t = new THREE.DataTexture(new Uint8Array(64 * 64 * 6), 64, 64 * 6, THREE.RedFormat, THREE.UnsignedByteType);
+  t.needsUpdate = true;
+  return t;
+}
+
 export function terrainMaterial({ far = false } = {}) {
   const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   mat.onBeforeCompile = (s) => {
     s.uniforms.uHole = shared.uHole;
     s.uniforms.uHole2 = shared.uHole2;
+    s.uniforms.uDigs = shared.uDigs;
+    s.uniforms.uDigMask = shared.uDigMask;
     s.uniforms.uTime = shared.uTime;
     s.uniforms.uNoise = shared.uNoise;
     s.uniforms.uScars = shared.uScars;
@@ -80,13 +96,14 @@ export function terrainMaterial({ far = false } = {}) {
        vP=(modelMatrix*vec4(transformed,1.)).xyz; vN=normal; vB=aBiome; vR=aRoad; vL=aLand;`,
     );
     s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL; uniform vec3 uHole,uHole2; uniform float uTime;
+      ${DIG_GLSL}
       ${HASH}
       ${SCAR_GLSL}
       float groundBump(vec2 p){ return vn(p*.9)*.5+vn(p*3.1)*.25; }
       \n${s.fragmentShader}`.replace(
       '#include <color_fragment>',
       /* glsl */`
-      ${far ? 'if(max(abs(vP.x-uHole.x),abs(vP.z-uHole.z))<uHole.y||max(abs(vP.x-uHole2.x),abs(vP.z-uHole2.z))<uHole2.y) discard;' : ''}
+      ${far ? 'if(max(abs(vP.x-uHole.x),abs(vP.z-uHole.z))<uHole.y||max(abs(vP.x-uHole2.x),abs(vP.z-uHole2.z))<uHole2.y) discard;' : 'if(dug(vP.xz)) discard;'}
       vec3 at=vP;
       float dist=length(vP-cameraPosition);
       float detail=1.-smoothstep(90.,420.,dist);

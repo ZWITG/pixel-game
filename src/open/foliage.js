@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { addWind } from '../render/wind.js';
-import { shared, SCAR_GLSL } from './materials.js';
+import { shared, SCAR_GLSL, DIG_GLSL } from './materials.js';
 
 // Trees and ground cover made of crossed cards. A card is two triangles, so a crown of soft
 // leaves costs less than a few boxes. Far trees swap to a single picture of the near one.
@@ -51,9 +51,12 @@ function scarred(material, shrink) {
     inner?.(shader, renderer);
     shader.uniforms.uScars = shared.uScars;
     shader.uniforms.uScarAt = shared.uScarAt;
-    shader.vertexShader = `${SCAR_GLSL}\nvarying vec4 vScar;\n${shader.vertexShader}`.replace(
+    shader.uniforms.uDigs = shared.uDigs;
+    shader.uniforms.uDigMask = shared.uDigMask;
+    shader.vertexShader = `${SCAR_GLSL}\n${DIG_GLSL}\nvarying vec4 vScar;\n${shader.vertexShader}`.replace(
       '#include <project_vertex>',
       `vScar = scarAt(instanceMatrix[3].xz);
+      if (bare(instanceMatrix[3].xz)) transformed *= 0.0;
       ${shrink}
       #include <project_vertex>`,
     );

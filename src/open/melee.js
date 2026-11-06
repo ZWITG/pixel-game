@@ -519,8 +519,9 @@ export default class Melee {
       this.player.world.caravans.struck(x, z, reach, force, this.player);
       this.player.world.estates.struck(x, z, reach, force, this.player);
       this.player.world.voxels?.blast(x, this.player.state.y + 0.8, z, this.work.cut(force, this.player, reach), this.player);
+      this.dug = this.player.world.digs?.blast(x, this.player.state.y + this.player.state.air + 1.4, z, this.work.cut(force, this.player, reach), this.player, crater) ?? false;
     }
-    if (crater) this.tear(x, z, crater);
+    if (crater && !this.dug) this.tear(x, z, crater);
     this.waves.push({ queue, x, z, reach, t: 0, drops: {}, broke: false });
     return queue.length > 0;
   }

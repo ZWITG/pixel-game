@@ -32,10 +32,12 @@ const STEP_UP = 1.1;                 // tiles a hero can step up onto rubble or 
 const BODY = [0.5, 1.4, 2.3];        // heights at which a hero's body meets walls
 const PIECE = 7;                     // voxels across a piece when a whole structure comes down
 const MESHES_PER_FRAME = 4;
+const BIG = 60000, WINDOW = 12;     // cells past which a volume checks support only near a cut, and how far round it
 const SECTOR_NEAR = 330, SECTOR_FAR = 480, STONE_VOXEL = 1; // city walls and castles: tiles, and their coarser voxels
 const HOUSE_NEAR = 170, HOUSE_FAR = 240, MOST_HOUSES = 36, HOUSE_CHECK = 0.5; // tiles; houses become voxels near a hero
 
 const offsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+let REACH_OF = null;
 
 // The voxels of one structure, in its own frame (the group it hangs on).
 class Volume {
@@ -46,7 +48,12 @@ class Volume {
     this.total = this.count();
     // How far each voxel already reaches from support as built: a wide floor that stands when
     // whole stands, and only falls once what held it is broken.
-    this.budget = this.reach(null);
+    this.budget = v.plain ? new Uint8Array(this.mat.length) : this.reach(null);
+    // Land (plain): the furthest any of its materials reaches sideways.
+    if (v.plain) {
+      const seen = new Set(this.mat);
+      this.most = Math.max(1, ...[...seen].filter(Boolean).map((m) => MATERIALS[m].reach));
+    }
   }
 
   count() {
@@ -101,44 +108,80 @@ class Volume {
 
   // What still stands: support flows up from the ground for free, and out sideways (or down)
   // one voxel at a time, as far as each material can reach. A 0-1 breadth-first search.
-  unsupported() {
-    const best = this.reach(this.budget), loose = [];
+  // `win`: cell bounds { i0, i1, j0, j1, k0, k1 } to look within, for big volumes: what's on the
+  // window's edges counts as held, as a collapse only ever involves what's near the hole.
+  unsupported(win) {
+    const best = this.reach(this.budget, win), loose = [];
+    if (win) {
+      const w = win.inner ?? win;
+      for (let k = w.k0; k <= w.k1; k++) for (let j = w.j0; j <= w.j1; j++) for (let i = w.i0; i <= w.i1; i++) {
+        const at = this.at(i, j, k);
+        if (this.mat[at] && best[at] === 255) loose.push(at);
+      }
+      return loose;
+    }
     for (let i = 0; i < best.length; i++) if (this.mat[i] && best[i] === 255) loose.push(i);
     return loose;
   }
 
+  window(i, j, k, span) {
+    if (this.plain) return this.around(i, j, k, span);
+    return { i0: Math.max(0, i - span), i1: Math.min(this.nx - 1, i + span), j0: Math.max(0, j - span), j1: Math.min(this.ny - 1, j + span), k0: Math.max(0, k - span), k1: Math.min(this.nz - 1, k + span) };
+  }
+
+  // Land: support never travels further sideways (or down) than its furthest-reaching material,
+  // so a cut can loosen only what lies that near it, and what holds those lies that much further
+  // out. Worked out from that far below the cut to the sky, its sides held by nothing; land
+  // deeper down can't be loosened by it, so the bottom of the box holds.
+  around(i, j, k, span) {
+    const box = (d) => ({ i0: Math.max(0, i - d), i1: Math.min(this.nx - 1, i + d), j0: Math.max(0, j - span - this.most), j1: this.ny - 1, k0: Math.max(0, k - d), k1: Math.min(this.nz - 1, k + d) });
+    return { ...box(span + 2 * this.most), open: true, inner: box(span + this.most) };
+  }
+
   // Each voxel's distance from support; `budget` lets one reach as far as it did when built.
   // Worked out level by level: going up costs nothing, so it stays in the level it came from.
-  reach(budget) {
+  reach(budget, win) {
     const { nx, ny, nz, mat } = this, n = mat.length;
     this.bestBuf ??= new Uint8Array(n); // kept between blows, so a castle's punch allocates nothing big
-    const best = budget ? this.bestBuf.fill(255) : new Uint8Array(n).fill(255);
+    const best = budget ? this.bestBuf : new Uint8Array(n);
+    const w = win ?? { i0: 0, i1: nx - 1, j0: 0, j1: ny - 1, k0: 0, k1: nz - 1 };
     let level = [], next = [];
     const ground = Math.max(0, Math.floor((0.6 - this.oy) / this.s));
-    for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
-      for (let j = 0; j <= ground; j++) {
-        const at = this.at(i, j, k);
-        if (mat[at]) {
-          best[at] = 0;
-          level.push(at);
-        }
+    for (let k = w.k0; k <= w.k1; k++) for (let j = w.j0; j <= w.j1; j++) for (let i = w.i0; i <= w.i1; i++) {
+      const at = this.at(i, j, k);
+      best[at] = 255;
+      // Held: the ground layer, and, in a window, everything on its edge.
+      const edge = win && (win.open ? j === w.j0 : i === w.i0 || i === w.i1 || k === w.k0 || k === w.k1 || j === w.j0 || j === w.j1);
+      if (mat[at] && (j <= ground || edge)) {
+        best[at] = 0;
+        level.push(at);
       }
     }
-    for (let h = 0; level.length; h++) {
+    // How far each material reaches, looked up once.
+    if (REACH_OF?.n !== MATERIALS.length) {
+      REACH_OF = Uint8Array.from({ length: 256 }, (_, m) => MATERIALS[m]?.reach ?? 0);
+      REACH_OF.n = MATERIALS.length;
+    }
+    const far = REACH_OF;
+    const layer = nx * ny;
+    let h = 0;
+    const go = (to, nh) => {
+      const m = mat[to];
+      if (!m || nh >= best[to] || nh > (budget ? Math.max(far[m], budget[to]) : 250)) return;
+      best[to] = nh;
+      (nh === h ? level : next).push(to);
+    };
+    for (; level.length; h++) {
       for (let q = 0; q < level.length; q++) {
         const at = level[q];
         if (best[at] !== h) continue;
-        const i = at % nx, j = Math.floor(at / nx) % ny, k = Math.floor(at / (nx * ny));
-        for (const [di, dj, dk] of offsets) {
-          const a = i + di, b = j + dj, c = k + dk;
-          if (a < 0 || b < 0 || c < 0 || a >= nx || b >= ny || c >= nz) continue;
-          const to = this.at(a, b, c), m = mat[to];
-          if (!m) continue;
-          const nh = dj === 1 ? h : h + 1;
-          if (nh >= best[to] || nh > (budget ? Math.max(MATERIALS[m].reach, budget[to]) : 250)) continue;
-          best[to] = nh;
-          (nh === h ? level : next).push(to);
-        }
+        const k = (at / layer) | 0, rest = at - k * layer, j = (rest / nx) | 0, i = rest - j * nx, up = h + 1;
+        if (j < w.j1) go(at + nx, h);
+        if (i > w.i0) go(at - 1, up);
+        if (i < w.i1) go(at + 1, up);
+        if (j > w.j0) go(at - nx, up);
+        if (k > w.k0) go(at - layer, up);
+        if (k < w.k1) go(at + layer, up);
       }
       level = next;
       next = [];
@@ -304,8 +347,9 @@ export default class Voxels {
       (entry.pivot ?? entry.group).add(entry.mesh);
       if (!entry.pivot) for (const c of entry.group.children) if (c !== entry.mesh && c.isMesh) c.visible = false;
     }
-    if (!entry.ready) entry.onReady?.();
+    const first = !entry.ready;
     entry.ready = true;
+    if (first) entry.onReady?.();
   }
 
   remesh(entry) {
@@ -319,11 +363,14 @@ export default class Voxels {
     const entry = owner.vox;
     if (!entry?.ready) return 0;
     entry.group.updateMatrixWorld(true);
-    const local = entry.group.worldToLocal(this.v.set(x, y, z));
+    // Its own vector: spray() below reuses this.v.
+    const local = entry.group.worldToLocal(new THREE.Vector3(x, y, z));
     const out = entry.vol.carve(local.x, local.y, local.z, r, only);
     if (!out.length) return 0;
+    this.onCarve?.(entry, out, hero);
     this.spray(entry, out, x, y, z);
-    const loose = entry.vol.unsupported();
+    const vol = entry.vol, big = vol.mat.length > BIG, [ci, cj, ck] = vol.cell(local.x, local.y, local.z);
+    const loose = vol.unsupported(vol.plain ? vol.around(ci, cj, ck, Math.ceil(r / Math.sqrt(MATERIALS[1].strength) / vol.s) + 1) : big ? vol.window(ci, cj, ck, Math.ceil(r / vol.s) + WINDOW) : null);
     if (loose.length) this.drop(entry, entry.vol.pieces(loose), hero, x, y, z);
     this.remesh(entry);
     entry.left = entry.vol.count() / entry.vol.total;
