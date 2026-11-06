@@ -98,7 +98,46 @@ function voxelize({ pos, col, glow, s }) {
       }
     }
   }
+  hollow(nx, ny, nz, s, oy, mat, color);
   return { nx, ny, nz, s, ox, oy, oz, mat, col: color };
+}
+
+// Rooms inside: everything more than WALL voxels from the outside air is cleared, leaving walls
+// of that thickness, with a plank floor at ground level and every storey up.
+const WALL = 2, STOREY = 7, PLANK = (0x6a << 16) | (0x44 << 8) | 0x26;
+function hollow(nx, ny, nz, s, oy, mat, color) {
+  const n = mat.length, depth = new Uint8Array(n), queue = [];
+  const air = (i, j, k) => i < 0 || j < 0 || k < 0 || i >= nx || j >= ny || k >= nz || !mat[i + nx * (j + ny * k)];
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const at = i + nx * (j + ny * k);
+    if (!mat[at]) continue;
+    if (air(i + 1, j, k) || air(i - 1, j, k) || air(i, j + 1, k) || (j > 0 && air(i, j - 1, k)) || air(i, j, k + 1) || air(i, j, k - 1)) {
+      depth[at] = 1;
+      queue.push(at);
+    }
+  }
+  for (let q = 0; q < queue.length; q++) {
+    const at = queue[q], d = depth[at];
+    if (d > WALL) continue;
+    const i = at % nx, j = Math.floor(at / nx) % ny, k = Math.floor(at / (nx * ny));
+    for (const [a, b, c] of [[i + 1, j, k], [i - 1, j, k], [i, j + 1, k], [i, j - 1, k], [i, j, k + 1], [i, j, k - 1]]) {
+      if (a < 0 || b < 0 || c < 0 || a >= nx || b >= ny || c >= nz) continue;
+      const to = a + nx * (b + ny * c);
+      if (mat[to] && !depth[to]) {
+        depth[to] = d + 1;
+        queue.push(to);
+      }
+    }
+  }
+  const ground = Math.max(0, Math.round(-oy / s));
+  for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const at = i + nx * (j + ny * k);
+    if (!mat[at] || depth[at] && depth[at] <= WALL) continue;
+    if (j <= ground || (j - ground) % STOREY === 0) {
+      mat[at] = WOOD;
+      color[at] = PLANK;
+    } else mat[at] = 0;
+  }
 }
 
 // Greedy meshing with corner shading. Faces merge only when colour, material and all four

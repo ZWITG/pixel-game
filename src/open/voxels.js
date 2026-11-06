@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { height } from './terrain.js';
+import { houseVoxels } from './blueprints.js';
+import { nationAt } from './nations.js';
 
 // Breakable structures in the manner of Teardown: built from cubes of real materials that a blow
 // cuts exactly where it lands. After each cut the structure checks what still holds it up
@@ -29,6 +31,7 @@ const STEP_UP = 1.1;                 // tiles a hero can step up onto rubble or 
 const BODY = [0.5, 1.4, 2.3];        // heights at which a hero's body meets walls
 const PIECE = 7;                     // voxels across a piece when a whole structure comes down
 const MESHES_PER_FRAME = 4;
+const HOUSE_NEAR = 170, HOUSE_FAR = 240, MOST_HOUSES = 36, HOUSE_CHECK = 0.5; // tiles; houses become voxels near a hero
 
 const offsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
@@ -39,6 +42,9 @@ class Volume {
     this.full = v.mat.slice();
     this.fullCol = v.col.slice();
     this.total = this.count();
+    // How far each voxel already reaches from support as built: a wide floor that stands when
+    // whole stands, and only falls once what held it is broken.
+    this.budget = this.reach(null);
   }
 
   count() {
@@ -92,6 +98,13 @@ class Volume {
   // What still stands: support flows up from the ground for free, and out sideways (or down)
   // one voxel at a time, as far as each material can reach. A 0-1 breadth-first search.
   unsupported() {
+    const best = this.reach(this.budget), loose = [];
+    for (let i = 0; i < best.length; i++) if (this.mat[i] && best[i] === 255) loose.push(i);
+    return loose;
+  }
+
+  // Each voxel's distance from support; `budget` lets one reach as far as it did when built.
+  reach(budget) {
     const { nx, ny, nz, mat } = this, n = mat.length, best = new Uint8Array(n).fill(255), queue = new Int32Array(n * 4);
     let head = n * 2, tail = n * 2; // a double-ended queue in one array: the front grows down from the middle
     const ground = Math.max(0, Math.floor((0.6 - this.oy) / S));
@@ -112,15 +125,13 @@ class Volume {
         const to = this.at(a, b, c), m = mat[to];
         if (!m) continue;
         const cost = dj === 1 ? 0 : 1, nh = h + cost;
-        if (nh >= best[to] || nh > MATERIALS[m].reach) continue;
+        if (nh >= best[to] || nh > (budget ? Math.max(MATERIALS[m].reach, budget[to]) : 250)) continue;
         best[to] = nh;
         if (cost) queue[tail++] = to;
         else queue[--head] = to;
       }
     }
-    const loose = [];
-    for (let i = 0; i < n; i++) if (mat[i] && best[i] === 255) loose.push(i);
-    return loose;
+    return best;
   }
 
   // Groups loose voxels into the separate pieces they fall as.
@@ -239,12 +250,8 @@ export default class Voxels {
     this.waiting.delete(m.id);
     if (!job) return;
     if (m.type === 'voxelized') {
-      const vol = new Volume(m.v), entry = { vol, group: job.group, owner: job.owner, mesh: null, stamp: 0, ready: false, at: job.group.getWorldPosition(new THREE.Vector3()) };
-      job.owner.vox = entry;
-      if (job.owner.solid) job.owner.solid.voxel = true; // the hero meets the voxels themselves now
-      if (job.owner.vox && job.owner.fallen) entry.left = 0;
-      this.list.push(entry);
-      this.remesh(entry);
+      const entry = this.take(job.owner, job.group, m.v);
+      if (job.owner.fallen) entry.left = 0;
     } else if (m.type === 'meshed') {
       if (m.stamp !== job.entry.stamp) return; // a newer cut is on its way
       const g = new THREE.BufferGeometry();
@@ -255,6 +262,16 @@ export default class Voxels {
       g.computeBoundingSphere();
       this.wear(job.entry, g);
     }
+  }
+
+  // A volume made directly (blueprints.js) rather than from a painted model.
+  take(owner, group, v, onReady) {
+    const entry = { vol: new Volume(v), group, owner, mesh: null, stamp: 0, ready: false, at: group.getWorldPosition(new THREE.Vector3()), onReady };
+    owner.vox = entry;
+    if (owner.solid) owner.solid.voxel = true; // the hero meets the voxels themselves now
+    this.list.push(entry);
+    this.remesh(entry);
+    return entry;
   }
 
   // Puts a fresh mesh on a structure or a chunk, hiding the painted model the first time.
@@ -268,6 +285,7 @@ export default class Voxels {
       (entry.pivot ?? entry.group).add(entry.mesh);
       if (!entry.pivot) for (const c of entry.group.children) if (c !== entry.mesh && c.isMesh) c.visible = false;
     }
+    if (!entry.ready) entry.onReady?.();
     entry.ready = true;
   }
 
@@ -383,6 +401,45 @@ export default class Voxels {
     }
     for (const c of this.chunks) if (!c.asleep) this.fall(c, dt);
     this.updateBits(dt);
+    if ((this.houseCheck = (this.houseCheck ?? 0) - dt) <= 0) {
+      this.houseCheck = HOUSE_CHECK;
+      this.houses();
+    }
+  }
+
+  // Houses near a hero are voxels, built from their blueprint; far off they're the painted model.
+  houses() {
+    const { marks, players, work } = this.world;
+    let active = this.list.filter((e) => e.owner.house).length;
+    for (const h of marks.houses) {
+      const d = players.reduce((m, p) => Math.min(m, Math.hypot(p.state.x - h.x, p.state.z - h.z)), 1e9), gone = work.chunks.isGone(h.id);
+      if (h.vox) {
+        if (d > HOUSE_FAR) {
+          this.scene.remove(h.vox.group);
+          this.forget(h);
+          h.solid.voxel = false;
+          h.voxFell = false;
+          work.showHouse(h);
+          active--;
+        } else if (h.vox.ready) {
+          h.mesh.visible = false;
+          if (!gone && h.vox.left === 0) {
+            this.mend(h);
+            h.voxFell = false;
+          }
+          if (h.rubble) h.rubble.visible = gone && !h.voxFell;
+        }
+        continue;
+      }
+      if (d > HOUSE_NEAR || gone || active >= MOST_HOUSES) continue;
+      const seed = [...h.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7), group = new THREE.Group();
+      group.position.copy(h.mesh.position);
+      group.rotation.y = h.mesh.rotation.y;
+      this.scene.add(group);
+      h.house = true;
+      this.take(h, group, houseVoxels(nationAt(h.x, h.z)?.id ?? 'free', seed % 4, seed), () => { h.mesh.visible = false; });
+      active++;
+    }
   }
 
   fall(c, dt) {

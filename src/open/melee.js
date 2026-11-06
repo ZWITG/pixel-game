@@ -520,7 +520,7 @@ export default class Melee {
       this.player.world.estates.struck(x, z, reach, force, this.player);
     }
     if (crater) this.tear(x, z, crater);
-    this.waves.push({ queue, x, z, t: 0, drops: {}, broke: false });
+    this.waves.push({ queue, x, z, reach, t: 0, drops: {}, broke: false });
     return queue.length > 0;
   }
 
@@ -603,7 +603,7 @@ export default class Melee {
       const { o, m, h, foe, force, at } = w.queue.shift();
       if (foe) this.hitHero(foe, force, w.x, w.z);
       else if (m) this.monsters.hit(m, force, w.x, w.z);
-      else if (h) w.broke = this.work.hitHouse(h, force) || w.broke;
+      else if (h) w.broke = this.work.hitHouse(h, force, { x: w.x, z: w.z, reach: w.reach ?? 0, y: this.player.state.y + 1.3 }) || w.broke;
       else if (!this.work.chunks.gone.has(o.id)) w.broke = this.work.hit(o, force, w.drops, at > 0) || w.broke;
     }
     if (w.queue.length) return;

@@ -1,5 +1,5 @@
 import { fortMesh } from './doctrines.js';
-import { raises, raiseWorks, razeWorks, strike, settleWorks, restoreWorks, standing, workDuties, explode, fury, dishearten } from './raze.js';
+import { raises, raiseWorks, razeWorks, strike, settleWorks, restoreWorks, standing, workDuties, explode, fury, dishearten, voxelWorld, cut } from './raze.js';
 import * as THREE from 'three';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
 import { height, biome, riverDistance, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
@@ -199,6 +199,7 @@ export default class Sites {
   struck(x, z, reach, stage, p, force = 0) {
     for (const s of this.list) {
       if (s.works && !s.done && Math.hypot(s.x - x, s.z - z) < reach + 60) this.strikeWorks(s, x, z, reach, force, p);
+      if (s.vox?.ready && !s.done && force && Math.hypot(s.x - x, s.z - z) < reach + 40) voxelWorld().hit(s, x, p.state.y + 1.3, z, cut(force, p, reach), p);
       if (s.done || s.cat.goal !== 'break' || Math.hypot(s.x - x, s.z - z) > Math.max(reach, 2) + 5) continue;
       s.hits += 1 + stage;
       this.work.burst(s.x, s.y + 2, s.z, [s.cat.color, '#ffffff'], 10, 6);
@@ -268,6 +269,7 @@ export default class Sites {
     restoreWorks(s);
     if (s.mesh && !s.cat.fort) s.mesh.material.color.set('#ffffff');
     if (s.mesh && s.cat.fort) s.mesh.visible = true;
+    voxelWorld()?.mend(s);
     this.save();
   }
 
@@ -307,10 +309,14 @@ export default class Sites {
       if (s.done) razeWorks(s);
     }
     if (s.cat.fort && !s.mesh) {
-      s.mesh = fortMesh(s.cat.color);
+      // The palisade and its buildings, breakable as voxels where blows land.
+      const model = fortMesh(s.cat.color);
+      s.mesh = new THREE.Group();
+      s.mesh.add(model);
       s.mesh.position.set(s.x, s.y, s.z);
       s.mesh.visible = !s.done;
       this.scene.add(s.mesh);
+      voxelWorld()?.adopt(s, s.mesh, [model.geometry.clone()]);
       return;
     }
     if (s.mesh || s.cat.built) return;

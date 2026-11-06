@@ -257,13 +257,19 @@ export default class Work {
     });
   }
 
-  hitHouse(h, force) {
-    const done = (this.hurt.get(h.id) ?? 0) + force, y = h.mesh.position.y + 3;
+  // `at`: where the blow landed, so a voxel house is cut there (voxels.js).
+  hitHouse(h, force, at) {
+    const done = (this.hurt.get(h.id) ?? 0) + force, y = h.mesh.position.y + 3, vox = this.voxels && h.vox?.ready;
+    if (vox && at) this.voxels.hit(h, at.x, at.y, at.z, this.cut(force, this.actor, at.reach), this.actor);
     this.burst(h.x, y, h.z, ['#e8d5b0', '#7a5230', '#b13e53'], 10, 6);
     if (done < HOUSE_HP) {
       this.hurt.set(h.id, done);
-      h.mesh.rotation.z = (done / HOUSE_HP) * 0.05; // it starts to lean
+      if (!vox) h.mesh.rotation.z = (done / HOUSE_HP) * 0.05; // it starts to lean
       return false;
+    }
+    if (vox) {
+      this.voxels.fell(h, this.actor);
+      h.voxFell = true;
     }
     this.hurt.delete(h.id);
     this.houseFell?.(h.id.split('|')[0]);
