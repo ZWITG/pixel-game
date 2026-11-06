@@ -202,10 +202,12 @@ New buildings by tier (each one works, and each one can be destroyed):
 | 2 | v0.20 | Blueprints: every house, wall, tower, fort and castle becomes voxel near the hero, with far meshes from the same blueprint, nation styles, voxel interiors and saved rubble | `architecture.js`, `fortress.js`, `towns.js`, `settlements.js`, `rooms.js` |
 | 2b | v0.20.5 | Diggable ground: voxel patches where blasts go deep, tunnels, caves, falling overhangs, walking inside them | new `groundVoxels.js`; `chunks.js`, `terrain.js`, `materials.js`, `work.js`, `monsters.js` |
 | 3 | v0.21 | Atmosphere: smoke and dust volumes, fire through timber, glass shatter, fire light, smoke columns seen from afar | `post.js`, `elementFx.js`, `scars.js` |
-| 4 | v0.22 | Economy core (simulation only): goods, production, needs, prices, prosperity, treasury, tolls. Shown on the Nations tab and town signs. | new `economy.js`; `realm.js`, `settlements.js` |
-| 5 | v0.23 | Caravans and traders: road graph with bridges and ferries, visible wagons, horses and guards, inns, robbing or escorting, supply trains | new `caravans.js`, `roads.js`; `terrain.js`, `creatures.js` |
-| 6 | v0.24 | Kingdom buildings and districts: treasury, armory, barracks, granary, quarters, the effects of destroying each, rebuilding with scaffolding | `settlements.js`, `realm.js`, `doctrines.js`, `raze.js` |
+| 4 | **v0.19 (done 2026-11-06)** | Economy core (simulation only): goods, production, needs, prices, prosperity, treasury, tolls. Shown on the Nations tab and town signs. | new `economy.js`; `realm.js`, `settlements.js` |
+| 5 | v0.20 | Caravans and traders: road graph with bridges and ferries, visible wagons, horses and guards, inns, robbing or escorting, supply trains | new `caravans.js`, `roads.js`; `terrain.js`, `creatures.js` |
+| 6 | v0.21 | Kingdom buildings and districts: treasury, armory, barracks, granary, quarters, the effects of destroying each, rebuilding with scaffolding | `settlements.js`, `realm.js`, `doctrines.js`, `raze.js` |
 | 7 | v0.25 | NPC detail and routines, animals, new places, fairs and events | `figures.js`, `creatures.js`, `sites.js`, `landmarks.js` |
+
+**Order (the user chose 2026-11-06): trade and kingdoms first, phases 4, 5 and 6, then destruction, phases 1 to 3, then 7.** The version numbers in the table for those phases will move up to follow.
 
 **Performance gate for every phase:** the frame rate is measured in the busiest city with a Worldbreaker blast before and after, and the version doesn't ship if it got slower.
 

@@ -5,6 +5,7 @@ import { svg, MAX_RANK } from './powers.js';
 import { NATIONS, nationAt, COUNTRY } from './nations.js';
 import { DOCTRINES } from './doctrines.js';
 import { TIERS, tierOf } from './settlements.js';
+import { GOODS } from './economy.js';
 import { SKILLS } from './skills.js';
 
 // The menu in play: one row of icon tabs over the map, the Spirit Tree, the Satchel, the
@@ -24,6 +25,7 @@ const SHAPES = {
   town: 'M8 4 1 11h2v10h5v-5h2v5h3V11h1zM17 9l-3 3v9h9v-9h-1z',
   hamlet: 'M12 7l-8 7h2v7h12v-7h2z',
   gifts: 'M12 2l2.6 6.6L22 9.4l-5.4 4.8 1.6 7.3L12 17.7l-6.2 3.8 1.6-7.3L2 9.4l7.4-.8z',
+  cart: 'M2 8h13v8H2zM15 11h4l3 3v2h-7zM6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
   fort: 'M3 21V9l2-4 2 4v2h2V9l3-5 3 5v2h2V9l2-4 2 4v12h-6v-5h-6v5z',
   village: 'M12 3 2 12h3v9h5v-6h4v6h5v-9h3z',
   bandit: 'M12 4 2 20h7l3-6 3 6h7z',
@@ -37,9 +39,15 @@ const TABS = [['map', 'Map'], ['nations', 'Nations'], ['powers', 'Powers'], ['gi
 export const SATCHEL_TAB = 5;
 const TERRITORY = 128;      // cells across the map's overlay of borders
 const POWER_COLS = 4, DIRS = ['up', 'right', 'down', 'left'], DIR_NAMES = ['Up', 'Right', 'Down', 'Left'];
+// What a place is short of and has plenty of, for the map.
+function marketLine(economy, s) {
+  const { short, cheap } = economy.outlook(s), name = (g) => GOODS[g].name.toLowerCase();
+  return `${short.length ? ` · short of ${short.map(name).join(', ')}` : ''}${cheap.length ? ` · cheap ${cheap.map(name).join(', ')}` : ''}`;
+}
+
 const KINDS = {
   crown: ['#ffd98a', 'Seat of a nation'], kingdom: ['#ffe7b0', 'Kingdom'], city: ['#ffe7b0', 'City'], town: ['#ffd9a0', 'Town'], village: ['#ffd9a0', 'Village'], hamlet: ['#e8ddc8', 'Hamlet or homestead'],
-  fort: ['#ff8f7f', 'Fort'], bandit: ['#ff8f7f', 'Bandit camp'], keep: ['#d8d0c8', 'Ruined keep'], lair: ['#ff4a6a', 'Lair'], landmark: ['#9fe8ff', 'Landmark'], goal: ['#ffffff', 'Place you have found'], pin: ['#ffe15a', 'Your pin'],
+  fort: ['#ff8f7f', 'Fort'], bandit: ['#ff8f7f', 'Bandit camp'], keep: ['#d8d0c8', 'Ruined keep'], lair: ['#ff4a6a', 'Lair'], landmark: ['#9fe8ff', 'Landmark'], goal: ['#ffffff', 'Place you have found'], cart: ['#ffe7a0', 'Trader on the road'], pin: ['#ffe15a', 'Your pin'],
 };
 // The icon and size for each tier of a settlement, from homestead to kingdom.
 const TIER_ICONS = [['hamlet', 0.72], ['hamlet', 0.84], ['village', 1], ['town', 1.1], ['city', 1.26], ['kingdom', 1.5]];
@@ -242,13 +250,14 @@ export default class GameMenu {
     const { nations } = this.world, cards = NATIONS.map((n) => {
       const r = nations.report(n), { realm } = this.world, force = realm.of(n.id), d = DOCTRINES[n.id], state = r.fallen ? 'Conquered' : r.open ? 'Ruler exposed' : force.stance;
       const fill = r.fallen ? 100 : Math.round((r.done / Math.max(1, r.need)) * 100), power = r.fallen ? 0 : Math.round(realm.strength(n.id) * 100);
-      const places = realm.placesOf(n.id).length, captain = force.captains.find((c) => c.alive);
+      const places = realm.placesOf(n.id).length, captain = force.captains.find((c) => c.alive), econ = realm.economy.report(n.id);
       return `<div class="nation ${r.fallen ? 'fallen' : ''}" style="--c:${n.color}">
         <i>${SVG(r.fallen ? SHAPES.nations : SHAPES.crown, 34)}</i>
         <div><b>${n.name}<small> · Level ${n.level}</small></b><span>${d.title}: ${d.style}</span>
         <div class="nation-bar"><u style="width:${fill}%"></u></div>
         <em>${state}${r.fallen || r.open ? '' : ` · ${r.done} of ${r.need} strongholds broken`}</em>
-        ${r.fallen ? '' : `<span>Strength ${power}% · ${Math.round(force.troops)} troops · ${places} settlements${captain ? ` · ${captain.title ?? 'Captain'} ${captain.name}` : ''}</span>`}</div>
+        ${r.fallen ? '' : `<span>Strength ${power}% · ${Math.round(force.troops)} troops · ${places} settlements${captain ? ` · ${captain.title ?? 'Captain'} ${captain.name}` : ''}</span>`}
+        ${r.fallen || !econ ? '' : `<span>Treasury ${Math.round(force.gold)}g, ${econ.income >= 0 ? '+' : ''}${Math.round(econ.income)}g a day · Prosperity ${Math.round(econ.prosperity * 100)}% · ${econ.food < 0.6 ? 'Hungry' : econ.food < 0.9 ? 'Short of food' : 'Fed'} · ${Math.round(econ.arms)} arms in store · ${econ.runs} trade runs</span>`}</div>
       </div>`;
     }).join('');
     const { realm } = this.world, count = nations.fallen.size, line = count === NATIONS.length ? 'The country is yours. Something has noticed.' : 'Break a nation\'s strongholds to expose its ruler, then bring the ruler down. They will not wait for you.';
@@ -392,7 +401,12 @@ export default class GameMenu {
     // Every settlement as it is today: its size, and whose it is.
     for (const s of realm.settlements) {
       const tier = tierOf(s.pop), owner = NATIONS.find((n) => n.id === s.owner), [icon, size] = TIER_ICONS[tier];
-      out.push({ x: s.x, z: s.z, name: s.name, icon, size, color: owner?.color ?? (s.owner === 'hero' ? YOURS : KINDS[icon][0]), info: `${s.name}, ${TIERS[tier].name.toLowerCase()} of ${Math.round(s.pop)}, ${nameOf(s.owner)}` });
+      out.push({ x: s.x, z: s.z, name: s.name, icon, size, color: owner?.color ?? (s.owner === 'hero' ? YOURS : KINDS[icon][0]), info: `${s.name}, ${TIERS[tier].name.toLowerCase()} of ${Math.round(s.pop)}, ${nameOf(s.owner)}${s.stock ? ` · prosperity ${Math.round(s.prosperity * 100)}%${marketLine(realm.economy, s)}` : ''}` });
+    }
+    // Merchants on the road, and what they carry.
+    for (const r of realm.economy.runs) {
+      const [x, z] = realm.economy.where(r);
+      out.push({ x, z, name: r.kind, icon: 'cart', size: 0.62, color: NATIONS.find((n) => n.id === r.owner)?.color ?? KINDS.cart[0], info: `${r.kind} of ${Math.round(r.qty)} ${GOODS[r.good].name.toLowerCase()}, ${r.from.name} to ${r.to.name}` });
     }
     for (const o of realm.outposts) {
       if (!o.done) out.push({ x: o.x, z: o.z, name: o.name, icon: 'fort', color: NATIONS.find((n) => n.id === o.nation).color, info: `${o.name}, held by ${nameOf(o.nation)}` });

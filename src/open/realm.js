@@ -2,6 +2,7 @@ import { height, PLACES, TOWNS, roadDistance, riverDistance } from './terrain.js
 import { NATIONS, nationAt } from './nations.js';
 import { DOCTRINES, FIELD } from './doctrines.js';
 import { TIERS, tierOf, namePlace, nameCaptain } from './settlements.js';
+import Economy, { GOODS } from './economy.js';
 
 // The living country. Time passes whether the hero is near or not: nations earn and spend,
 // choose what to do, send armies, raise forts and fight each other, while people settle the
@@ -13,12 +14,14 @@ const DAY = 960;             // seconds, as the sky
 const THINK = 40;            // seconds between one nation's decisions; they take turns
 const WORTH_DOING = 0.32;    // a plan must score this to be done
 const CHANCE = 0.3;          // how much a nation's mood sways a choice
-const INCOME = 0.022;        // gold a day from each person
 const STIPEND = 30;          // gold a day a nation has from its lands whatever its towns
 const UPKEEP = 0.28;         // gold a day to keep one soldier
 const WAR_GAP = 420;         // seconds between a nation's wars
 const ARMY_PER_POP = 0.07, MIN_ARMY = 45, MOST_ARMY = 220;
+const RICH = 1500, RICH_ARMY = 1;  // gold at which a nation keeps an army twice its usual size
 const COST = { raise: 18, fortify: 40, build: 55, raid: 14, settle: 26, hunt: 20, field: 12, war: 30 };
+const ARMS_EACH = 0.25;       // arms from a nation's markets for each soldier raised; short of them, fewer are raised
+const SIGN_REACH = 90;       // tiles from a place's middle at which a hero reads its sign
 const RAISED = 12, CAPTAINS = 2, MOST_OUTPOSTS = 3, MOST_SETTLEMENTS = 4, MOST_FREE = 3;
 const GROWTH = 0.3;          // of the way up its curve per day
 const NEAR_NATION = 900;     // tiles a raid or a field power reaches from a hero's position in a nation
@@ -49,6 +52,7 @@ export default class Realm {
     this.news = [];
     this.settlements = [];
     this.outposts = [];
+    this.economy = new Economy(this);
     this.nations = Object.fromEntries(NATIONS.map((n) => [n.id, { id: n.id, gold: 110, troops: 40, peak: 40, stance: 'Growing', plan: '', waits: {}, captains: [] }]));
     const saved = this.load();
     this.seed(saved);
@@ -73,7 +77,8 @@ export default class Realm {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         day: this.day, time: this.time, news: this.news, nations: this.nations,
-        settlements: this.settlements.map(({ id, name, x, z, owner, pop, fixed }) => ({ id, name, x, z, owner, pop, fixed })),
+        settlements: this.settlements.map((s) => ({ id: s.id, name: s.name, x: s.x, z: s.z, owner: s.owner, pop: s.pop, fixed: s.fixed, ...this.economy.save(s) })),
+        runs: this.economy.saveRuns(),
         outposts: this.outposts.map(({ nation, x, z, name, done }) => ({ nation, x, z, name, done })),
       }));
     } catch { /* it lasts for this visit */ }
@@ -85,6 +90,8 @@ export default class Realm {
       for (const [id, s] of Object.entries(saved.nations)) Object.assign(this.nations[id], s, { waits: {} });
       for (const s of saved.settlements) this.world.towns.add(this.settlements, s);
       for (const o of saved.outposts) this.raiseOutpost(o.nation, o.x, o.z, o.name, o.done);
+      for (const s of this.settlements) this.economy.open(s);
+      this.economy.loadRuns(saved.runs);
       return;
     }
     // The towns already standing, and a first few families out on the land.
@@ -144,7 +151,8 @@ export default class Realm {
   // ---- how a nation decides ----
   plans(id) {
     const s = this.of(id), weights = DOCTRINES[id].weights, threat = this.threat(id), st = this.world.nations.get(id), n = NATIONS.find((a) => a.id === id);
-    const army = s.troops / Math.min(MOST_ARMY, Math.max(MIN_ARMY, this.people(id) * ARMY_PER_POP));
+    // A full treasury keeps a bigger army, if its markets can arm it.
+    const army = s.troops / (Math.min(MOST_ARMY, Math.max(MIN_ARMY, this.people(id) * ARMY_PER_POP)) * (1 + Math.min(RICH_ARMY, s.gold / RICH)));
     const broken = st.holds.filter((h) => h.done).length, here = this.heroOn(id);
     // A hero far below a nation's notice isn't worth an army, until they start breaking things.
     const noticed = threat > 0.25 || this.hero().body.level >= n.level * 0.6 ? 1 : 0;
@@ -178,9 +186,10 @@ export default class Realm {
     this[plan](id);
   }
 
+  // Soldiers need arms from the nation's own markets: cut its iron and its recruits go short.
   raise(id) {
-    const s = this.of(id);
-    s.troops += RAISED * (id === 'bone' ? 1.6 : 1);
+    const s = this.of(id), want = RAISED * (id === 'bone' ? 1.6 : 1), armed = this.economy.arm(id, want * ARMS_EACH) / (want * ARMS_EACH);
+    s.troops += want * (0.45 + 0.55 * armed);
     s.peak = Math.max(s.peak, s.troops);
   }
 
@@ -363,13 +372,15 @@ export default class Realm {
 
   // ---- time passing ----
   grow(days) {
+    this.economy.tick(days);
     for (const s of this.settlements) {
       const owner = s.owner === 'free' || s.owner === 'hero' ? null : this.of(s.owner);
       const before = tierOf(s.pop);
       // A slow start, a boom, and a leveling off; war at home holds it back.
-      const held = owner ? 1 - this.threat(s.owner) * 0.7 : 1;
+      // A well fed, well supplied place grows; a hungry one hardly at all.
+      const held = (owner ? 1 - this.threat(s.owner) * 0.7 : 1) * (0.2 + (s.prosperity ?? 0.6) * 1.1);
       s.pop += GROWTH * s.pop * Math.max(0, 1 - s.pop / limitOf(s)) * days * held;
-      if (owner) owner.gold += s.pop * INCOME * days;
+      if (owner) owner.gold += this.economy.taxes(s, days);
       const after = tierOf(s.pop);
       if (after > before) {
         this.say(`${s.name} has grown into a ${TIERS[after].name.toLowerCase()}.`, NATIONS.find((n) => n.id === s.owner)?.color ?? '#e8ddc8', s.x, s.z);
@@ -404,10 +415,24 @@ export default class Realm {
     this.bordersOf = (this.bordersOf ?? 0) + 1;
   }
 
+  // Coming into a place, a hero reads how it's doing: its size, its prosperity, its market.
+  signs() {
+    for (const p of this.world.players) {
+      const s = this.settlements.find((q) => q.stock && Math.hypot(q.x - p.state.x, q.z - p.state.z) < SIGN_REACH);
+      if (s && s !== p.inPlace) {
+        const { short, cheap } = this.economy.outlook(s), name = (g) => GOODS[g].name.toLowerCase();
+        p.hud.message(`${s.name}, ${TIERS[tierOf(s.pop)].name.toLowerCase()} of ${Math.round(s.pop)} · prosperity ${Math.round(s.prosperity * 100)}%${short.length ? ` · short of ${short.map(name).join(' and ')}` : ''}${cheap.length ? ` · cheap ${cheap.map(name).join(' and ')}` : ''}`, true, 4500);
+      }
+      p.inPlace = s ?? null;
+    }
+  }
+
   update(dt) {
     this.time += dt;
     this.blizzard = Math.max(0, this.blizzard - dt);
     this.world.towns.update(dt, this.settlements);
+    this.economy.update(dt);
+    this.signs();
     if (this.time - this.lastThink < THINK / NATIONS.length) return;
     const days = (this.time - this.lastThink) / DAY;
     this.lastThink = this.time;
