@@ -25,6 +25,7 @@ import { CONQUERORS } from './conquerors.js';
 import Nations from './nations.js';
 import Scars from './scars.js';
 import Realm from './realm.js';
+import Caravans from './caravans.js';
 import { lightWindows } from './architecture.js';
 import Towns from './settlements.js';
 
@@ -138,13 +139,14 @@ monsters.world = world;
 world.chunks = chunks;
 world.towns = new Towns(scene, world);
 world.realm = new Realm(world);
+world.caravans = new Caravans(scene, world);
 work.houseFell = (id) => world.realm.houseLost(id);
 world.quake = new Quake(scene, chunks);
 monsters.quake = world.quake;
 // The Spirit Tree stops the world. So does the Satchel when playing alone, but in co-op it only
 // fills its owner's half: the other hero plays on, and both can have theirs open.
 world.checkPause = () => {
-  world.paused = world.menu || world.pick.isOpen || world.gameMenu.isOpen || players.some((p) => p.hud.mapOpen) || (players.length === 1 && p1.hud.packOpen);
+  world.paused = world.menu || world.pick.isOpen || world.gameMenu.isOpen || players.some((p) => p.hud.mapOpen) || (players.length === 1 && (p1.hud.packOpen || p1.hud.marketOpen));
 };
 world.viewYaw = (p) => (world.together ? shared2.yaw : p.state.yaw);
 
@@ -629,6 +631,7 @@ function step(dt) {
     world.nations.update(dt);
     world.scars.update(dt);
     world.realm.update(dt);
+    world.caravans.update(dt);
     world.fx.update(dt);
     world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);

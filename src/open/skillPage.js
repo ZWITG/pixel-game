@@ -119,7 +119,7 @@ export default class WorldHud {
   }
 
   get open() {
-    return this.mapOpen || this.packOpen;
+    return this.mapOpen || this.packOpen || this.marketOpen;
   }
 
   toggle(skills, body) {

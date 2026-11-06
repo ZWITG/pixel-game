@@ -21,6 +21,7 @@ const ARMY_PER_POP = 0.07, MIN_ARMY = 45, MOST_ARMY = 220;
 const RICH = 1500, RICH_ARMY = 1;  // gold at which a nation keeps an army twice its usual size
 const COST = { raise: 18, fortify: 40, build: 55, raid: 14, settle: 26, hunt: 20, field: 12, war: 30 };
 const ARMS_EACH = 0.25;       // arms from a nation's markets for each soldier raised; short of them, fewer are raised
+const GRUDGE_EACH = 0.05, GRUDGE_MOST = 0.35, GRUDGE_FADES = 0.15; // threat from robbing a nation's roads, and its fade a day
 const SIGN_REACH = 90;       // tiles from a place's middle at which a hero reads its sign
 const RAISED = 12, CAPTAINS = 2, MOST_OUTPOSTS = 3, MOST_SETTLEMENTS = 4, MOST_FREE = 3;
 const GROWTH = 0.3;          // of the way up its curve per day
@@ -139,7 +140,8 @@ export default class Realm {
   threat(id) {
     const st = this.world.nations.get(id), hurt = st.holds.length ? this.world.nations.broken(st) / st.holds.length : 0;
     const here = this.world.players.some((p) => nationAt(p.state.x, p.state.z)?.id === id && !p.rooms.house);
-    return clamp(hurt * 0.75 + (here ? 0.4 : 0));
+    // Robbed caravans and squeezed merchants count too, fading as the days pass.
+    return clamp(hurt * 0.75 + (here ? 0.4 : 0) + Math.min(GRUDGE_MOST, (this.of(id).grudge ?? 0) * GRUDGE_EACH));
   }
 
   // Armies grow with the hero, on a curve that levels off rather than running away.
@@ -151,8 +153,7 @@ export default class Realm {
   // ---- how a nation decides ----
   plans(id) {
     const s = this.of(id), weights = DOCTRINES[id].weights, threat = this.threat(id), st = this.world.nations.get(id), n = NATIONS.find((a) => a.id === id);
-    // A full treasury keeps a bigger army, if its markets can arm it.
-    const army = s.troops / (Math.min(MOST_ARMY, Math.max(MIN_ARMY, this.people(id) * ARMY_PER_POP)) * (1 + Math.min(RICH_ARMY, s.gold / RICH)));
+    const army = s.troops / this.armyCap(id);
     const broken = st.holds.filter((h) => h.done).length, here = this.heroOn(id);
     // A hero far below a nation's notice isn't worth an army, until they start breaking things.
     const noticed = threat > 0.25 || this.hero().body.level >= n.level * 0.6 ? 1 : 0;
@@ -169,6 +170,11 @@ export default class Realm {
       war: rival ? clamp(this.strength(id) - this.strength(rival.owner) + 0.4) * (1 - threat) * afford('war') * ready('war') : 0,
     };
     return Object.entries(score).map(([plan, v]) => [plan, v * weights[plan] + Math.random() * CHANCE * (v > 0 ? 1 : 0)]).sort((a, b) => b[1] - a[1]);
+  }
+
+  // The army a nation can keep: more with more people, more again with a full treasury.
+  armyCap(id) {
+    return Math.min(MOST_ARMY, Math.max(MIN_ARMY, this.people(id) * ARMY_PER_POP)) * (1 + Math.min(RICH_ARMY, this.of(id).gold / RICH));
   }
 
   heroOn(id) {
@@ -381,6 +387,8 @@ export default class Realm {
       const held = (owner ? 1 - this.threat(s.owner) * 0.7 : 1) * (0.2 + (s.prosperity ?? 0.6) * 1.1);
       s.pop += GROWTH * s.pop * Math.max(0, 1 - s.pop / limitOf(s)) * days * held;
       if (owner) owner.gold += this.economy.taxes(s, days);
+      // Places you've taken pay you.
+      else if (s.owner === 'hero') for (const p of this.world.players) p.bag.gold += this.economy.taxes(s, days) / this.world.players.length;
       const after = tierOf(s.pop);
       if (after > before) {
         this.say(`${s.name} has grown into a ${TIERS[after].name.toLowerCase()}.`, NATIONS.find((n) => n.id === s.owner)?.color ?? '#e8ddc8', s.x, s.z);
@@ -391,6 +399,7 @@ export default class Realm {
     for (const n of NATIONS) {
       if (this.world.nations.isFallen(n)) continue;
       const force = this.of(n.id);
+      force.grudge = (force.grudge ?? 0) * Math.max(0, 1 - GRUDGE_FADES * days);
       force.gold = Math.max(0, force.gold + (STIPEND - force.troops * UPKEEP) * days);
     }
     // Free towns that grow large throw in with the strongest neighbor.
@@ -425,6 +434,10 @@ export default class Realm {
       }
       p.inPlace = s ?? null;
     }
+  }
+
+  get dayLength() {
+    return DAY;
   }
 
   update(dt) {

@@ -8,6 +8,7 @@ import Compass from './compass.js';
 import { reachPin, SATCHEL_TAB } from './gameMenu.js';
 import PowerSet, { PowerBar } from './powers.js';
 import Nature from './nature.js';
+import Market from './market.js';
 import { CONQUERORS } from './conquerors.js';
 import Skills from './skills.js';
 import Swim, { DEEP, SURFACE } from './swim.js';
@@ -71,6 +72,7 @@ export default class Player {
     this.controls = new Controls(world.renderer.domElement, { keyboard: index === 0 });
     this.controls.device = 'pad'; // PS5 prompts by default; pressing a key switches them to keyboard
     const hud = this.hud = new WorldHud(prefix);
+    this.market = new Market(this, prefix);
     this.skills = new Skills((raw, level) => {
       const conq = this.powers?.def, skill = this.nature?.named(raw) ?? raw;
       const twist = this.nature?.twistAt(skill.id, level - 1);
@@ -125,7 +127,10 @@ export default class Player {
   // Doors, beds and chests, all used with the same button.
   use(spot) {
     const { hud, rooms, state, bag, world } = this;
-    if (spot.person) world.people.talk(this, spot.person);
+    if (spot.caravan) {
+      if (!spot.idle) this.market.open({ run: spot.caravan });
+    } else if (spot.market) this.market.open({ place: spot.market });
+    else if (spot.person) world.people.talk(this, spot.person);
     else if (spot.site) {
       if (spot.site.cat.goal === 'cave') this.enterCave(spot.site);
       else if (!spot.held) world.sites.use(this, spot.site);
@@ -157,7 +162,7 @@ export default class Player {
       return false;
     }
     const door = !rooms.house && !swim.inWater && world.work.door(state);
-    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.people.spot(this);
+    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.caravans.spot(this) ?? world.people.spot(this) ?? world.caravans.market(this);
     // With Destructive Blow, the button waits to see if it's a tap or a hold (see updateCharge).
     const fights = !rooms.house || rooms.house.hostile;
     if (fights && !swim.inWater) {
@@ -267,6 +272,8 @@ export default class Player {
   // Input, movement and everything that moves this hero, for one frame.
   update(dt) {
     const { controls, hud, state, swim, body, skills, melee, rooms, world } = this, just = controls.just;
+    // A press that closed a menu this frame mustn't also reach the world and open it again.
+    const busy = hud.open;
     // Together, both heroes steer from the one shared camera.
     const aim = world.together ? world.shared : state;
     if (!this.frozen && !world.gameMenu.isOpen) {
@@ -278,11 +285,12 @@ export default class Player {
         world.checkPause();
       } else if (!hud.open && just.pack) world.gameMenu.open(this, SATCHEL_TAB);
       else if (!hud.open && just.pause) world.gameMenu.open(this);
+      else if (hud.marketOpen) this.market.handle(just);
       else if (hud.packOpen) hud.pack.handle(just);
       if (hud.packOpen) hud.pack.update();
     }
     if (!world.paused) reachPin(this);
-    const used = this.act(just);
+    const used = busy ? false : this.act(just);
     const free = !hud.open && !this.frozen;
     if (free && !melee.active && this.powers.def) {
       for (let i = 0; i < 4; i++) if (just[`power${i}`]) this.powers.use(i);

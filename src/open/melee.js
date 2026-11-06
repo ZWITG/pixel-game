@@ -514,7 +514,10 @@ export default class Melee {
       }
     }
     queue.sort((m, n) => m.at - n.at);
-    if (!inside) this.player.world.sites.struck(x, z, reach, this.stage, this.player, force);
+    if (!inside) {
+      this.player.world.sites.struck(x, z, reach, this.stage, this.player, force);
+      this.player.world.caravans.struck(x, z, reach, force, this.player);
+    }
     if (crater) this.tear(x, z, crater);
     this.waves.push({ queue, x, z, t: 0, drops: {}, broke: false });
     return queue.length > 0;

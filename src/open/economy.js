@@ -1,6 +1,7 @@
 import { height, biome, forest, riverDistance } from './terrain.js';
 import { NATIONS, nationAt } from './nations.js';
 import { tierOf } from './settlements.js';
+import { route, pathLength, crossings, along } from './roads.js';
 
 // The trade of the country. Every settlement works the land around it, makes goods, eats and uses
 // them, and sells what it has too much of to whoever pays most. Prices come from stock against
@@ -56,9 +57,13 @@ const SETTLE = 0.6;           // of the way to its new level prosperity moves in
 const TAX = 0.024;            // gold a day from each person, at full prosperity
 const TAX_FLOOR = 0.3;        // share of the tax a ruined place still pays
 const STARVE = 0.04;          // of the people lost a day at no food at all
-// Trade runs between markets. Phase 5 puts them on the roads as real carts and caravans.
+// Trade runs between markets, on the roads (roads.js). caravans.js gives the ones near a hero
+// wagons, beasts and guards.
 const CART_SPEED = 3.2;       // tiles a second
-const LOADS = [[30, 'Peddler'], [80, 'Cart'], [180, 'Caravan']];
+export const LOADS = [[30, 'Peddler'], [80, 'Cart'], [180, 'Caravan']];
+const SUPPLY_EVERY = 2;       // days between a nation's supply trains to each of its forts
+const SUPPLY_LOAD = 24;       // arms and food a supply train carries
+const SUPPLY_TROOPS = 0.25;   // soldiers a fort keeps for each unit delivered, up to what the nation can keep
 const MOST_RUNS = 28, PLANS = 4, REACH = 2600, HAUL_COST = 0.0006; // gold per unit per tile
 const SPARE_DAYS = 2;         // days of its own need a market keeps back from merchants
 const GATE_TOLL = 0.06, BRIDGE_TOLL = 0.04;   // of a load's worth
@@ -190,6 +195,7 @@ export default class Economy {
     for (const s of places) this.allot(s, days);
     for (const s of places) this.work(s, days);
     this.trade();
+    this.supply(days);
     for (const s of places) for (const g of Object.keys(GOODS)) s.price[g] = this.priceOf(s, g);
   }
 
@@ -286,57 +292,84 @@ export default class Economy {
     }
     if (!best) return;
     from.stock[best.g] -= best.qty;
-    this.runs.push({ id: `${from.id}>${best.to.id}:${Date.now() % 1e6}`, kind, from, to: best.to, good: best.g, qty: best.qty, buy: from.price[best.g], dist: best.d, gone: 0, owner: from.owner });
+    this.send({ kind, from, to: best.to, good: best.g, qty: best.qty, buy: from.price[best.g], owner: from.owner });
+  }
+
+  // Puts a load on the road, along the way a carter would take.
+  send(run) {
+    const path = route(run.from, run.to);
+    const r = { id: `${run.from.id}>${run.to.id}:${Math.floor(Math.random() * 1e6)}`, gone: 0, halted: false, ...run, path, dist: pathLength(path), crossings: crossings(path) };
+    this.runs.push(r);
+    return r;
+  }
+
+  // Each nation keeps its forts fed and armed. A train lost on the road is soldiers the fort never gets.
+  supply(days) {
+    for (const o of this.realm.outposts) {
+      const n = this.realm.nations[o.nation];
+      if (o.done || !n || (o.fed ?? -1) > this.realm.time - SUPPLY_EVERY * this.realm.dayLength) continue;
+      if (this.runs.some((r) => r.to.id === o.name)) continue;
+      const home = this.realm.settlements.filter((s) => s.owner === o.nation && s.stock).sort((a, b) => b.stock.arms + b.stock.grain - a.stock.arms - a.stock.grain)[0];
+      if (!home) continue;
+      o.fed = this.realm.time;
+      const good = home.stock.arms >= 6 ? 'arms' : 'grain', qty = Math.min(SUPPLY_LOAD, home.stock[good]);
+      if (qty < 4) continue;
+      home.stock[good] -= qty;
+      this.send({ kind: 'Supply train', from: home, to: { id: o.name, name: o.name, x: o.x, z: o.z, fort: true, owner: o.nation }, good, qty, buy: home.price[good], owner: o.nation, supply: true });
+    }
+    void days;
   }
 
   // Tolls on the way: the gate of a walled town, and every river crossed under another's flag.
   tolls(from, to, worth) {
-    return worth * (this.gates(to) + this.bridges(from, to).length * BRIDGE_TOLL);
+    return worth * (this.gates(to) + crossings(route(from, to)).length * BRIDGE_TOLL);
   }
 
   gates(s) {
-    return tierOf(s.pop) >= 3 && s.owner !== 'free' ? GATE_TOLL : 0;
+    return !s.fort && tierOf(s.pop) >= 3 && s.owner !== 'free' ? GATE_TOLL : 0;
   }
 
-  // Where a straight run crosses water, and who holds the crossing.
-  bridges(from, to) {
-    const steps = Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) / 40), out = [];
-    let wet = false;
-    for (let i = 1; i < steps; i++) {
-      const x = from.x + ((to.x - from.x) * i) / steps, z = from.z + ((to.z - from.z) * i) / steps, now = riverDistance(x, z) < 0;
-      if (now && !wet) out.push({ x, z, owner: nationAt(x, z)?.id ?? 'free' });
-      wet = now;
-    }
-    return out;
+  // What a load is worth where it's going.
+  worthOf(r) {
+    return (r.to.price?.[r.good] ?? r.from.price[r.good]) * r.qty;
   }
 
-  // Carts move every frame, so the map and (later) the roads can show them.
+  // Carts move every frame, unless something on the road has stopped them.
   update(dt) {
-    for (const r of this.runs) r.gone += dt * CART_SPEED;
+    for (const r of this.runs) if (!r.halted) r.gone += dt * CART_SPEED * (r.pace ?? 1);
     for (const r of this.runs.filter((x) => x.gone >= x.dist)) this.arrive(r);
   }
 
   where(r) {
-    const k = Math.min(1, r.gone / r.dist);
-    return [r.from.x + (r.to.x - r.from.x) * k, r.from.z + (r.to.z - r.from.z) * k];
+    return along(r.path, Math.min(r.gone, r.dist));
   }
 
   arrive(r) {
     this.runs.splice(this.runs.indexOf(r), 1);
-    const { to, from, good, qty } = r, worth = to.price[good] * qty;
+    this.arrived?.(r);
+    const { to, from, good, qty } = r;
+    if (to.fort) {
+      const n = this.realm.nations[r.owner];
+      if (n) n.troops = Math.max(n.troops, Math.min(this.realm.armyCap(r.owner), n.troops + qty * SUPPLY_TROOPS));
+      return;
+    }
+    const worth = to.price[good] * qty;
     to.stock[good] += qty;
     // Gates and bridges pay their holders; the merchant's profit is its home town's.
     const gate = worth * this.gates(to);
     if (gate && this.realm.nations[to.owner]) this.realm.nations[to.owner].gold += gate;
-    for (const b of this.bridges(from, to)) if (this.realm.nations[b.owner]) this.realm.nations[b.owner].gold += worth * BRIDGE_TOLL;
+    for (const b of r.crossings) if (this.realm.nations[b.owner]) this.realm.nations[b.owner].gold += worth * BRIDGE_TOLL;
     from.prosperity = Math.min(1, from.prosperity + Math.max(0, worth - r.buy * qty) / Math.max(50, from.pop * 40));
     to.price[good] = this.priceOf(to, good);
   }
 
-  // A robbed or burnt cart: its load is gone and its town feels it.
+  // A robbed, seized or burnt cart: its load is gone, its town feels it, and a supply train's
+  // soldiers never reach their fort.
   lose(r) {
+    if (!this.runs.includes(r)) return;
     this.runs.splice(this.runs.indexOf(r), 1);
-    r.from.prosperity = Math.max(0, r.from.prosperity - 0.05);
+    this.lost?.(r);
+    r.from.prosperity = Math.max(0, r.from.prosperity - (r.supply ? 0.02 : 0.05));
   }
 
   // What a nation's places add up to, for the Nations tab.
@@ -376,14 +409,15 @@ export default class Economy {
     return { stock: Object.fromEntries(Object.entries(s.stock ?? {}).map(([g, v]) => [g, Math.round(v * 10) / 10])), prosperity: Math.round((s.prosperity ?? 0.6) * 1000) / 1000, jobs: s.jobs && Object.fromEntries(Object.entries(s.jobs).map(([id, v]) => [id, Math.round(v * 1000) / 1000])) };
   }
 
+  // Supply trains aren't kept: their forts send for them again.
   saveRuns() {
-    return this.runs.map(({ kind, from, to, good, qty, buy, dist, gone, owner }) => ({ kind, from: from.id, to: to.id, good, qty, buy, dist, gone, owner }));
+    return this.runs.filter((r) => !r.supply).map(({ kind, from, to, good, qty, buy, gone, owner }) => ({ kind, from: from.id, to: to.id, good, qty, buy, gone, owner }));
   }
 
   loadRuns(list = []) {
     for (const r of list) {
       const from = this.realm.settlements.find((s) => s.id === r.from), to = this.realm.settlements.find((s) => s.id === r.to);
-      if (from && to) this.runs.push({ ...r, from, to });
+      if (from && to) this.send({ ...r, from, to }).gone = r.gone;
     }
   }
 }

@@ -18,6 +18,16 @@ export const ITEMS = {
   wood: { name: 'Wood', kind: 'material', weight: 1, color: '#c98f5a', icon: 'log' },
   stone: { name: 'Stone', kind: 'material', weight: 2, color: '#b7a9b4', icon: 'pebble' },
   iron: { name: 'Iron', kind: 'material', weight: 3, color: '#e8a06a', icon: 'ore' },
+  // Trade goods: what markets and caravans deal in (economy.js). Iron, wood and stone double as goods.
+  grain: { name: 'Grain', kind: 'material', weight: 1, color: '#e8c060', icon: 'sheaf', text: 'Sacks of grain. Every town eats.' },
+  fish: { name: 'Fish', kind: 'material', weight: 1, color: '#8fd0e8', icon: 'fish', text: 'Salted fish.' },
+  meat: { name: 'Meat', kind: 'material', weight: 1, color: '#d86a5a', icon: 'meat', text: 'Cured meat.' },
+  tools: { name: 'Tools', kind: 'material', weight: 2, color: '#c9d4e2', icon: 'hammer', text: "Smiths' tools. Towns can't grow without them." },
+  arms: { name: 'Arms', kind: 'material', weight: 3, color: '#e8e0f0', icon: 'sword', text: 'Blades and spearheads. Nations arm their soldiers with these.' },
+  cloth: { name: 'Cloth', kind: 'material', weight: 1, color: '#d8b0e8', icon: 'vest', text: 'Bolts of woven cloth.' },
+  ale: { name: 'Ale', kind: 'material', weight: 2, color: '#e8a040', icon: 'jar', text: 'A cask of ale.' },
+  furs: { name: 'Furs', kind: 'material', weight: 1, color: '#c8a888', icon: 'hide', text: 'Northern furs, dear in the south.' },
+  wine: { name: 'Wine', kind: 'material', weight: 2, color: '#b03a5a', icon: 'flask', text: 'Wine from the warm lands. Cities pay well for it.' },
 
   salve: { name: 'Healing Salve', kind: 'use', weight: 1, color: '#7be36a', icon: 'jar', heal: 0.5, text: 'Heals half your health.' },
   tonic: { name: 'Ember Tonic', kind: 'use', weight: 1, color: '#ff8a3d', icon: 'flask', bonus: { force: 0.5 }, secs: 60, text: '+50% force for 60 seconds.' },

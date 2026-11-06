@@ -39,7 +39,7 @@ export const TOWNS = [
 ];
 
 // Every town can be walked to by road; city roads end at their gates.
-const ROADS = [
+export const ROADS = [
   [[2900, 5300], [3200, 5120], [3470, 4960], [3560, 4700], [3700, 4000]],
   [[3700, 4000], [4000, 3360], [4700, 3280], [5300, 3050], [5640, 2860]],
   [[2900, 5300], [2600, 4640], [2250, 4190]],

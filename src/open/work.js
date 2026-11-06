@@ -49,6 +49,7 @@ export class Bag {
     this.stored = saved?.stored ?? {};
     this.worn = saved?.worn ?? {};  // slot id -> item id
     this.perks = saved?.perks ?? {}; // lasting bonuses from finished places
+    this.gold = saved?.gold ?? 0;   // coin, from markets, caravans and the places you hold
     this.buffs = [];                // { id, left } for potions at work
   }
 
@@ -125,7 +126,7 @@ export class Bag {
   }
 
   save() {
-    save(this.saveKey, { items: this.items, stored: this.stored, worn: this.worn, perks: this.perks });
+    save(this.saveKey, { items: this.items, stored: this.stored, worn: this.worn, perks: this.perks, gold: Math.round(this.gold) });
   }
 }
 
