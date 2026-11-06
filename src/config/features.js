@@ -35,5 +35,6 @@ export const FEATURES = {
   grassBlades: true,    // thousands of small grass blades (turn off on slow machines)
   dayNight: true,       // day/night cycle (8 minutes a day): sunsets, stars, lit windows, fireflies
   ambientLife: true,    // butterflies, birds, fish, fireflies, chimney smoke, windmill, wind in grass and trees
+  voxels: true,         // open world: raze works and kingdom buildings are breakable voxels (voxels.js); off = the painted models fall whole
   wanderingVillagers: true, // villagers stroll and patrol instead of standing still
 };

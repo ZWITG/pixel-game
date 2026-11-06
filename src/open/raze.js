@@ -9,6 +9,8 @@ import { toon, paint, ball, limb, spike, block, rock, aimed, skin, shine } from 
 const WOOD = '#7a5230', DARK = '#4e3220', STONE = '#8e8490';
 const BLOW = 1.3, GROWTH_KEPT = 0.85;
 const FALL_SECS = 1.3;
+const CUT_BASE = 0.9, CUT_FORCE = 0.6, CUT_REACH = 0.55, CUT_MOST = 11;
+const FIRE_CUT = 1.3, FIRE_HEIGHTS = [0.8, 2.6, 4.4, 6.2, 8];
 const GARRISON_EVERY = 16;   // seconds between reinforcements from a barracks
 const GARRISON = 2, MOST_DEFENDERS = 8;
 const TOWER_EVERY = 3, TOWER_REACH = 46;
@@ -39,7 +41,7 @@ export const WORKS = {
   tower: {
     name: 'Watchtower', hits: 10, size: 4,
     draw(parts) {
-      for (const [x, z] of [[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4]]) parts.push(paint(aimed(limb(0.26, 0.36, 15), x * 0.7, 15, z * 0.7, -x * 0.04, -1, -z * 0.04), DARK));
+      for (const [x, z] of [[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4]]) parts.push(paint(aimed(limb(0.26, 0.36, 15.4), x * 0.62, 15.2, z * 0.62, -x * 0.04, 1, -z * 0.04), DARK));
       parts.push(paint(block(7, 0.6, 7).translate(0, 15, 0), WOOD), paint(block(7.4, 1.8, 0.4).translate(0, 16.4, 3.4), WOOD), paint(block(7.4, 1.8, 0.4).translate(0, 16.4, -3.4), WOOD), paint(block(0.4, 1.8, 7.4).translate(3.4, 16.4, 0), WOOD), paint(block(0.4, 1.8, 7.4).translate(-3.4, 16.4, 0), WOOD));
       parts.push(paint(new THREE.ConeGeometry(5.4, 3.4, 4).rotateY(Math.PI / 4).translate(0, 20.6, 0), DARK), paint(block(0.3, 7, 0.3).translate(0, 18.6, 0), DARK));
     },
@@ -97,6 +99,14 @@ export function ground(a, ring, size, solids, s) {
 }
 
 // Stands the works up, the first time a hero comes near.
+// The voxel world, once main.js has made it; null means works fall whole as before.
+let voxels = null;
+export const useVoxels = (v) => { voxels = v; };
+export const voxelWorld = () => voxels;
+
+// How wide a blow cuts, in tiles: a hero's own blows widen with their stage, area blasts with their reach.
+export const cut = (force, hero, reach = 0) => Math.min(CUT_MOST, CUT_BASE + CUT_FORCE * Math.sqrt(Math.max(0.2, force / hero.body.might)) + reach * CUT_REACH);
+
 export function raiseWorks(s, scene, solids) {
   const [kinds, ring] = LAYOUTS[s.key], mat = toon();
   s.works = kinds.map((kind, i) => {
@@ -110,7 +120,9 @@ export function raiseWorks(s, scene, solids) {
     scene.add(group);
     const solid = { x, z, r: def.size * 0.6 };
     solids.push(solid);
-    return { kind, def, group, solid, x, y, z, hp: null, age: null };
+    const w = { kind, def, group, solid, x, y, z, hp: null, age: null };
+    voxels?.adopt(w, group, parts, lit);
+    return w;
   });
 }
 
@@ -121,16 +133,25 @@ function toughen(w, hero) {
 }
 
 // One blow on one work. Frozen works shatter more easily. Returns true if it fell.
-export function strike(w, force, hero, fx, burst) {
+// `at`: where the blow landed, { x, z, reach, y?, fire? }, so voxels are cut there.
+export function strike(w, force, hero, fx, burst, at) {
   if (w.age !== null) return false;
   if (w.hp === null) toughen(w, hero);
   w.hp -= force * (w.brittle > 0 ? 1.5 : 1);
-  w.group.rotation.z = (1 - Math.max(0, w.hp) / w.maxHp) * 0.05;
-  burst(w.x, w.y + 3, w.z, ['#c9bcc4', '#7a5230', '#a89a8c'], 6, 5);
+  const vox = w.vox?.ready && at;
+  if (vox && at.fire) {
+    for (const h of FIRE_HEIGHTS) voxels.hit(w, at.x, height(at.x, at.z) + h, at.z, FIRE_CUT, hero, (m) => m.burns);
+  } else if (vox) voxels.hit(w, at.x, at.y ?? hero.state.y + 1.3, at.z, cut(force, hero, at.reach), hero);
+  else {
+    w.group.rotation.z = (1 - Math.max(0, w.hp) / w.maxHp) * 0.05;
+    burst(w.x, w.y + 3, w.z, ['#c9bcc4', '#7a5230', '#a89a8c'], 6, 5);
+  }
   if (w.hp > 0) return false;
   w.age = 0;
   w.solid.off = true;
-  fx.impact('earth', w.x, w.y, w.z, w.def.size);
+  w.fallen = true;
+  if (w.vox?.ready) voxels.fell(w, hero);
+  else fx.impact('earth', w.x, w.y, w.z, w.def.size);
   return true;
 }
 
@@ -140,6 +161,7 @@ export function settleWorks(s, dt) {
     w.brittle = Math.max(0, (w.brittle ?? 0) - dt);
     if (w.age === null) continue;
     w.age += dt;
+    if (w.vox?.ready) continue; // its voxels fell as chunks of their own
     const k = Math.min(1, w.age / FALL_SECS);
     w.group.rotation.x = k * k * 1.3;
     w.group.position.y = w.y - k * k * 7;
@@ -149,8 +171,9 @@ export function settleWorks(s, dt) {
 
 export function restoreWorks(s) {
   for (const w of s.works ?? []) {
-    Object.assign(w, { hp: null, age: null, brittle: 0 });
+    Object.assign(w, { hp: null, age: null, brittle: 0, fallen: false });
     w.solid.off = false;
+    voxels?.mend(w);
     w.group.visible = true;
     w.group.position.y = w.y;
     w.group.rotation.x = w.group.rotation.z = 0;
@@ -209,7 +232,7 @@ export function explode(w, sites, hero, world) {
   for (const e of sites.monsters.within(w.x, w.z, BLAST_REACH)) sites.monsters.hit(e, force, w.x, w.z);
   world.fx.impact('fire', w.x, w.y, w.z, BLAST_REACH * 0.7);
   world.scars.mark('fire', w.x, w.z, 8, hero, 2);
-  for (const o of sites.nearby(w, BLAST_REACH)) strike(o, force, hero, world.fx, sites.work.burst.bind(sites.work));
+  for (const o of sites.nearby(w, BLAST_REACH)) strike(o, force, hero, world.fx, sites.work.burst.bind(sites.work), { x: w.x, z: w.z, y: w.y + 2, reach: BLAST_REACH * 0.5 });
   sites.work.shake = 0.5;
   sites.work.shakeAt = hero.state;
 }

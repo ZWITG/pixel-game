@@ -198,7 +198,7 @@ New buildings by tier (each one works, and each one can be destroyed):
 
 | Phase | Version | Content | Main files |
 |---|---|---|---|
-| 1 | v0.19 | Voxel engine: bricks, materials, worker greedy meshing, corner shading, carving, support check, falling chunks, debris and dust. One test building and the raze works converted. | new `voxels.js`, `voxelWorker.js`, `debris.js`; `raze.js`, `melee.js`, `powers.js` |
+| 1 | **v0.22 (done 2026-11-06: raze works and kingdom buildings)** | Voxel engine: bricks, materials, worker greedy meshing, corner shading, carving, support check, falling chunks, debris and dust. One test building and the raze works converted. | new `voxels.js`, `voxelWorker.js`, `debris.js`; `raze.js`, `melee.js`, `powers.js` |
 | 2 | v0.20 | Blueprints: every house, wall, tower, fort and castle becomes voxel near the hero, with far meshes from the same blueprint, nation styles, voxel interiors and saved rubble | `architecture.js`, `fortress.js`, `towns.js`, `settlements.js`, `rooms.js` |
 | 2b | v0.20.5 | Diggable ground: voxel patches where blasts go deep, tunnels, caves, falling overhangs, walking inside them | new `groundVoxels.js`; `chunks.js`, `terrain.js`, `materials.js`, `work.js`, `monsters.js` |
 | 3 | v0.21 | Atmosphere: smoke and dust volumes, fire through timber, glass shatter, fire light, smoke columns seen from afar | `post.js`, `elementFx.js`, `scars.js` |

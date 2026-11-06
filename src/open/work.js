@@ -171,7 +171,7 @@ export default class Work {
       if (o.type === 'tree' || state.air < o.sc) this.pushCircle(state, o.x, o.z, o.r); // rocks can be jumped
     }
     for (const s of this.marks.solids) {
-      if (s.off) continue;
+      if (s.off || s.voxel) continue; // voxel structures stop the hero by their own cubes (voxels.js)
       if (s.r) this.pushCircle(state, s.x, s.z, s.r);
       else this.pushRect(state, s);
     }

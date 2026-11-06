@@ -351,7 +351,12 @@ export default class Player {
       state.onWater = !!state.super && state.pace > WATER_PACE && skills.level('superspeed') >= WATER_RUN && (wet || state.y < DEEP);
       const steep = rise / Math.max(dist, 1e-3);
       // Slopes only matter on foot: a swimmer can make for any bank, however steep the bed.
-      if (state.air > 2 || swim.inWater || state.onWater || (steep < body.climbLimit && (FEATURES.swimming || !wet))) {
+      // Walls of cubes stop the hero; holes cut in them let the hero through.
+      const walled = !rooms.house && world.voxels?.blocks(nx, state.y + state.air, nz);
+      if (walled) {
+        if (!world.voxels.blocks(nx, state.y + state.air, state.z)) state.x = nx;
+        else if (!world.voxels.blocks(state.x, state.y + state.air, nz)) state.z = nz;
+      } else if (state.air > 2 || swim.inWater || state.onWater || (steep < body.climbLimit && (FEATURES.swimming || !wet))) {
         state.x = nx;
         state.z = nz;
         if (steep > CLIMB_START && !state.air) skills.add('climbing', dt);
@@ -379,7 +384,8 @@ export default class Player {
     }
     if (rooms.house) rooms.collide(state);
     else if (FEATURES.worldWork) world.work.collide(state);
-    const y = rooms.house ? rooms.floor : world.scars.floor(state.x, state.z, height(state.x, state.z));
+    // Rubble, ledges and rooftops can be stood on.
+    const y = rooms.house ? rooms.floor : Math.max(world.scars.floor(state.x, state.z, height(state.x, state.z)), world.voxels?.floor(state.x, state.z, state.y + state.air) ?? -Infinity);
     if (!world.paused) this.jump(dt, y);
     if (FEATURES.swimming && !world.paused && !rooms.house) {
       swim.update(dt, state.air > 0 || (state.super && state.onWater) ? 0 : y, state.moving, state.sprinting); // the air over a lake isn't the lake

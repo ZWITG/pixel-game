@@ -207,11 +207,11 @@ export default class Sites {
   }
 
   // Everything a blow reaches takes it; the last work standing ends the place.
-  strikeWorks(s, x, z, reach, force, p) {
+  strikeWorks(s, x, z, reach, force, p, fire = false) {
     if (this.sealed?.(s, p)) return;
     for (const w of standing(s)) {
       if (Math.hypot(w.x - x, w.z - z) > reach + w.def.size) continue;
-      const fell = strike(w, force * p.nature.demolition, p, this.world.fx, this.work.burst.bind(this.work));
+      const fell = strike(w, force * p.nature.demolition, p, this.world.fx, this.work.burst.bind(this.work), { x, z, reach, fire });
       if (!fell) continue;
       p.nature.deed('demolition', w.def.hits);
       p.hud.message(`${w.def.name} destroyed. ${standing(s).length} left standing.`);
@@ -230,7 +230,7 @@ export default class Sites {
 
   // Fire on the ground eats whatever stands in it, and frost makes it brittle.
   scorch(x, z, force, p) {
-    for (const s of this.live) if (Math.hypot(s.x - x, s.z - z) < 90) this.strikeWorks(s, x, z, 1, force, p);
+    for (const s of this.live) if (Math.hypot(s.x - x, s.z - z) < 90) this.strikeWorks(s, x, z, 1, force, p, true);
   }
 
   chill(x, z) {

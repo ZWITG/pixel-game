@@ -5,7 +5,7 @@ import { STONEWORK } from './fortress.js';
 import { NATIONS } from './nations.js';
 import { ESTATE_TIER, REBUILD } from './economy.js';
 import { TIERS, tierOf } from './settlements.js';
-import { strike, settleWorks, ground } from './raze.js';
+import { strike, settleWorks, ground, voxelWorld } from './raze.js';
 
 // The buildings that make a place a kingdom's town, each doing a job: a granary holds food
 // against hunger, barracks raise soldiers, an armory keeps arms and lets armourers work, a market
@@ -187,7 +187,9 @@ export default class Estates {
     this.scene.add(group);
     const solid = { x, z, r: def.size * 0.7 };
     this.world.marks.solids.push(solid);
-    return { kind, def, group: body, root: group, scaf, rubble, solid, x, y, z, hp: null, age: null, place: s };
+    const e = { kind, def, group: body, root: group, scaf, rubble, solid, x, y, z, hp: null, age: null, place: s };
+    voxelWorld()?.adopt(e, body, parts, lit);
+    return e;
   }
 
   roadward(s) {
@@ -211,6 +213,7 @@ export default class Estates {
 
   forget(s) {
     for (const e of s.estates ?? []) {
+      voxelWorld()?.forget(e);
       this.scene.remove(e.root);
       const i = this.world.marks.solids.indexOf(e.solid);
       if (i >= 0) this.world.marks.solids.splice(i, 1);
@@ -222,7 +225,8 @@ export default class Estates {
   show(e) {
     const ruin = e.place.ruined?.[e.kind];
     if (ruin === undefined) {
-      if (e.age !== null) Object.assign(e, { age: null, hp: null });
+      if (e.age !== null) Object.assign(e, { age: null, hp: null, fallen: false });
+      if (e.vox?.left === 0) voxelWorld().mend(e);
       e.group.visible = true;
       e.group.scale.y = 1;
       e.group.position.y = 0;
@@ -236,6 +240,7 @@ export default class Estates {
     e.solid.off = ruin < 0.5;
     if (e.age === null || e.age > 2) {
       e.age ??= 9;
+      if (ruin > 0 && e.vox?.left === 0) voxelWorld().mend(e); // what rises in the scaffolding is whole
       e.group.visible = ruin > 0;
       e.group.position.y = -(1 - Math.max(0, ruin)) * RISE; // it goes up from its footings, inside the scaffolding
       e.group.rotation.x = 0;
@@ -263,7 +268,7 @@ export default class Estates {
         if (e.age !== null || s.ruined?.[e.kind] !== undefined || Math.hypot(e.x - x, e.z - z) > reach + e.def.size) continue;
         this.alarm(s, p);
         e.hp ??= e.def.hits * BLOW * p.body.might ** GROWTH_KEPT;
-        if (strike(e, force * p.nature.demolition, p, this.world.fx, this.world.work.burst.bind(this.world.work))) this.fall(s, e, p);
+        if (strike(e, force * p.nature.demolition, p, this.world.fx, this.world.work.burst.bind(this.world.work), { x, z, reach })) this.fall(s, e, p);
         else e.maxHp ??= e.hp;
       }
     }
@@ -276,7 +281,7 @@ export default class Estates {
       for (const e of s.estates) {
         if (!e.def.timber || e.age !== null || s.ruined?.[e.kind] !== undefined || Math.hypot(e.x - x, e.z - z) > e.def.size + 2) continue;
         e.hp ??= e.def.hits * BLOW * p.body.might ** GROWTH_KEPT;
-        if (strike(e, force, p, this.world.fx, () => {})) this.fall(s, e, p);
+        if (strike(e, force, p, this.world.fx, () => {}, { x, z, reach: 1, fire: true })) this.fall(s, e, p);
       }
     }
   }
