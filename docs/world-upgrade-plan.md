@@ -204,7 +204,7 @@ New buildings by tier (each one works, and each one can be destroyed):
 | 3 | v0.21 | Atmosphere: smoke and dust volumes, fire through timber, glass shatter, fire light, smoke columns seen from afar | `post.js`, `elementFx.js`, `scars.js` |
 | 4 | **v0.19 (done 2026-11-06)** | Economy core (simulation only): goods, production, needs, prices, prosperity, treasury, tolls. Shown on the Nations tab and town signs. | new `economy.js`; `realm.js`, `settlements.js` |
 | 5 | **v0.20 (done 2026-11-06; inns and riding moved to phase 7)** | Caravans and traders: road graph with bridges and ferries, visible wagons, horses and guards, inns, robbing or escorting, supply trains | new `caravans.js`, `roads.js`; `terrain.js`, `creatures.js` |
-| 6 | v0.21 | Kingdom buildings and districts: treasury, armory, barracks, granary, quarters, the effects of destroying each, rebuilding with scaffolding | `settlements.js`, `realm.js`, `doctrines.js`, `raze.js` |
+| 6 | **v0.21 (done 2026-11-06)** | Kingdom buildings and districts: treasury, armory, barracks, granary, quarters, the effects of destroying each, rebuilding with scaffolding | `settlements.js`, `realm.js`, `doctrines.js`, `raze.js` |
 | 7 | v0.25 | NPC detail and routines, animals, new places, fairs and events, roadside inns and waystations, riding | `figures.js`, `creatures.js`, `sites.js`, `landmarks.js` |
 
 **Order (the user chose 2026-11-06): trade and kingdoms first, phases 4, 5 and 6, then destruction, phases 1 to 3, then 7.** The version numbers in the table for those phases will move up to follow.

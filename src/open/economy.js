@@ -72,6 +72,15 @@ const SCORCH_REACH = 170;
 const PANIC = 1.5;            // prosperity lost a day with every field on fire
 const ARMY_ARMS = 0.006;      // arms a day a nation's markets want for each soldier
 
+// The kingdom buildings (estates.js), from the tier a place must reach to have one, and what
+// rebuilding one takes a day while it's under scaffolding.
+export const ESTATE_TIER = { granary: 2, barracks: 3, armory: 3, market: 3, warehouse: 3, guild: 4, treasury: 4 };
+export const REBUILD = { days: 3, wait: 1, gold: 25, wood: 6, stone: 6 };
+const has = (s, kind) => tierOf(s.pop) >= ESTATE_TIER[kind] && s.ruined?.[kind] === undefined;
+const GRANARY_DAYS = 20, GRANARY_FILL = 0.15; // days of food a granary holds; share of the surplus it takes a day
+const WAREHOUSE_KEEP = 1.7, GUILD_KNACK = 1.3, MARKET_TAX = 1.15, NO_VAULT_TAX = 0.75;
+const UNARMED_ARMS = 3;       // arms a place without an armory can keep
+
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 // What a place's land is good for, from the ground around it.
@@ -133,6 +142,8 @@ export default class Economy {
     for (const [id, t] of Object.entries(TRADES)) {
       if (t.uses?.[g] && this.workers(s, id)) n += this.workers(s, id) * t.rate * t.uses[g];
     }
+    // A place rebuilding what it lost wants timber and stone for it.
+    if (s.ruined && Object.keys(s.ruined).length && (g === 'wood' || g === 'stone')) n += REBUILD[g];
     return Math.max(0.2, n);
   }
 
@@ -149,7 +160,8 @@ export default class Economy {
   // How good this place is at a trade: its land for the land trades, the same everywhere for crafts.
   knack(s, id) {
     const t = TRADES[id];
-    if (t.tier !== undefined) return tierOf(s.pop) >= t.tier ? 1 : 0;
+    if (id === 'armourer' && !has(s, 'armory')) return 0;
+    if (t.tier !== undefined) return tierOf(s.pop) >= t.tier ? (has(s, 'guild') ? GUILD_KNACK : 1) : 0;
     return POOR_LAND + (1 - POOR_LAND) * Math.min(1, (s.land?.[id] ?? 0) * (t.seam ?? 2.2));
   }
 
@@ -192,6 +204,9 @@ export default class Economy {
     const places = this.realm.settlements;
     for (const s of places) this.open(s);
     this.survey();
+    this.vaults = new Set(places.filter((s) => has(s, 'treasury')).map((s) => s.owner));
+    // A nation that never grew a city to hold one keeps its gold at its seat.
+    for (const s of places) if (tierOf(s.pop) < ESTATE_TIER.treasury && !places.some((p) => p.owner === s.owner && tierOf(p.pop) >= ESTATE_TIER.treasury)) this.vaults.add(s.owner);
     for (const s of places) this.allot(s, days);
     for (const s of places) this.work(s, days);
     this.trade();
@@ -219,6 +234,20 @@ export default class Economy {
       s.stock[g] -= take;
       hunger -= take;
     }
+    // A granary carries a place through a lean spell, and fills from good harvests.
+    s.reserve = has(s, 'granary') ? s.reserve ?? 0 : 0;
+    if (hunger > 0 && s.reserve > 0) {
+      const take = Math.min(hunger, s.reserve);
+      s.reserve -= take;
+      hunger -= take;
+    } else if (has(s, 'granary')) {
+      const room = s.pop * NEEDS.food * GRANARY_DAYS - s.reserve;
+      for (const g of ['grain', 'fish']) {
+        const spare = Math.max(0, s.stock[g] - this.need(s, g) * COVER), put = Math.min(room, spare * GRANARY_FILL * Math.min(1, days * 4));
+        s.stock[g] -= put;
+        s.reserve += put;
+      }
+    }
     met.food = eaten ? 1 - hunger / eaten : 1;
     for (const [g, per] of Object.entries(NEEDS)) {
       if (g === 'food') continue;
@@ -240,7 +269,9 @@ export default class Economy {
     s.met = met;
     // Fires burn stores; past a point, stock spoils.
     if (scorched) for (const g of ['grain', 'wood', 'meat', 'cloth']) s.stock[g] *= 1 - scorched * Math.min(1, days * 8);
-    for (const g of Object.keys(GOODS)) s.stock[g] = Math.min(s.stock[g], this.need(s, g) * KEEP + 30);
+    const keep = KEEP * (has(s, 'warehouse') ? WAREHOUSE_KEEP : 1);
+    for (const g of Object.keys(GOODS)) s.stock[g] = Math.min(s.stock[g], this.need(s, g) * (GOODS[g].food ? KEEP : keep) + 30);
+    if (!has(s, 'armory') && tierOf(s.pop) >= ESTATE_TIER.armory) s.stock.arms = Math.min(s.stock.arms, UNARMED_ARMS);
     const content = Object.entries(WEIGHT).reduce((sum, [k, w]) => sum + w * (met[k] ?? 1), 0);
     s.prosperity += (content - s.prosperity) * Math.min(1, days * SETTLE);
     s.prosperity = Math.max(0, s.prosperity - scorched * PANIC * days); // burning fields frighten people away
@@ -263,8 +294,10 @@ export default class Economy {
   }
 
   // Taxes for the nation that holds a place.
+  // A market hall adds to them; a nation with no treasury left standing loses some on the way.
   taxes(s, days) {
-    return s.pop * TAX * (TAX_FLOOR + (1 - TAX_FLOOR) * s.prosperity) * days;
+    const vault = !this.realm.nations[s.owner] || !this.vaults || this.vaults.has(s.owner) ? 1 : NO_VAULT_TAX;
+    return s.pop * TAX * (TAX_FLOOR + (1 - TAX_FLOOR) * s.prosperity) * days * (has(s, 'market') ? MARKET_TAX : 1) * vault;
   }
 
   // Merchants set out with whatever pays best, and deliver what's on the road.
@@ -406,7 +439,7 @@ export default class Economy {
   }
 
   save(s) {
-    return { stock: Object.fromEntries(Object.entries(s.stock ?? {}).map(([g, v]) => [g, Math.round(v * 10) / 10])), prosperity: Math.round((s.prosperity ?? 0.6) * 1000) / 1000, jobs: s.jobs && Object.fromEntries(Object.entries(s.jobs).map(([id, v]) => [id, Math.round(v * 1000) / 1000])) };
+    return { stock: Object.fromEntries(Object.entries(s.stock ?? {}).map(([g, v]) => [g, Math.round(v * 10) / 10])), prosperity: Math.round((s.prosperity ?? 0.6) * 1000) / 1000, jobs: s.jobs && Object.fromEntries(Object.entries(s.jobs).map(([id, v]) => [id, Math.round(v * 1000) / 1000])), reserve: Math.round(s.reserve ?? 0), ruined: s.ruined };
   }
 
   // Supply trains aren't kept: their forts send for them again.

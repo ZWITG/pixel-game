@@ -72,6 +72,7 @@ export default class Towns {
   raiseHouse(s, animate) {
     const n = s.built++, [x, z, rot] = this.spot(s, n), { marks } = this.world;
     if (Math.abs(height(x, z) - height(s.x, s.z)) > 14 || height(x, z) < 2) return;
+    if (s.estates?.some((e) => Math.hypot(e.x - x, e.z - z) < e.def.size + 7)) return; // that ground is the town's hall or store
     // Settlers clear the ground before they build on it.
     for (const o of this.world.chunks.near(x, z, CLEARED)) if (o.type === 'tree') this.world.chunks.remove(o, Date.now() + CLEARED_FOR);
     placeHouse(this.scene, marks, `${s.id}|${n}`, x, z, rot, ROOFS[(n + s.name.length) % ROOFS.length]);

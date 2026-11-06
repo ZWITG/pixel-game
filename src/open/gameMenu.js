@@ -251,13 +251,14 @@ export default class GameMenu {
       const r = nations.report(n), { realm } = this.world, force = realm.of(n.id), d = DOCTRINES[n.id], state = r.fallen ? 'Conquered' : r.open ? 'Ruler exposed' : force.stance;
       const fill = r.fallen ? 100 : Math.round((r.done / Math.max(1, r.need)) * 100), power = r.fallen ? 0 : Math.round(realm.strength(n.id) * 100);
       const places = realm.placesOf(n.id).length, captain = force.captains.find((c) => c.alive), econ = realm.economy.report(n.id);
+      const halls = realm.placesOf(n.id).flatMap((s) => { const r = this.world.estates.report(s); return [...r.up.map(() => 1), ...r.down.map(() => 0)]; }), standing = halls.filter(Boolean).length;
       return `<div class="nation ${r.fallen ? 'fallen' : ''}" style="--c:${n.color}">
         <i>${SVG(r.fallen ? SHAPES.nations : SHAPES.crown, 34)}</i>
         <div><b>${n.name}<small> · Level ${n.level}</small></b><span>${d.title}: ${d.style}</span>
         <div class="nation-bar"><u style="width:${fill}%"></u></div>
         <em>${state}${r.fallen || r.open ? '' : ` · ${r.done} of ${r.need} strongholds broken`}</em>
         ${r.fallen ? '' : `<span>Strength ${power}% · ${Math.round(force.troops)} troops · ${places} settlements${captain ? ` · ${captain.title ?? 'Captain'} ${captain.name}` : ''}</span>`}
-        ${r.fallen || !econ ? '' : `<span>Treasury ${Math.round(force.gold)}g, ${econ.income >= 0 ? '+' : ''}${Math.round(econ.income)}g a day · Prosperity ${Math.round(econ.prosperity * 100)}% · ${econ.food < 0.6 ? 'Hungry' : econ.food < 0.9 ? 'Short of food' : 'Fed'} · ${Math.round(econ.arms)} arms in store · ${econ.runs} trade runs</span>`}</div>
+        ${r.fallen || !econ ? '' : `<span>Treasury ${Math.round(force.gold)}g, ${econ.income >= 0 ? '+' : ''}${Math.round(econ.income)}g a day · Prosperity ${Math.round(econ.prosperity * 100)}% · ${econ.food < 0.6 ? 'Hungry' : econ.food < 0.9 ? 'Short of food' : 'Fed'} · ${Math.round(econ.arms)} arms in store · ${econ.runs} trade runs · ${standing} of ${halls.length} kingdom buildings standing</span>`}</div>
       </div>`;
     }).join('');
     const { realm } = this.world, count = nations.fallen.size, line = count === NATIONS.length ? 'The country is yours. Something has noticed.' : 'Break a nation\'s strongholds to expose its ruler, then bring the ruler down. They will not wait for you.';
@@ -401,7 +402,7 @@ export default class GameMenu {
     // Every settlement as it is today: its size, and whose it is.
     for (const s of realm.settlements) {
       const tier = tierOf(s.pop), owner = NATIONS.find((n) => n.id === s.owner), [icon, size] = TIER_ICONS[tier];
-      out.push({ x: s.x, z: s.z, name: s.name, icon, size, color: owner?.color ?? (s.owner === 'hero' ? YOURS : KINDS[icon][0]), info: `${s.name}, ${TIERS[tier].name.toLowerCase()} of ${Math.round(s.pop)}, ${nameOf(s.owner)}${s.stock ? ` · prosperity ${Math.round(s.prosperity * 100)}%${marketLine(realm.economy, s)}` : ''}` });
+      out.push({ x: s.x, z: s.z, name: s.name, icon, size, color: owner?.color ?? (s.owner === 'hero' ? YOURS : KINDS[icon][0]), info: `${s.name}, ${TIERS[tier].name.toLowerCase()} of ${Math.round(s.pop)}, ${nameOf(s.owner)}${s.stock ? ` · prosperity ${Math.round(s.prosperity * 100)}%${marketLine(realm.economy, s)}${(this.world.estates.report(s).down.length ? ` · ${this.world.estates.report(s).down.join(', ')}` : '')}` : ''}` });
     }
     // Merchants on the road, and what they carry.
     for (const r of realm.economy.runs) {

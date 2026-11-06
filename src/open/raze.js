@@ -77,7 +77,7 @@ export function raises(key) {
   return !!LAYOUTS[key];
 }
 
-function fits(x, z, size, solids) {
+export function fits(x, z, size, solids) {
   const y = height(x, z);
   if (y < SEA + 1) return false;
   for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (Math.abs(height(x + dx * size, z + dz * size) - y) > STEEPEST) return false;
@@ -85,7 +85,7 @@ function fits(x, z, size, solids) {
 }
 
 // Dry, level ground, clear of what's already built, as near the place it was meant for as there is.
-function ground(a, ring, size, solids, s) {
+export function ground(a, ring, size, solids, s) {
   for (const far of [1, 1.2, 1.4, 0.8, 1.7]) {
     for (let turn = 0; turn < 16; turn++) {
       const at = a + ((turn % 2 ? 1 : -1) * Math.ceil(turn / 2) * Math.PI) / 16;

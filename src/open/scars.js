@@ -234,7 +234,10 @@ export default class Scars {
     const { sites } = this.world;
     for (const c of this.cells.values()) {
       if (!c.owner) continue;
-      if (c.burn > 0 || c.rupture > 0) sites.scorch(c.x, c.z, c.owner.body.might * BURN_WORKS * c.owner.nature.pyromancy, c.owner);
+      if (c.burn > 0 || c.rupture > 0) {
+        sites.scorch(c.x, c.z, c.owner.body.might * BURN_WORKS * c.owner.nature.pyromancy, c.owner);
+        if (c.burn > 0) this.world.estates?.scorch(c.x, c.z, c.owner.body.might * BURN_WORKS * c.owner.nature.pyromancy, c.owner);
+      }
       else if (c.frost > 0.5) sites.chill(c.x, c.z);
     }
   }

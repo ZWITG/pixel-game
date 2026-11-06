@@ -517,6 +517,7 @@ export default class Melee {
     if (!inside) {
       this.player.world.sites.struck(x, z, reach, this.stage, this.player, force);
       this.player.world.caravans.struck(x, z, reach, force, this.player);
+      this.player.world.estates.struck(x, z, reach, force, this.player);
     }
     if (crater) this.tear(x, z, crater);
     this.waves.push({ queue, x, z, t: 0, drops: {}, broke: false });

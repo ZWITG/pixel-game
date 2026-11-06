@@ -2,7 +2,7 @@ import { height, PLACES, TOWNS, roadDistance, riverDistance } from './terrain.js
 import { NATIONS, nationAt } from './nations.js';
 import { DOCTRINES, FIELD } from './doctrines.js';
 import { TIERS, tierOf, namePlace, nameCaptain } from './settlements.js';
-import Economy, { GOODS } from './economy.js';
+import Economy, { GOODS, ESTATE_TIER } from './economy.js';
 
 // The living country. Time passes whether the hero is near or not: nations earn and spend,
 // choose what to do, send armies, raise forts and fight each other, while people settle the
@@ -20,6 +20,7 @@ const WAR_GAP = 420;         // seconds between a nation's wars
 const ARMY_PER_POP = 0.07, MIN_ARMY = 45, MOST_ARMY = 220;
 const RICH = 1500, RICH_ARMY = 1;  // gold at which a nation keeps an army twice its usual size
 const COST = { raise: 18, fortify: 40, build: 55, raid: 14, settle: 26, hunt: 20, field: 12, war: 30 };
+const DESERT = 0.5;          // of the soldiers a nation can't pay, the share that leave each day
 const ARMS_EACH = 0.25;       // arms from a nation's markets for each soldier raised; short of them, fewer are raised
 const GRUDGE_EACH = 0.05, GRUDGE_MOST = 0.35, GRUDGE_FADES = 0.15; // threat from robbing a nation's roads, and its fade a day
 const SIGN_REACH = 90;       // tiles from a place's middle at which a hero reads its sign
@@ -194,7 +195,9 @@ export default class Realm {
 
   // Soldiers need arms from the nation's own markets: cut its iron and its recruits go short.
   raise(id) {
-    const s = this.of(id), want = RAISED * (id === 'bone' ? 1.6 : 1), armed = this.economy.arm(id, want * ARMS_EACH) / (want * ARMS_EACH);
+    // Barracks raise them: a nation whose towns have lost theirs raises far fewer.
+    const towns = this.placesOf(id).filter((p) => tierOf(p.pop) >= ESTATE_TIER.barracks), halls = towns.length ? towns.filter((p) => p.ruined?.barracks === undefined).length / towns.length : 1;
+    const s = this.of(id), want = RAISED * (id === 'bone' ? 1.6 : 1) * (0.35 + 0.65 * halls), armed = this.economy.arm(id, want * ARMS_EACH) / Math.max(1, want * ARMS_EACH);
     s.troops += want * (0.45 + 0.55 * armed);
     s.peak = Math.max(s.peak, s.troops);
   }
@@ -379,6 +382,7 @@ export default class Realm {
   // ---- time passing ----
   grow(days) {
     this.economy.tick(days);
+    this.world.estates?.rebuild(days);
     for (const s of this.settlements) {
       const owner = s.owner === 'free' || s.owner === 'hero' ? null : this.of(s.owner);
       const before = tierOf(s.pop);
@@ -386,7 +390,11 @@ export default class Realm {
       // A well fed, well supplied place grows; a hungry one hardly at all.
       const held = (owner ? 1 - this.threat(s.owner) * 0.7 : 1) * (0.2 + (s.prosperity ?? 0.6) * 1.1);
       s.pop += GROWTH * s.pop * Math.max(0, 1 - s.pop / limitOf(s)) * days * held;
-      if (owner) owner.gold += this.economy.taxes(s, days);
+      if (owner) {
+        const tax = this.economy.taxes(s, days);
+        owner.gold += tax;
+        owner.taxed = (owner.taxed ?? 0) + tax;
+      }
       // Places you've taken pay you.
       else if (s.owner === 'hero') for (const p of this.world.players) p.bag.gold += this.economy.taxes(s, days) / this.world.players.length;
       const after = tierOf(s.pop);
@@ -400,7 +408,11 @@ export default class Realm {
       if (this.world.nations.isFallen(n)) continue;
       const force = this.of(n.id);
       force.grudge = (force.grudge ?? 0) * Math.max(0, 1 - GRUDGE_FADES * days);
+      // Soldiers no one can pay walk away.
+      const net = (STIPEND - force.troops * UPKEEP) * days + (force.taxed ?? 0);
+      force.taxed = 0;
       force.gold = Math.max(0, force.gold + (STIPEND - force.troops * UPKEEP) * days);
+      if (force.gold <= 0 && net < 0) force.troops = Math.max(0, force.troops + (net / UPKEEP) * DESERT);
     }
     // Free towns that grow large throw in with the strongest neighbor.
     for (const s of this.placesOf('free')) {
@@ -430,7 +442,8 @@ export default class Realm {
       const s = this.settlements.find((q) => q.stock && Math.hypot(q.x - p.state.x, q.z - p.state.z) < SIGN_REACH);
       if (s && s !== p.inPlace) {
         const { short, cheap } = this.economy.outlook(s), name = (g) => GOODS[g].name.toLowerCase();
-        p.hud.message(`${s.name}, ${TIERS[tierOf(s.pop)].name.toLowerCase()} of ${Math.round(s.pop)} · prosperity ${Math.round(s.prosperity * 100)}%${short.length ? ` · short of ${short.map(name).join(' and ')}` : ''}${cheap.length ? ` · cheap ${cheap.map(name).join(' and ')}` : ''}`, true, 4500);
+        const down = this.world.estates?.report(s).down ?? [];
+        p.hud.message(`${s.name}, ${TIERS[tierOf(s.pop)].name.toLowerCase()} of ${Math.round(s.pop)} · prosperity ${Math.round(s.prosperity * 100)}%${short.length ? ` · short of ${short.map(name).join(' and ')}` : ''}${cheap.length ? ` · cheap ${cheap.map(name).join(' and ')}` : ''}${down.length ? ` · ${down.join(', ')}` : ''}`, true, 4500);
       }
       p.inPlace = s ?? null;
     }

@@ -26,6 +26,7 @@ import Nations from './nations.js';
 import Scars from './scars.js';
 import Realm from './realm.js';
 import Caravans from './caravans.js';
+import Estates from './estates.js';
 import { lightWindows } from './architecture.js';
 import Towns from './settlements.js';
 
@@ -140,6 +141,7 @@ world.chunks = chunks;
 world.towns = new Towns(scene, world);
 world.realm = new Realm(world);
 world.caravans = new Caravans(scene, world);
+world.estates = new Estates(scene, world);
 work.houseFell = (id) => world.realm.houseLost(id);
 world.quake = new Quake(scene, chunks);
 monsters.quake = world.quake;
@@ -632,6 +634,7 @@ function step(dt) {
     world.scars.update(dt);
     world.realm.update(dt);
     world.caravans.update(dt);
+    world.estates.update(dt);
     world.fx.update(dt);
     world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);
