@@ -1,4 +1,5 @@
 import { height, biome, region, roadDistance, WORLD } from './terrain.js';
+import { streetDistance } from './cityPlan.js';
 
 // Surveys the whole world once, away from the game, and sends the chart back a strip at a time.
 const SIZE = 384, STRIP = 24;
@@ -21,7 +22,7 @@ function paint(x, z, h, west, north) {
   const light = 1 + Math.max(-0.42, Math.min(0.32, ((h - west) + (h - north)) * -0.009));
   c = c.map((v) => v * light);
   if (Math.floor(h / CONTOUR) !== Math.floor(west / CONTOUR) || Math.floor(h / CONTOUR) !== Math.floor(north / CONTOUR)) c = mix(c, INK, 0.26);
-  if (roadDistance(x, z) < 12) c = mix(c, ROAD, 0.85);
+  if (roadDistance(x, z) < 12 || streetDistance(x, z) < 6) c = mix(c, ROAD, 0.85);
   return c;
 }
 

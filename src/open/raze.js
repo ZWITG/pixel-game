@@ -71,7 +71,7 @@ const LAYOUTS = {
   bandit: [['banner', 'barracks', 'tower', 'supply', 'supply'], 26],
   keep: [['banner', 'idol', 'barracks', 'tower', 'supply'], 30],
   fort: [['banner', 'barracks', 'tower', 'supply'], 15],
-  city: [['banner', 'tower', 'tower', 'barracks', 'supply'], 62],
+  city: [['banner', 'tower', 'tower', 'barracks', 'supply'], 88],
   lair: [['idol', 'idol', 'banner', 'tower'], 46],
 };
 

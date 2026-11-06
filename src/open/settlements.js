@@ -7,6 +7,7 @@ import { height } from './terrain.js';
 import { placeHouse } from './landmarks.js';
 import { masonry } from './materials.js';
 import { NATIONS } from './nations.js';
+import { townPlans, settlementPlan, addPlan, limitOf } from './cityPlan.js';
 
 // Places people have built. The size of a place follows its people: each tier adds houses, then
 // a fence, then stone walls. A place is only made into meshes when a hero comes near it.
@@ -20,9 +21,10 @@ export const TIERS = [
 ];
 export const tierOf = (pop) => TIERS.reduce((best, t, i) => (pop >= t.pop ? i : best), 0);
 
-const SHOW_NEAR = 620;       // tiles from a hero that a place is built in the world
+const SHOW_NEAR = 620;       // tiles past a place's edge that it's built in the world
+const FILL = 0.65;           // how a place's houses follow its people: below 1, it fills its middle early
+const FIRST_BUILD = 40;      // houses put up at once the first time a place is seen
 const RISE_SECS = 5;         // a new house goes up over this long
-const HOUSE_ROOM = 7.5;      // tiles between rings of houses
 const BUILDERS = 3;
 const CLEARED = 7;           // tiles of trees felled around a new house
 const CLEARED_FOR = 3e10;    // ms: for as long as the house stands
@@ -59,23 +61,37 @@ export default class Towns {
 
   add(list, data) {
     const s = { ...data, built: 0, houses: [], rising: [], walls: -1, banner: null, crew: [] };
+    // Its streets: a town's own plan, or one grown for a place founded in play, and told to the
+    // workers that paint the ground.
+    s.plan = (s.fixed && townPlans().get(s.name)) || settlementPlan(s, limitOf(s));
+    if (!s.fixed) {
+      addPlan(s.plan);
+      this.world.chunks?.tell({ type: 'plan', place: { name: s.name, x: s.x, z: s.z }, limit: limitOf(s) });
+    }
     list.push(s);
     return s;
   }
 
+  // Houses a place has people for: its streets were laid out for the most it can ever hold, and
+  // fill as it grows toward that, the best plots first.
+  wanted(s) {
+    return Math.min(s.plan.plots.length, Math.max(2, Math.round(s.plan.plots.length * Math.min(1, s.pop / limitOf(s)) ** FILL)));
+  }
+
   // Where a place's nth house stands: rings going outward, each door facing the middle.
+  // The nth best plot: houses go up along the main streets and the middle first.
   spot(s, n) {
-    const a = n * 2.4 + s.x * 0.01, d = 11 + Math.sqrt(n + 1) * HOUSE_ROOM;
-    return [s.x + Math.cos(a) * d, s.z + Math.sin(a) * d, Math.round(a / (Math.PI / 2)) * (Math.PI / 2)];
+    const p = s.plan.plots[Math.min(n, s.plan.plots.length - 1)];
+    return [s.x + p.x, s.z + p.z, p.rot, p.type];
   }
 
   raiseHouse(s, animate) {
-    const n = s.built++, [x, z, rot] = this.spot(s, n), { marks } = this.world;
+    const n = s.built++, [x, z, rot, type] = this.spot(s, n), { marks } = this.world;
     if (Math.abs(height(x, z) - height(s.x, s.z)) > 14 || height(x, z) < 2) return;
     if (s.estates?.some((e) => Math.hypot(e.x - x, e.z - z) < e.def.size + 7)) return; // that ground is the town's hall or store
     // Settlers clear the ground before they build on it.
     for (const o of this.world.chunks.near(x, z, CLEARED)) if (o.type === 'tree') this.world.chunks.remove(o, Date.now() + CLEARED_FOR);
-    placeHouse(this.scene, marks, `${s.id}|${n}`, x, z, rot, ROOFS[(n + s.name.length) % ROOFS.length]);
+    placeHouse(this.scene, marks, `${s.id}|${n}`, x, z, rot, ROOFS[(n + s.name.length) % ROOFS.length], type, s.id);
     const home = marks.houses[marks.houses.length - 1];
     s.houses.push(home);
     if (animate) s.rising.push({ mesh: home.mesh, y: home.mesh.position.y, left: RISE_SECS });
@@ -84,7 +100,9 @@ export default class Towns {
   // A fence, then stone, as a place grows into them.
   wall(s, tier) {
     if (s.wallMesh) this.scene.remove(s.wallMesh);
-    const b = new VoxelBuilder(), R = 26 + Math.sqrt(TIERS[tier].houses) * HOUSE_ROOM, stone = tier >= 4, n = Math.round(R * (stone ? 0.8 : 1.5));
+    // Round what's been built, a little past its furthest house.
+    const reach = s.houses.reduce((m, h) => Math.max(m, Math.hypot(h.x - s.x, h.z - s.z)), 0);
+    const b = new VoxelBuilder(), R = Math.max(26, reach + 14), stone = tier >= 4, n = Math.round(R * (stone ? 0.8 : 1.5));
     for (let i = 0; i < n; i++) {
       const a = (i / n) * 6.283, x = Math.cos(a) * R, z = Math.sin(a) * R;
       if (Math.abs(x) < 8 && z > 0) continue;
@@ -127,14 +145,14 @@ export default class Towns {
     this.clock += dt;
     const { players } = this.world;
     for (const s of list) {
-      if (s.fixed) continue;
-      const near = players.some((p) => Math.hypot(p.state.x - s.x, p.state.z - s.z) < SHOW_NEAR);
+      const near = players.some((p) => Math.hypot(p.state.x - s.x, p.state.z - s.z) < SHOW_NEAR + s.plan.R);
       if (!near) continue;
       const tier = tierOf(s.pop);
-      if (!s.banner) this.raiseBanner(s);
-      if (s.built < TIERS[tier].houses) this.raiseHouse(s, s.seen === true);
-      s.seen = true;
-      const wanted = tier >= 4 ? 2 : tier >= 2 ? 1 : 0;
+      if (!s.banner && !s.fixed) this.raiseBanner(s);
+      // The first time, a place is simply there; after that, each new house goes up to be seen.
+      for (let i = 0; i < (s.seen ? 1 : FIRST_BUILD) && s.built < this.wanted(s); i++) this.raiseHouse(s, s.seen === true);
+      if (s.built >= this.wanted(s)) s.seen = true;
+      const wanted = s.fixed ? s.walls : tier >= 4 ? 2 : tier >= 2 ? 1 : 0;
       if (wanted !== s.walls) {
         s.walls = wanted;
         if (wanted) this.wall(s, tier);
@@ -143,6 +161,7 @@ export default class Towns {
         r.left -= dt;
         const k = Math.max(0, r.left / RISE_SECS);
         r.mesh.position.y = r.y - k * 6;
+        r.mesh.sync?.();
         return k > 0;
       });
       this.work(s);

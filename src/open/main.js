@@ -31,6 +31,7 @@ import Caravans from './caravans.js';
 import Estates from './estates.js';
 import { lightWindows } from './architecture.js';
 import Towns from './settlements.js';
+import { nearSolids } from './solidGrid.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -429,9 +430,10 @@ function clearance(ax, ay, az, bx, by, bz) {
 
 // How far along the line from a to b the camera can go before a wall or landmark, 0..1.
 function solidStop(ax, az, bx, bz) {
+  const near = nearSolids(marks, (ax + bx) / 2, (az + bz) / 2, Math.hypot(bx - ax, bz - az) / 2 + 4);
   for (let i = 1; i <= WALL_SAMPLES; i++) {
     const t = i / WALL_SAMPLES, x = ax + (bx - ax) * t, z = az + (bz - az) * t;
-    for (const s of marks.solids) {
+    for (const s of near) {
       if (s.off) continue;
       const inside = s.r ? Math.hypot(x - s.x, z - s.z) < s.r + WALL_GAP
         : x > s.x0 - WALL_GAP && x < s.x1 + WALL_GAP && z > s.z0 - WALL_GAP && z < s.z1 + WALL_GAP;

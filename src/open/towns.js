@@ -11,15 +11,19 @@ import { LOOKS } from '../art/looks.js';
 import { TOWNS } from './terrain.js';
 import { placeHouse } from './landmarks.js';
 import { ITEMS } from './items.js';
+import { townPlans } from './cityPlan.js';
+import { nearSolids } from './solidGrid.js';
 
 // Built places: walled cities, villages, bandit camps and ruined keeps. Every layout comes from
 // the town's name, so it's the same each visit. Houses are ordinary houses: enter or wreck them.
+const SECTORS = 8;          // a city's stonework is drawn and turned to voxels in this many parts, and the castle
 const STONE = '#a89a8c', STONE_DARK = '#7c6e68', WOOD = '#7a5230', WOOD_DARK = '#5a3a22', PAVE = '#b8a98e';
 const ROOFS = [['#b13e53', '#8a2e40'], ['#3b5dc9', '#2c4498'], ['#e8a33a', '#b87a22'], ['#257179', '#1a535a'], ['#7a5a9e', '#5a4078']];
 const FOLK_NEAR = 160;      // tiles past a town's edge that people start to appear
-const CROWD = { village: 8, city: 16 };
+const CROWD = { village: 10, city: 44 };
 const TALK = 3.6;
-const GREET = 8;            // tiles at which townsfolk stop and wave
+const GREET = 8;
+const FOLK_SEEN = 200;      // tiles (as the crow walks the grid) at which a townsperson is drawn            // tiles at which townsfolk stop and wave
 const WANDER = 2.4;         // townsfolk walking speed
 const TRADE_COST = 5;
 const FOLK = [LOOKS.merchant, LOOKS.kid, LOOKS.smith, LOOKS.bard, LOOKS.elder, LOOKS.guard];
@@ -45,62 +49,104 @@ function stall(b, x, z, color) {
   for (let i = -2; i <= 2; i++) b.box(x + i, 1.8, z, 0.6, 0.4, 0.6, ['#d8a060', '#ef7d57', '#a7f070'][(i + 2) % 3], 0);
 }
 
+// A village: a square with its well, stalls on market day, lanterns along the main street.
+// Its houses grow along the plan's streets with its people (settlements.js).
 function village(T, b, add, rand) {
-  b.box(0, 0.06, 0, 56, 0.12, 56, PAVE, 0.04);
-  b.box(0, 0.8, 0, 7, 1.6, 7, STONE, 0.05).box(0, 1.65, 0, 4.4, 0.1, 4.4, '#3f8fb0', 0).box(0, 5.6, 0, 8.4, 0.5, 8.4, WOOD_DARK);
-  for (const [x, z] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) b.box(x, 3.4, z, 0.4, 3.8, 0.4, WOOD);
-  add.circle(0, 0, 4.5);
-  const n = 8 + Math.floor(rand() * 3);
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * 6.28 + rand() * 0.3, d = 44 + rand() * 18, x = Math.cos(a) * d, z = Math.sin(a) * d;
-    add.house(x, z, quarter(x, z), ROOFS[i % ROOFS.length]);
-  }
-  stall(b, -18, 16, '#b13e53');
-  stall(b, 18, -16, '#257179');
-  for (let i = 0; i < 6; i++) lantern(b, Math.cos(i) * 30, Math.sin(i) * 30);
+  const { plan } = add, m = plan.market;
+  b.box(m.x, 0.8, m.z, 7, 1.6, 7, STONE, 0.05).box(m.x, 1.65, m.z, 4.4, 0.1, 4.4, '#3f8fb0', 0).box(m.x, 5.6, m.z, 8.4, 0.5, 8.4, WOOD_DARK);
+  for (const [x, z] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) b.box(m.x + x, 3.4, m.z + z, 0.4, 3.8, 0.4, WOOD);
+  add.circle(m.x, m.z, 4.5);
+  stall(b, m.x - 14, m.z + 12, '#b13e53');
+  stall(b, m.x + 14, m.z - 12, '#257179');
+  lanterns(b, plan, 'main', 34);
 }
 
+// Lanterns down the streets of one kind, set back from the middle.
+function lanterns(b, plan, type, every) {
+  for (const st of plan.streets) {
+    if (st.type !== type) continue;
+    let carry = every / 2;
+    for (let k = 1; k < st.pts.length; k++) {
+      const [ax, az] = st.pts[k - 1], [bx, bz] = st.pts[k], len = Math.hypot(bx - ax, bz - az);
+      for (let t = carry; t < len; t += every) {
+        const side = (Math.floor(t / every) % 2 ? 1 : -1) * (st.width / 2 + 1), nx = -(bz - az) / len, nz = (bx - ax) / len;
+        lantern(b, ax + ((bx - ax) * t) / len + nx * side, az + ((bz - az) * t) / len + nz * side);
+      }
+      carry = (carry - len) % every;
+      if (carry < 0) carry += every;
+    }
+  }
+}
+
+// A stretch of the city wall from a to b, cut into pieces short enough to break as voxels.
+function walls(add, P, ax, az, bx, bz, tall, thick) {
+  const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(len / 40));
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n, t1 = (i + 1) / n;
+    add.piece(() => {
+      wall(add.stone, P, ax + (bx - ax) * t0, az + (bz - az) * t0, ax + (bx - ax) * t1, az + (bz - az) * t1, tall, thick);
+      for (let t = t0 * len; t <= t1 * len; t += 6) add.circle(ax + ((bx - ax) * t) / len, az + ((bz - az) * t) / len, thick / 2 + 1.2);
+    });
+  }
+}
+
+// A city from its plan: an irregular ring of wall with a tower at every turn and a gatehouse
+// where each road comes in, the castle on its green in the middle, the market with its stalls.
+// Its houses grow along the streets with its people (settlements.js).
 function city(T, b, add, rand) {
-  const H = Math.round(T.r * 0.62), gate = 11, tall = 18, thick = 6, P = add.P;
-  b.box(0, 0.05, 0, H * 2, 0.1, H * 2, '#9c8e7a', 0.03);
-  for (const z of [-1, 1]) b.box(0, 0.12, z * 1, H * 2, 0.1, 22, PAVE, 0.03);
-  b.box(0, 0.13, 0, 22, 0.1, H * 2, PAVE, 0.03);
-  // Four walls with a gate in each, a great tower at every corner, the citadel in the middle.
-  for (const side of [-1, 1]) {
-    for (const part of [-1, 1]) {
-      const mid = part * (H + gate) / 2, len = H - gate, from = part * gate, to = part * H;
-      wall(add.stone, P, from, side * H, to, side * H, tall, thick);
-      wall(add.stone, P, side * H, from, side * H, to, tall, thick);
-      add.rect(mid - len / 2, mid + len / 2, side * H - thick / 2, side * H + thick / 2);
-      add.rect(side * H - thick / 2, side * H + thick / 2, mid - len / 2, mid + len / 2);
+  const { plan } = add, P = add.P, tall = 18, thick = 6, gap = 11, poly = plan.wall, n = poly.length;
+  // Where each gate meets the wall: the edge its road crosses, and how far along.
+  const gates = plan.gates.map((g) => {
+    for (let i = 0; i < n; i++) {
+      const [ax, az] = poly[i], [bx, bz] = poly[(i + 1) % n], dx = bx - ax, dz = bz - az, ux = Math.cos(g.a), uz = Math.sin(g.a);
+      const den = ux * dz - uz * dx;
+      if (Math.abs(den) < 1e-6) continue;
+      const t = (ux * az - uz * ax) / den, r = (ax * dz - az * dx) / den;
+      if (t >= 0 && t <= 1 && r > 0) return { edge: i, t, x: ax + dx * t, z: az + dz * t, a: g.a };
     }
-    for (const c of [-1, 1]) {
-      tower(add.stone, P, side * H, c * H, 7.6, tall + 12, { flag: true });
-      add.rect(side * H - 7.5, side * H + 7.5, c * H - 7.5, c * H + 7.5);
+    return null;
+  }).filter(Boolean);
+  for (let i = 0; i < n; i++) {
+    const [ax, az] = poly[i], [bx, bz] = poly[(i + 1) % n], len = Math.hypot(bx - ax, bz - az);
+    const here = gates.filter((g) => g.edge === i).sort((p, q) => p.t - q.t);
+    let from = 0;
+    for (const g of here) {
+      const half = (gap + 9) / len;
+      if (g.t - half > from) walls(add, P, ax + (bx - ax) * from, az + (bz - az) * from, ax + (bx - ax) * (g.t - half), az + (bz - az) * (g.t - half), tall, thick);
+      from = g.t + half;
     }
-    gatehouse(add.stone, P, 0, side * H, gate, tall, thick, true);
-    gatehouse(add.stone, P, side * H, 0, gate, tall, thick, false);
+    if (from < 1) walls(add, P, ax + (bx - ax) * from, az + (bz - az) * from, bx, bz, tall, thick);
+    add.piece(() => {
+      tower(add.stone, P, ax, az, 6.6, tall + 11, { flag: i % 3 === 0 });
+      add.circle(ax, az, 7.4);
+    });
   }
-  citadel(add.stone, P, 27, 9);
-  add.rect(-32, 32, -32, 32);
-  // Streets of houses, leaving the two avenues clear.
-  const step = 40;
-  for (let gx = -3; gx <= 3; gx++) for (let gz = -3; gz <= 3; gz++) {
-    if (!gx || !gz || (Math.abs(gx) <= 1 && Math.abs(gz) <= 1)) continue;
-    for (const side of [-1, 1]) {
-      const x = gx * step + side * 10, z = gz * step;
-      if (Math.max(Math.abs(x), Math.abs(z)) > H - 12) continue;
-      add.house(x, z + (side > 0 ? 8 : -8), Math.abs(gx) > Math.abs(gz) ? (gz > 0 ? 0 : Math.PI) : (gx > 0 ? -Math.PI / 2 : Math.PI / 2), ROOFS[Math.floor(rand() * ROOFS.length)]);
-    }
+  // Gatehouses, turned to face down their road.
+  for (const g of gates) {
+    add.piece(() => {
+      const parts = [];
+      gatehouse(parts, P, 0, 0, gap, tall, thick, true);
+      const turn = Math.atan2(Math.cos(g.a), Math.sin(g.a));
+      for (const part of parts) add.stone.push(part.rotateY(turn).translate(g.x, 0, g.z));
+      for (const s of [-1, 1]) add.circle(g.x + Math.cos(g.a + Math.PI / 2) * s * (gap + 3.5), g.z + Math.sin(g.a + Math.PI / 2) * s * (gap + 3.5), 6);
+    });
   }
-  // Market on the south avenue.
-  for (let i = -2; i <= 2; i++) if (i) stall(b, i * 9 + (i > 0 ? 5 : -5), H - 28, ROOFS[(i + 2) % 5][0]);
-  for (let i = 1; i <= 4; i++) for (const s of [-1, 1]) {
-    lantern(b, s * 12, i * 32);
-    lantern(b, s * 12, -i * 32);
-    lantern(b, i * 32, s * 12);
-    lantern(b, -i * 32, s * 12);
+  // The castle on its green.
+  add.piece(() => {
+    citadel(add.stone, P, plan.castle.half, 12);
+    add.rect(-plan.castle.half - 6, plan.castle.half + 6, -plan.castle.half - 6, plan.castle.half + 6);
+  });
+  // The market: a fountain in the middle and stalls round its edge.
+  const m = plan.market;
+  b.box(m.x, 0.7, m.z, 9, 1.4, 9, STONE, 0.05).box(m.x, 1.5, m.z, 7, 0.1, 7, '#3f8fb0', 0).box(m.x, 3.4, m.z, 1.4, 4, 1.4, STONE_DARK, 0.05);
+  add.circle(m.x, m.z, 5.5);
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * 6.283 + 0.3, x = m.x + Math.cos(a) * (m.r - 8), z = m.z + Math.sin(a) * (m.r - 8);
+    stall(b, x, z, ROOFS[i % ROOFS.length][0]);
   }
+  lanterns(b, plan, 'main', 30);
+  lanterns(b, plan, 'ring', 46);
+  void rand;
 }
 
 function bandit(T, b, add, rand) {
@@ -177,23 +223,66 @@ export function addTowns(scene, marks) {
   for (const T of TOWNS) {
     const b = new VoxelBuilder(), rand = seeded(T.name), stone = [], glow = [];
     let n = 0;
+    // Each piece of stonework (a stretch of wall, a tower, a gate, the castle) is kept apart too,
+    // so it can be broken on its own as voxels.
+    T.pieces = [];
+    let current = null;
+    const solid = (s) => {
+      marks.solids.push(s);
+      current?.solids.push(s);
+    };
     BUILD[T.kind](T, b, {
-      stone, glow, P: STONEWORK[nationAt(T.x, T.z)?.id ?? 'free'],
+      stone, glow, P: STONEWORK[nationAt(T.x, T.z)?.id ?? 'free'], plan: townPlans().get(T.name),
+      piece: (fn) => {
+        const from = stone.length;
+        current = { parts: null, solids: [], from };
+        fn();
+        current.parts = stone.slice(from);
+        T.pieces.push(current);
+        current = null;
+      },
       house: (x, z, rot, roof) => placeHouse(scene, marks, `${T.name}${n++}`, T.x + x, T.z + z, rot, roof),
-      rect: (x0, x1, z0, z1) => marks.solids.push({ x0: T.x + x0, x1: T.x + x1, z0: T.z + z0, z1: T.z + z1 }),
-      circle: (x, z, r) => marks.solids.push({ x: T.x + x, z: T.z + z, r }),
+      rect: (x0, x1, z0, z1) => solid({ x0: T.x + x0, x1: T.x + x1, z0: T.z + z0, z1: T.z + z1 }),
+      circle: (x, z, r) => solid({ x: T.x + x, z: T.z + z, r }),
     }, rand);
+    // A city's stonework in sectors, each its own mesh, so the part near a hero can become voxels
+    // (voxels.js) while the rest stays one painted mesh.
+    const inPiece = new Set(T.pieces.flatMap((p) => p.parts));
+    T.sectors = [];
+    for (const p of T.pieces) {
+      const box = new THREE.Box3();
+      for (const g of p.parts) {
+        g.computeBoundingBox();
+        box.union(g.boundingBox);
+      }
+      const c = box.getCenter(new THREE.Vector3()), castle = Math.hypot(c.x, c.z) < 70, k = castle ? 'castle' : Math.floor(((Math.atan2(c.z, c.x) + Math.PI) / (2 * Math.PI)) * SECTORS) % SECTORS;
+      let sec = T.sectors.find((x) => x.k === k);
+      if (!sec) T.sectors.push(sec = { k, pieces: [], x: 0, z: 0, n: 0 });
+      sec.pieces.push(p);
+      sec.x += c.x;
+      sec.z += c.z;
+      sec.n++;
+    }
     const mesh = new THREE.Mesh(b.build(), masonry());
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.position.set(T.x, T.y, T.z);
     scene.add(mesh);
-    if (stone.length) {
-      const work = new THREE.Mesh(mergeGeometries(stone.map((g) => (g.index ? g.toNonIndexed() : g))), mesh.material);
+    const drawn = (parts) => {
+      const work = new THREE.Mesh(mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g))), mesh.material);
       work.castShadow = true;
       work.receiveShadow = true;
       work.position.copy(mesh.position);
       scene.add(work);
+      return work;
+    };
+    const loose = stone.filter((g) => !inPiece.has(g));
+    if (loose.length) drawn(loose);
+    for (const sec of T.sectors) {
+      sec.x = T.x + sec.x / sec.n;
+      sec.z = T.z + sec.z / sec.n;
+      sec.mesh = drawn(sec.pieces.flatMap((p) => p.parts));
+      sec.y = T.y;
     }
     if (glow.length) {
       const lit = new THREE.Group();
@@ -214,15 +303,20 @@ export class People {
 
   fill(T) {
     this.live.add(T);
-    const rand = seeded(`${T.name}folk`), spread = T.kind === 'city' ? T.r * 0.5 : 26;
+    const rand = seeded(`${T.name}folk`), spread = T.kind === 'city' ? T.r * 0.5 : 26, plan = townPlans().get(T.name);
+    // Out on the streets, the busy ones near the middle.
+    const streets = plan.streets.filter((st) => st.type !== 'lane'), at = () => {
+      const st = streets[Math.floor(rand() * streets.length)], p = st.pts[Math.floor(rand() * st.pts.length)];
+      return [T.x + p[0], T.z + p[1]];
+    };
     for (let i = 0; i < CROWD[T.kind]; i++) {
       const model = makeFigure(FOLK[i % FOLK.length]);
       const job = i === 0 ? 'healer' : i === 1 ? 'trader' : 'folk';
-      const x = T.x + (rand() - 0.5) * spread * 2, z = T.z + (rand() - 0.5) * spread * 2;
+      const [x, z] = at();
       model.group.position.set(x, T.y, z);
       model.group.scale.setScalar(2.3);
       this.scene.add(model.group);
-      this.list.push({ T, model, job, phase: rand() * 6, dir: rand() * 6.28, turn: rand() * 4, moving: true, spread, line: CHATTER[T.kind][i % CHATTER[T.kind].length] });
+      this.list.push({ T, home: [x, z], model, job, phase: rand() * 6, dir: rand() * 6.28, turn: rand() * 4, moving: true, spread: 40, line: CHATTER[T.kind][i % CHATTER[T.kind].length] });
     }
   }
 
@@ -236,7 +330,7 @@ export class People {
   }
 
   blocked(x, z) {
-    return this.world.marks.solids.some((s) => !s.off && (s.r ? Math.hypot(x - s.x, z - s.z) < s.r + 1 : x > s.x0 - 1 && x < s.x1 + 1 && z > s.z0 - 1 && z < s.z1 + 1));
+    return nearSolids(this.world.marks, x, z).some((s) => !s.off && (s.r ? Math.hypot(x - s.x, z - s.z) < s.r + 1 : x > s.x0 - 1 && x < s.x1 + 1 && z > s.z0 - 1 && z < s.z1 + 1));
   }
 
   update(dt) {
@@ -255,6 +349,10 @@ export class People {
       }
     }
     for (const f of this.list) {
+      // Only those near enough to see are drawn and walked: a big city's crowd is mostly far off.
+      const g0 = f.model.group.position, seen = players.some((p) => Math.abs(p.state.x - g0.x) + Math.abs(p.state.z - g0.z) < FOLK_SEEN);
+      f.model.group.visible = seen;
+      if (!seen) continue;
       if ((f.turn -= dt) <= 0) {
         f.turn = 2 + Math.random() * 5;
         f.moving = Math.random() < 0.7;
@@ -270,7 +368,7 @@ export class People {
         continue;
       }
       const g = f.model.group, nx = g.position.x + Math.sin(f.dir) * WANDER * dt, nz = g.position.z + Math.cos(f.dir) * WANDER * dt;
-      const stray = Math.max(Math.abs(nx - f.T.x), Math.abs(nz - f.T.z)) > f.spread;
+      const stray = Math.max(Math.abs(nx - f.home[0]), Math.abs(nz - f.home[1])) > f.spread;
       if (f.moving && !stray && !this.blocked(nx, nz)) {
         g.position.x = nx;
         g.position.z = nz;

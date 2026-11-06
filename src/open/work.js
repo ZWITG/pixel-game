@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { height, dents, addDent, SPAWN } from './terrain.js';
 import { ITEMS } from './items.js';
+import { nearSolids } from './solidGrid.js';
 
 // Hands on the world: trees and rocks stand in the way, and can be chopped and mined for
 // materials. What is gone stays gone until it regrows, so the world remembers you were there.
@@ -170,7 +171,7 @@ export default class Work {
     for (const o of this.chunks.near(state.x, state.z, 6)) {
       if (o.type === 'tree' || state.air < o.sc) this.pushCircle(state, o.x, o.z, o.r); // rocks can be jumped
     }
-    for (const s of this.marks.solids) {
+    for (const s of nearSolids(this.marks, state.x, state.z)) {
       if (s.off || s.voxel) continue; // voxel structures stop the hero by their own cubes (voxels.js)
       if (s.r) this.pushCircle(state, s.x, s.z, s.r);
       else this.pushRect(state, s);
@@ -264,7 +265,10 @@ export default class Work {
     this.burst(h.x, y, h.z, ['#e8d5b0', '#7a5230', '#b13e53'], 10, 6);
     if (done < HOUSE_HP) {
       this.hurt.set(h.id, done);
-      if (!vox) h.mesh.rotation.z = (done / HOUSE_HP) * 0.05; // it starts to lean
+      if (!vox) {
+        h.mesh.rotation.z = (done / HOUSE_HP) * 0.05; // it starts to lean
+        h.mesh.sync?.();
+      }
       return false;
     }
     if (vox) {
@@ -285,6 +289,7 @@ export default class Work {
     const gone = this.chunks.isGone(h.id);
     h.mesh.visible = !gone;
     h.mesh.rotation.z = 0;
+    h.mesh.sync?.();
     if (gone) h.rubble ??= h.makeRubble();
     if (h.rubble) h.rubble.visible = gone;
     h.solid.off = gone;

@@ -172,7 +172,8 @@ export default class Estates {
     const def = ESTATES[kind], c = STONEWORK[s.owner] ?? STONEWORK.free, toRoad = this.roadward(s);
     const turn = { market: 0, warehouse: 0.55, barracks: Math.PI, armory: Math.PI + 0.6, granary: Math.PI / 2, guild: -0.9, treasury: -Math.PI / 2 }[kind];
     const ring = def.quarter + (s.fixed ? Math.min(80, tierOf(s.pop) * 12) : 0);
-    const [x, z, a] = ground(toRoad + turn, ring, def.size, this.world.marks.solids, s), y = height(x, z);
+    const civic = s.plan?.civic.find((c) => c.kind === kind);
+    const [x, z] = civic ? [s.x + civic.x, s.z + civic.z] : ground(toRoad + turn, ring, def.size, this.world.marks.solids, s), y = height(x, z);
     const group = new THREE.Group(), parts = [], lit = [];
     def.draw(parts, lit, c);
     const body = new THREE.Group();

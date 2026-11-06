@@ -1,4 +1,5 @@
 import { STYLES } from './architecture.js';
+import { TYPES } from './cityPlan.js';
 
 // Voxel blueprints for houses: the same house as its painted model (architecture.js, at the
 // scale placeHouse uses), but built cube by cube from parts, so it can be broken: a stone footing,
@@ -17,14 +18,14 @@ function shade(c, k) {
   return (r << 16) | (g << 8) | b;
 }
 
-export function houseVoxels(styleId, shape, seed) {
-  const st = STYLES[styleId] ?? STYLES.free;
+export function houseVoxels(styleId, shape, seed, type = 'house') {
+  const st = STYLES[styleId] ?? STYLES.free, t = TYPES[type] ?? TYPES.house, plain = type === 'house';
   let rnd = seed * 7919 + 13;
   const rand = () => (rnd = (rnd * 16807) % 2147483647) / 2147483647;
   const vox = (t) => Math.round((t * SCALE) / S);
-  const W = vox(HALF_W), D = vox(HALF_D), E = Math.max(1, vox(EAVE)), low = st.stilts ? vox(0.32) : 1;
-  const storeys = shape === 1 || shape === 3 ? 1.5 : 1, wallTop = low + vox(st.tall * storeys), rise = Math.round(W * st.pitch * 0.9) + 1;
-  const wing = shape === 2 ? 4 : 0, chimneyTop = wallTop + rise + 2;
+  const W = vox(HALF_W * (t.w / TYPES.house.w)), D = vox(HALF_D * (t.d / TYPES.house.d)), E = Math.max(1, vox(EAVE)), low = st.stilts ? vox(0.32) : 1;
+  const storeys = plain ? (shape === 1 || shape === 3 ? 1.5 : 1) : t.storeys, wallTop = low + vox(st.tall * storeys), rise = Math.round(W * st.pitch * 0.9) + 1;
+  const wing = shape === 2 && plain ? 4 : 0, chimneyTop = wallTop + rise + 2;
   const nx = (W + E + 1) * 2 + 1 + wing, ny = chimneyTop + 3, nz = (D + E + 1) * 2 + 3;
   const cx = W + E + 1, cz = D + E + 1; // grid cell of the house's middle
   const mat = new Uint8Array(nx * ny * nz), col = new Uint32Array(nx * ny * nz);
@@ -135,7 +136,7 @@ export function houseVoxels(styleId, shape, seed) {
       set(x, low + 4 - Math.floor((x - W) / 2), z, roofMat, roofs[1], 0.07);
     }
   }
-  if (shape === 3) {
+  if (shape === 3 && plain) {
     const tx = -Math.round(W * 0.62), tz = Math.round(D * 0.55);
     for (let y = wallTop; y < wallTop + 5; y++) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) set(tx + dx, y, tz + dz, STONE, stone, 0.12);
     for (let dy = 0; dy < 3; dy++) for (let dx = -(2 - dy); dx <= 2 - dy; dx++) for (let dz = -(2 - dy); dz <= 2 - dy; dz++) set(tx + dx, wallTop + 5 + dy, tz + dz, roofMat, roofs[0], 0.07);

@@ -207,6 +207,8 @@ New buildings by tier (each one works, and each one can be destroyed):
 | 6 | **v0.21 (done 2026-11-06)** | Kingdom buildings and districts: treasury, armory, barracks, granary, quarters, the effects of destroying each, rebuilding with scaffolding | `settlements.js`, `realm.js`, `doctrines.js`, `raze.js` |
 | 7 | v0.25 | NPC detail and routines, animals, new places, fairs and events, roadside inns and waystations, riding | `figures.js`, `creatures.js`, `sites.js`, `landmarks.js` |
 
+**Cities (2026-11-06, v0.24.0):** three times wider with generated streets and districts, per the user. Research: Watabou's Medieval Fantasy City Generator (Voronoi wards), Parish and Müller 2001 (L-system road growth with global goals and local constraints), Chen et al. 2008 (tensor-field streets), Vanegas et al. 2012 (parcel subdivision), Townscaper (irregular grids and wave function collapse), medieval burgage plots (Elgin unit 8.1 m, plots at fractions and multiples; Hungerford ~100 m deep; streets widening into a market), Kingdom Come: Deliverance 2's Kuttenberg (city scale bounded by NPC density budgets).
+
 **Order (the user chose 2026-11-06): trade and kingdoms first, phases 4, 5 and 6, then destruction, phases 1 to 3, then 7.** The version numbers in the table for those phases will move up to follow.
 
 **Performance gate for every phase:** the frame rate is measured in the busiest city with a Worldbreaker blast before and after, and the version doesn't ship if it got slower.

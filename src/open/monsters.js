@@ -10,6 +10,7 @@ import { makeCreature } from './creatures.js';
 import { machineMesh, DOCTRINES } from './doctrines.js';
 import { arm, stagger, standDown, TURN_TAKERS, PARRIED } from './foes.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
+import { nearSolids } from './solidGrid.js';
 
 // Monsters in the open world. They use the game's own Enemy class; this file is the small
 // `game` it expects, plus spawning around the hero and the hero's health.
@@ -93,7 +94,8 @@ export default class Monsters {
   // Walls and buildings stop monsters too.
   walled(x, z, e) {
     const r = e.radius * 0.6;
-    return this.work.marks.solids.some((s) => {
+    return nearSolids(this.work.marks, x, z).some((s) => {
+      if (s.off) return false;
       if (s.r) return Math.hypot(x - s.x, z - s.z) < s.r + r;
       return !s.off && x > s.x0 - r && x < s.x1 + r && z > s.z0 - r && z < s.z1 + r;
     });

@@ -5,7 +5,8 @@ import { PLACES, height } from './terrain.js';
 import { masonry } from './materials.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { tower as roundTower } from './fortress.js';
-import { makeBuilding } from './architecture.js';
+import { makeBuilding, placeBuilding } from './architecture.js';
+import { TYPES } from './cityPlan.js';
 import { nationAt } from './nations.js';
 
 const HOUSE = { x: 3.1, z: 2.95, door: 3.8 }; // half size and door distance at the scale used here
@@ -98,18 +99,17 @@ function rubble(scene, x, z, seed) {
 }
 
 // A house you can enter and wreck. Turned by quarter turns; its door faces `rot`.
-export function placeHouse(scene, out, id, hx, hz, rot, roof) {
+// `type`: a building type from cityPlan.js. `cluster`: the place it belongs to, which it's batched with.
+export function placeHouse(scene, out, id, hx, hz, rot, roof, type = 'house', cluster = 'wild') {
   // Whoever holds this land builds the way they build.
-  const seed = [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7);
-  const house = makeBuilding(nationAt(hx, hz)?.id ?? 'free', seed);
-  house.position.set(hx, height(hx, hz), hz);
-  house.scale.setScalar(3.4);
-  house.rotation.y = rot;
-  scene.add(house);
-  const ox = Math.sin(rot), oz = Math.cos(rot), turned = Math.abs(Math.round(rot / (Math.PI / 2))) % 2 === 1;
-  const sx = turned ? HOUSE.z : HOUSE.x, sz = turned ? HOUSE.x : HOUSE.z;
-  const solid = { x0: hx - sx, x1: hx + sx, z0: hz - sz, z1: hz + sz };
-  out.houses.push({ id, mesh: house, solid, rubble: null, makeRubble: () => rubble(scene, hx, hz, out.houses.length), x: hx, z: hz, rot, door: { x: hx + ox * HOUSE.door, z: hz + oz * HOUSE.door } });
+  const seed = [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7), t = TYPES[type] ?? TYPES.house;
+  const house = placeBuilding(scene, cluster, nationAt(hx, hz)?.id ?? 'free', seed, type, hx, height(hx, hz), hz, rot, 3.4);
+  const ox = Math.sin(rot), oz = Math.cos(rot), quarter = Math.abs(rot / (Math.PI / 2) - Math.round(rot / (Math.PI / 2))) < 0.01;
+  const turned = Math.abs(Math.round(rot / (Math.PI / 2))) % 2 === 1, hw = (t.w / 2) * (HOUSE.x / (TYPES.house.w / 2)), hd = (t.d / 2) * (HOUSE.z / (TYPES.house.d / 2));
+  // Square to the world: a box. Turned to follow a street: a circle that fits inside it.
+  const solid = quarter ? { x0: hx - (turned ? hd : hw), x1: hx + (turned ? hd : hw), z0: hz - (turned ? hw : hd), z1: hz + (turned ? hw : hd) } : { x: hx, z: hz, r: Math.min(hw, hd) + 0.4 };
+  const door = hd + (HOUSE.door - HOUSE.z);
+  out.houses.push({ id, type, mesh: house, solid, rubble: null, makeRubble: () => rubble(scene, hx, hz, out.houses.length), x: hx, z: hz, rot, door: { x: hx + ox * door, z: hz + oz * door } });
   out.solids.push(solid);
 }
 

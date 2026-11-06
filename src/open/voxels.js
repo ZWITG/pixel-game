@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { height } from './terrain.js';
 import { houseVoxels } from './blueprints.js';
 import { nationAt } from './nations.js';
+import { TOWNS } from './terrain.js';
 
 // Breakable structures in the manner of Teardown: built from cubes of real materials that a blow
 // cuts exactly where it lands. After each cut the structure checks what still holds it up
@@ -31,6 +32,7 @@ const STEP_UP = 1.1;                 // tiles a hero can step up onto rubble or 
 const BODY = [0.5, 1.4, 2.3];        // heights at which a hero's body meets walls
 const PIECE = 7;                     // voxels across a piece when a whole structure comes down
 const MESHES_PER_FRAME = 4;
+const SECTOR_NEAR = 330, SECTOR_FAR = 480, STONE_VOXEL = 1; // city walls and castles: tiles, and their coarser voxels
 const HOUSE_NEAR = 170, HOUSE_FAR = 240, MOST_HOUSES = 36, HOUSE_CHECK = 0.5; // tiles; houses become voxels near a hero
 
 const offsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
@@ -63,11 +65,13 @@ class Volume {
   }
 
   cell(x, y, z) {
-    return [Math.floor((x - this.ox) / S), Math.floor((y - this.oy) / S), Math.floor((z - this.oz) / S)];
+    const s = this.s;
+    return [Math.floor((x - this.ox) / s), Math.floor((y - this.oy) / s), Math.floor((z - this.oz) / s)];
   }
 
   centre(i, j, k) {
-    return [this.ox + (i + 0.5) * S, this.oy + (j + 0.5) * S, this.oz + (k + 0.5) * S];
+    const s = this.s;
+    return [this.ox + (i + 0.5) * s, this.oy + (j + 0.5) * s, this.oz + (k + 0.5) * s];
   }
 
   solid(i, j, k) {
@@ -78,7 +82,7 @@ class Volume {
   // `only`: a test on the material, for fire that eats only what burns. Returns what came out.
   carve(x, y, z, r, only) {
     const out = [], reach = r / Math.sqrt(MATERIALS[1].strength);
-    const [ci, cj, ck] = this.cell(x, y, z), span = Math.ceil(reach / S) + 1;
+    const [ci, cj, ck] = this.cell(x, y, z), span = Math.ceil(reach / this.s) + 1;
     for (let k = Math.max(0, ck - span); k <= Math.min(this.nz - 1, ck + span); k++) {
       for (let j = Math.max(0, cj - span); j <= Math.min(this.ny - 1, cj + span); j++) {
         for (let i = Math.max(0, ci - span); i <= Math.min(this.nx - 1, ci + span); i++) {
@@ -104,32 +108,40 @@ class Volume {
   }
 
   // Each voxel's distance from support; `budget` lets one reach as far as it did when built.
+  // Worked out level by level: going up costs nothing, so it stays in the level it came from.
   reach(budget) {
-    const { nx, ny, nz, mat } = this, n = mat.length, best = new Uint8Array(n).fill(255), queue = new Int32Array(n * 4);
-    let head = n * 2, tail = n * 2; // a double-ended queue in one array: the front grows down from the middle
-    const ground = Math.max(0, Math.floor((0.6 - this.oy) / S));
+    const { nx, ny, nz, mat } = this, n = mat.length;
+    this.bestBuf ??= new Uint8Array(n); // kept between blows, so a castle's punch allocates nothing big
+    const best = budget ? this.bestBuf.fill(255) : new Uint8Array(n).fill(255);
+    let level = [], next = [];
+    const ground = Math.max(0, Math.floor((0.6 - this.oy) / this.s));
     for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
       for (let j = 0; j <= ground; j++) {
         const at = this.at(i, j, k);
         if (mat[at]) {
           best[at] = 0;
-          queue[tail++] = at;
+          level.push(at);
         }
       }
     }
-    while (head < tail) {
-      const at = queue[head++], h = best[at], i = at % nx, j = Math.floor(at / nx) % ny, k = Math.floor(at / (nx * ny));
-      for (const [di, dj, dk] of offsets) {
-        const a = i + di, b = j + dj, c = k + dk;
-        if (a < 0 || b < 0 || c < 0 || a >= nx || b >= ny || c >= nz) continue;
-        const to = this.at(a, b, c), m = mat[to];
-        if (!m) continue;
-        const cost = dj === 1 ? 0 : 1, nh = h + cost;
-        if (nh >= best[to] || nh > (budget ? Math.max(MATERIALS[m].reach, budget[to]) : 250)) continue;
-        best[to] = nh;
-        if (cost) queue[tail++] = to;
-        else queue[--head] = to;
+    for (let h = 0; level.length; h++) {
+      for (let q = 0; q < level.length; q++) {
+        const at = level[q];
+        if (best[at] !== h) continue;
+        const i = at % nx, j = Math.floor(at / nx) % ny, k = Math.floor(at / (nx * ny));
+        for (const [di, dj, dk] of offsets) {
+          const a = i + di, b = j + dj, c = k + dk;
+          if (a < 0 || b < 0 || c < 0 || a >= nx || b >= ny || c >= nz) continue;
+          const to = this.at(a, b, c), m = mat[to];
+          if (!m) continue;
+          const nh = dj === 1 ? h : h + 1;
+          if (nh >= best[to] || nh > (budget ? Math.max(MATERIALS[m].reach, budget[to]) : 250)) continue;
+          best[to] = nh;
+          (nh === h ? level : next).push(to);
+        }
       }
+      level = next;
+      next = [];
     }
     return best;
   }
@@ -182,7 +194,8 @@ class Volume {
       cx += x; cy += y; cz += z;
     }
     const n = piece.length;
-    return { v: { nx, ny, nz, s: S, ox: this.ox + i0 * S, oy: this.oy + j0 * S, oz: this.oz + k0 * S, mat, col }, centre: [cx / n, cy / n, cz / n], count: n };
+    const s = this.s;
+    return { v: { nx, ny, nz, s, ox: this.ox + i0 * s, oy: this.oy + j0 * s, oz: this.oz + k0 * s, mat, col }, centre: [cx / n, cy / n, cz / n], count: n };
   }
 
   data() {
@@ -208,6 +221,7 @@ export default class Voxels {
     this.bits.castShadow = true;
     scene.add(this.bits);
     this.flying = [];
+    this.towns = TOWNS; // for debugging: the walled places this works on
     // Draw one of each kind far under the ground from the start, so their shaders are ready
     // before the first wall comes down (the first collapse otherwise stalls a quarter second).
     const warm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), this.material);
@@ -226,7 +240,8 @@ export default class Voxels {
 
   // ---- making them ----
   // Hands a kit-built model over: it stays as it is until its voxels are ready, then they replace it.
-  adopt(owner, group, parts, lit = []) {
+  // `size`: tiles across a voxel; big stonework uses coarser ones.
+  adopt(owner, group, parts, lit = [], size = S) {
     const pos = [], col = [], glow = [];
     const add = (list, isGlow) => {
       for (const g of list) {
@@ -242,7 +257,7 @@ export default class Voxels {
     add(lit, true);
     const id = this.next++;
     this.waiting.set(id, { kind: 'adopt', owner, group });
-    this.worker.postMessage({ type: 'voxelize', id, pos: new Float32Array(pos), col: new Float32Array(col), glow: new Uint8Array(glow), s: S }, []);
+    this.worker.postMessage({ type: 'voxelize', id, pos: new Float32Array(pos), col: new Float32Array(col), glow: new Uint8Array(glow), s: size }, []);
   }
 
   reply(m) {
@@ -266,7 +281,11 @@ export default class Voxels {
 
   // A volume made directly (blueprints.js) rather than from a painted model.
   take(owner, group, v, onReady) {
-    const entry = { vol: new Volume(v), group, owner, mesh: null, stamp: 0, ready: false, at: group.getWorldPosition(new THREE.Vector3()), onReady };
+    // Its middle and reach in the world, so collision only asks the structures a hero is near.
+    const vol = new Volume(v);
+    group.updateMatrixWorld(true);
+    const at = group.localToWorld(new THREE.Vector3(v.ox + (v.nx * v.s) / 2, 0, v.oz + (v.nz * v.s) / 2)), reach = (Math.max(v.nx, v.nz) * v.s) / 2 + 4;
+    const entry = { vol, group, owner, mesh: null, stamp: 0, ready: false, at, reach, onReady };
     owner.vox = entry;
     if (owner.solid) owner.solid.voxel = true; // the hero meets the voxels themselves now
     this.list.push(entry);
@@ -356,7 +375,7 @@ export default class Voxels {
         vol: new Volume(lifted.v), offset: lifted.centre,
         vel: new THREE.Vector3((away.x / len) * push, whole ? Math.random() * 2 : 1, (away.z / len) * push),
         spin: new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 2).multiplyScalar(3 / Math.cbrt(lifted.count)),
-        radius: Math.max(lifted.v.nx, lifted.v.ny, lifted.v.nz) * S * 0.5, still: 0, asleep: false, age: 0, hard: false,
+        radius: Math.max(lifted.v.nx, lifted.v.ny, lifted.v.nz) * lifted.v.s * 0.5, still: 0, asleep: false, age: 0, hard: false,
       };
       this.chunks.push(chunk);
       this.remesh(chunk);
@@ -404,6 +423,54 @@ export default class Voxels {
     if ((this.houseCheck = (this.houseCheck ?? 0) - dt) <= 0) {
       this.houseCheck = HOUSE_CHECK;
       this.houses();
+      this.walls();
+    }
+  }
+
+  // A city's walls, towers, gates and castle near a hero are voxels, a sector at a time; the
+  // painted sector goes once every piece of it is ready, and comes back when all are left behind.
+  walls() {
+    const { players } = this.world;
+    for (const T of TOWNS) {
+      for (const sec of T.sectors ?? []) {
+        const d = players.reduce((m, p) => Math.min(m, Math.hypot(p.state.x - sec.x, p.state.z - sec.z)), 1e9);
+        if (!sec.vox && d < SECTOR_NEAR) {
+          sec.vox = true;
+          for (const piece of sec.pieces) {
+            const group = new THREE.Group();
+            group.position.set(T.x, T.y, T.z);
+            this.scene.add(group);
+            piece.townPiece = true;
+            this.adopt(piece, group, piece.parts.map((g) => g.clone()), [], STONE_VOXEL);
+          }
+        } else if (sec.vox) {
+          const ready = sec.pieces.every((p) => p.vox?.ready);
+          if (ready && sec.mesh.visible) {
+            sec.mesh.visible = false;
+            for (const p of sec.pieces) for (const s of p.solids) s.voxel = true;
+          }
+          const hurt = sec.pieces.some((p) => p.vox && p.vox.vol.count() < p.vox.vol.total);
+          if (d > SECTOR_FAR && ready && !hurt) {
+            for (const p of sec.pieces) {
+              this.scene.remove(p.vox.group);
+              this.forget(p);
+              for (const s of p.solids) s.voxel = false;
+            }
+            sec.mesh.visible = true;
+            sec.vox = false;
+          }
+        }
+      }
+    }
+  }
+
+  // A blow on a city's stonework: whatever piece is near enough is cut.
+  blast(x, y, z, r, hero) {
+    for (const e of this.list) {
+      if (!e.owner.townPiece || !e.ready) continue;
+      const b = e.box ??= new THREE.Box3().setFromObject(e.mesh ?? e.group);
+      if (x < b.min.x - r || x > b.max.x + r || z < b.min.z - r || z > b.max.z + r) continue;
+      this.hit(e.owner, x, y, z, r, hero);
     }
   }
 
@@ -437,7 +504,7 @@ export default class Voxels {
       group.rotation.y = h.mesh.rotation.y;
       this.scene.add(group);
       h.house = true;
-      this.take(h, group, houseVoxels(nationAt(h.x, h.z)?.id ?? 'free', seed % 4, seed), () => { h.mesh.visible = false; });
+      this.take(h, group, houseVoxels(nationAt(h.x, h.z)?.id ?? 'free', seed % 4, seed, h.type), () => { h.mesh.visible = false; });
       active++;
     }
   }
@@ -509,11 +576,11 @@ export default class Voxels {
 
   // ---- a hero among them ----
   // Is there something solid where a hero's body would be?
-  blocks(x, y, z, near = 30) {
+  blocks(x, y, z) {
     for (const e of this.list) {
       if (!e.ready || !e.group.visible || e.left === 0) continue;
       const g = e.group;
-      if (Math.abs(e.at.x - x) > near || Math.abs(e.at.z - z) > near) continue;
+      if (Math.abs(e.at.x - x) > e.reach || Math.abs(e.at.z - z) > e.reach) continue;
       g.updateMatrixWorld();
       for (const h of BODY) {
         const p = g.worldToLocal(this.v.set(x, y + h, z)), [i, j, k] = e.vol.cell(p.x, p.y, p.z);
@@ -524,17 +591,17 @@ export default class Voxels {
   }
 
   // The top of whatever solid is under a hero, close enough below or a step above.
-  floor(x, z, y, near = 30) {
+  floor(x, z, y) {
     let best = -Infinity;
     for (const e of this.list) {
       if (!e.ready || !e.group.visible || e.left === 0) continue;
       const g = e.group;
-      if (Math.abs(e.at.x - x) > near || Math.abs(e.at.z - z) > near) continue;
+      if (Math.abs(e.at.x - x) > e.reach || Math.abs(e.at.z - z) > e.reach) continue;
       g.updateMatrixWorld();
       const p = g.worldToLocal(this.v.set(x, y + STEP_UP, z)), [i, j0, k] = e.vol.cell(p.x, p.y, p.z);
       for (let j = Math.min(j0, e.vol.ny - 1); j >= 0 && j > j0 - 8; j--) {
         if (e.vol.solid(i, j, k)) {
-          const top = g.localToWorld(this.v.set(p.x, e.vol.oy + (j + 1) * S, p.z)).y;
+          const top = g.localToWorld(this.v.set(p.x, e.vol.oy + (j + 1) * e.vol.s, p.z)).y;
           best = Math.max(best, top);
           break;
         }
@@ -547,6 +614,7 @@ export default class Voxels {
     const e = owner.vox;
     if (!e) return;
     this.list.splice(this.list.indexOf(e), 1);
+    this.queue = this.queue.filter((q) => q !== e);
     e.mesh?.geometry.dispose();
     owner.vox = null;
   }

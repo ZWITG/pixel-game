@@ -16,13 +16,13 @@ export const SPAWN = { x: 3650, z: 4600 };
 
 // Built places (see towns.js). `r` is the ground levelled for it.
 export const TOWNS = [
-  { kind: 'city', name: 'Aurelgate', boss: 'marshal', x: 5400, z: 5000, r: 300, y: 36 },
-  { kind: 'city', name: 'Thornmere', boss: 'thornqueen', x: 2250, z: 4000, r: 260, y: 30 },
-  { kind: 'village', name: 'Fernwick', x: 3350, z: 5950, r: 110, y: 24 },
-  { kind: 'village', name: 'Mossford', x: 4650, z: 6100, r: 110, y: 22 },
-  { kind: 'village', name: 'Emberfield', x: 1700, z: 5050, r: 110, y: 26 },
-  { kind: 'village', name: 'Larkrest', x: 5450, z: 3650, r: 110, y: 34 },
-  { kind: 'village', name: 'Hollowbrook', x: 3050, z: 3250, r: 110, y: 28 },
+  { kind: 'city', name: 'Aurelgate', boss: 'marshal', x: 5400, z: 5000, r: 900, y: 36 },
+  { kind: 'city', name: 'Thornmere', boss: 'thornqueen', x: 2250, z: 4000, r: 780, y: 30 },
+  { kind: 'village', name: 'Fernwick', x: 3350, z: 5950, r: 220, y: 24 },
+  { kind: 'village', name: 'Mossford', x: 4650, z: 6100, r: 220, y: 22 },
+  { kind: 'village', name: 'Emberfield', x: 1700, z: 5050, r: 220, y: 26 },
+  { kind: 'village', name: 'Larkrest', x: 5450, z: 3650, r: 220, y: 34 },
+  { kind: 'village', name: 'Hollowbrook', x: 3050, z: 3250, r: 220, y: 28 },
   { kind: 'bandit', name: 'Redfang Camp', x: 2250, z: 6150, r: 75, y: 22 },
   { kind: 'bandit', name: 'Crow\'s Rest', x: 4150, z: 6750, r: 75, y: 20 },
   { kind: 'bandit', name: 'Ashpit Camp', x: 6100, z: 4450, r: 75, y: 44 },

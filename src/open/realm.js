@@ -3,6 +3,7 @@ import { NATIONS, nationAt } from './nations.js';
 import { DOCTRINES, FIELD } from './doctrines.js';
 import { TIERS, tierOf, namePlace, nameCaptain } from './settlements.js';
 import Economy, { GOODS, ESTATE_TIER } from './economy.js';
+import { limitOf } from './cityPlan.js';
 
 // The living country. Time passes whether the hero is near or not: nations earn and spend,
 // choose what to do, send armies, raise forts and fight each other, while people settle the
@@ -37,11 +38,6 @@ const SWAY_FROM = 0.72, SWAY_BY = 0.56;
 const clamp = (v) => Math.max(0, Math.min(1, v));
 
 // Every place has its own natural size: most stay small, a few have the room to become great.
-function limitOf(s) {
-  if (s.fixed) return s.pop < 200 ? 300 : 1000;
-  const roll = (s.name.charCodeAt(0) * 37 + s.name.charCodeAt(1) * 11 + s.name.length * 53) % 100;
-  return roll < 45 ? 60 : roll < 72 ? 180 : roll < 92 ? 500 : 1000;
-}
 
 export default class Realm {
   constructor(world) {

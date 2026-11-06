@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TYPES } from './cityPlan.js';
 
 // Buildings. Every people builds its own way, so you can tell whose land you're on from the
 // rooftops. Each style paints one sheet of walls, roof and trim on a canvas, and every house of
@@ -230,9 +231,12 @@ class Shell {
 }
 
 // One storey or two, a roof across the width, and what the style adds.
-function shapeHouse(st, shape) {
-  const s = new Shell(), W = HALF_W, D = HALF_D, low = st.stilts ? 0.32 : 0.1, storeys = shape === 1 || shape === 3 ? 1.5 : 1, top = low + st.tall * storeys;
-  const rise = W * st.pitch, peak = top + rise, E = EAVE, wings = shape === 2;
+// `type`: a building type from cityPlan.js, which sets its footprint and storeys.
+function shapeHouse(st, shape, type = 'house') {
+  const t = TYPES[type] ?? TYPES.house, plain = type === 'house';
+  const s = new Shell(), W = HALF_W * (t.w / TYPES.house.w), D = HALF_D * (t.d / TYPES.house.d), low = st.stilts ? 0.32 : 0.1;
+  const storeys = plain ? (shape === 1 || shape === 3 ? 1.5 : 1) : t.storeys, top = low + st.tall * storeys;
+  const rise = W * st.pitch, peak = top + rise, E = EAVE, wings = shape === 2 && plain;
   if (st.stilts) {
     for (const [x, z] of [[-W, -D], [W, -D], [-W, D], [W, D], [0, D], [0, -D]]) s.box(x * 0.92, 0, z * 0.92, 0.09, low + 0.04, 0.09, TIMBER);
     s.box(0, low - 0.05, 0.08, W * 2.1, 0.05, D * 2.3, TIMBER);
@@ -267,7 +271,18 @@ function shapeHouse(st, shape) {
     s.quad([x + 0.26, 0, D * 0.7], [x + 0.26, 0, -D * 0.7], [x + 0.26, tall, -D * 0.7], [x + 0.26, tall, D * 0.7], SIDE, 1, 0.7);
     s.quad([x + 0.34, tall - 0.06, D * 0.8], [x + 0.34, tall - 0.06, -D * 0.8], [W, tall + 0.34, -D * 0.8], [W, tall + 0.34, D * 0.8], ROOF, 0.5, 0.4);
   }
-  if (shape === 3) {
+  // A chapel's bell tower over its door; an inn's sign; a barn's wide doors.
+  if (type === 'chapel') {
+    s.box(0, 0, D - 0.3, 0.7, peak + 0.4, 0.7, STONE);
+    const t2 = peak + 0.4;
+    s.quad([-0.45, t2, D + 0.15], [0.45, t2, D + 0.15], [0, t2 + 1.1, D - 0.3], [0, t2 + 1.1, D - 0.3], ROOF);
+    s.quad([0.45, t2, D + 0.15], [0.45, t2, D - 0.75], [0, t2 + 1.1, D - 0.3], [0, t2 + 1.1, D - 0.3], ROOF);
+    s.quad([0.45, t2, D - 0.75], [-0.45, t2, D - 0.75], [0, t2 + 1.1, D - 0.3], [0, t2 + 1.1, D - 0.3], ROOF);
+    s.quad([-0.45, t2, D - 0.75], [-0.45, t2, D + 0.15], [0, t2 + 1.1, D - 0.3], [0, t2 + 1.1, D - 0.3], ROOF);
+  }
+  if (type === 'inn') s.box(W * 0.6, low + st.tall * 0.85, D + 0.3, 0.42, 0.3, 0.06, TIMBER);
+  if (type === 'barn') s.box(0, 0, D + 0.02, W * 0.9, top * 0.75, 0.05, TIMBER);
+  if (shape === 3 && plain) {
     // A watch turret at one corner.
     s.box(-W * 0.62, top, D * 0.55, 0.62, st.tall * 0.8, 0.62, STONE);
     const t = top + st.tall * 0.8;
@@ -293,16 +308,87 @@ function style(id) {
   map.colorSpace = emissiveMap.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = 4;
   const material = new THREE.MeshLambertMaterial({ map, emissiveMap, emissive: '#ffffff', emissiveIntensity: 0 });
-  made[id] = { material, shapes: Array.from({ length: SHAPES }, (_, i) => shapeHouse(st, i)) };
+  made[id] = { material, st, shapes: new Map() };
   return made[id];
 }
 
 // `seed` picks which of the style's houses this is, the same one every visit.
-export function makeBuilding(id, seed) {
-  const s = style(id), mesh = new THREE.Mesh(s.shapes[seed % SHAPES], s.material);
+function shapeOf(s, seed, type) {
+  const k = `${type}${seed % SHAPES}`;
+  if (!s.shapes.has(k)) s.shapes.set(k, shapeHouse(s.st, seed % SHAPES, type));
+  return s.shapes.get(k);
+}
+
+export function makeBuilding(id, seed, type = 'house') {
+  const s = style(id), mesh = new THREE.Mesh(shapeOf(s, seed, type), s.material);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
+}
+
+// Every house of one look in one place is drawn as one batch (an InstancedMesh), so a city of a
+// thousand houses is a few dozen draw calls. Each house gets a stand-in that moves and hides its
+// own instance, so the rest of the game can treat it as one object.
+const batches = new Map(), HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
+class Standin extends THREE.Object3D {
+  constructor(batch, index) {
+    super();
+    this.batch = batch;
+    this.index = index;
+    this.matrixAutoUpdate = false;
+  }
+
+  get visible() {
+    return this.shown ?? true;
+  }
+
+  set visible(v) {
+    this.shown = v;
+    this.sync();
+  }
+
+  // Writes this house's place into its batch. Call after moving it.
+  sync() {
+    if (!this.batch) return;
+    this.updateMatrix();
+    this.batch.mesh.setMatrixAt(this.index, this.shown === false ? HIDDEN : this.matrix);
+    this.batch.mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
+function batchFor(scene, cluster, id, seed, type) {
+  const k = `${cluster}|${id}|${type}|${seed % SHAPES}`;
+  let b = batches.get(k);
+  if (!b) {
+    const s = style(id);
+    b = { scene, count: 0, mesh: null, geometry: shapeOf(s, seed, type), material: s.material };
+    batches.set(k, b);
+  }
+  if (!b.mesh || b.count >= b.mesh.instanceMatrix.count) {
+    const cap = Math.max(16, (b.mesh?.instanceMatrix.count ?? 8) * 2), mesh = new THREE.InstancedMesh(b.geometry, b.material, cap);
+    mesh.castShadow = mesh.receiveShadow = true;
+    if (b.mesh) {
+      mesh.instanceMatrix.array.set(b.mesh.instanceMatrix.array);
+      scene.remove(b.mesh);
+      b.mesh.dispose();
+    }
+    mesh.count = b.count;
+    b.mesh = mesh;
+    scene.add(mesh);
+  }
+  return b;
+}
+
+// A building placed in the world, batched with its kind: returns its stand-in.
+export function placeBuilding(scene, cluster, id, seed, type, x, y, z, rot, scale) {
+  const b = batchFor(scene, cluster, id, seed, type), stand = new Standin(b, b.count++);
+  b.mesh.count = b.count;
+  stand.position.set(x, y, z);
+  stand.rotation.y = rot;
+  stand.scale.setScalar(scale);
+  stand.sync();
+  b.mesh.computeBoundingSphere();
+  return stand;
 }
 
 // Windows come on as the light goes.

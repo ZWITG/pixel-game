@@ -1,4 +1,5 @@
 import { height, biome, region, roadDistance, forest, dentAt, PLACES, TOWNS, SPAWN } from './terrain.js';
+import { streetDistance, plazaAt } from './cityPlan.js';
 
 // Working out what the land looks like: plain numbers, no three.js, so a worker can do it away
 // from the frame. Everything comes from the position, so it's the same each visit.
@@ -18,8 +19,9 @@ const ROCK_TINTS = [[0.69, 0.64, 0.67], [0.6, 0.64, 0.6], [0.66, 0.59, 0.55]], O
 // Trees stay out of these, so landmarks stand in the open.
 const CLEARINGS = [{ ...SPAWN, r: 70 }, PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }, ...TOWNS];
 // No grass through the paving of cities and village squares.
-const PAVED = TOWNS.filter((T) => T.kind === 'city' || T.kind === 'village').map((T) => ({ x: T.x, z: T.z, half: T.kind === 'city' ? T.r * 0.62 : 28 }));
-const paved = (x, z) => PAVED.some((T) => Math.abs(x - T.x) < T.half && Math.abs(z - T.z) < T.half);
+// Streets of every town are painted like roads (cityPlan.js), and its squares are paved.
+const paved = (x, z) => plazaAt(x, z);
+const way = (x, z) => Math.min(roadDistance(x, z), streetDistance(x, z));
 const rnd = (x, z, k) => {
   const v = Math.sin(x * 127.1 + z * 311.7 + k * 74.7) * 43758.5453;
   return v - Math.floor(v);
@@ -49,7 +51,7 @@ export function gridData(x0, z0, size, step, skirt) {
     bio[k * 3 + 2] = b[2];
     land[k * 2] = r[0];
     land[k * 2 + 1] = r[1];
-    road[k] = step <= 8 ? Math.min(ROAD_FAR, roadDistance(x, z)) : ROAD_FAR;
+    road[k] = step <= 8 ? Math.min(ROAD_FAR, way(x, z)) : ROAD_FAR;
   };
   for (let j = 0; j < v; j++) for (let i = 0; i < v; i++) {
     const k = j * v + i;
@@ -130,7 +132,7 @@ export function grassData(cx, cz) {
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const x = x0 + i * cell, z = z0 + j * cell;
     ys[j * n + i] = height(x, z);
-    bare[j * n + i] = roadDistance(x, z) < 5 || paved(x, z) ? 1 : 0;
+    bare[j * n + i] = way(x, z) < 5 || paved(x, z) ? 1 : 0;
   }
   const tones = [];
   for (let j = 0; j <= 2; j++) for (let i = 0; i <= 2; i++) tones.push([...biome(x0 + (i * CHUNK) / 2, z0 + (j * CHUNK) / 2), ...region(x0 + (i * CHUNK) / 2, z0 + (j * CHUNK) / 2)]);
