@@ -3,6 +3,7 @@ import Controls from '../systems/controls.js';
 import { prompt } from '../ui/glyphs.js';
 import { FEATURES } from '../config/features.js';
 import { height, smoothHeight, SPAWN } from './terrain.js';
+import { SADDLE, RIDE } from './animals.js';
 import HeroModel, { LOOKS } from './hero3d.js';
 import Compass from './compass.js';
 import { reachPin, SATCHEL_TAB } from './gameMenu.js';
@@ -165,9 +166,15 @@ export default class Player {
       return false;
     }
     const door = !rooms.house && !swim.inWater && world.work.door(state);
-    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.events?.spot(this) ?? world.fairs?.spot(this) ?? world.roadside?.spot(this) ?? world.caravans.spot(this) ?? world.people.spot(this) ?? world.caravans.market(this);
+    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.animals?.spot(this) ?? world.events?.spot(this) ?? world.fairs?.spot(this) ?? world.roadside?.spot(this) ?? world.caravans.spot(this) ?? world.people.spot(this) ?? world.caravans.market(this);
     // With Destructive Blow, the button waits to see if it's a tap or a hold (see updateCharge).
     const fights = !rooms.house || rooms.house.hostile;
+    // On horseback: Circle gets you down. Anywhere: the whistle calls your horse.
+    if (just.whistle) world.animals?.whistle(this);
+    if (state.riding && just.roll) {
+      world.animals.dismount(this);
+      just.roll = false;
+    }
     if (fights && !swim.inWater) {
       if (just.roll) {
         const m = this.controls.move(), yaw = world.viewYaw(this), sy = Math.sin(yaw), cy = Math.cos(yaw);
@@ -334,7 +341,7 @@ export default class Player {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
       // Walking sideways slowly brings the camera round behind the hero.
       if (!world.together && !rooms.house && this.looked > LOOK_RESPECT) aim.yaw -= m.x * TURN_WITH_MOVE * dt;
-      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale * this.nature.stride()) * amount * (melee.charging || melee.guarding ? CHARGE_SLOW : melee.held ? HOLD_SLOW : 1);
+      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = state.riding ? world.animals.speed(this, sprint, dt) * amount : (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale * this.nature.stride()) * amount * (melee.charging || melee.guarding ? CHARGE_SLOW : melee.held ? HOLD_SLOW : 1);
       const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
       if (state.pace > 0) {
         // A hard turn at speed costs you: momentum has to go somewhere.
@@ -360,7 +367,7 @@ export default class Player {
       if (walled) {
         if (!world.voxels.blocks(nx, state.y + state.air, state.z)) state.x = nx;
         else if (!world.voxels.blocks(state.x, state.y + state.air, nz)) state.z = nz;
-      } else if (state.air > 2 || swim.inWater || state.onWater || (steep < body.climbLimit && (FEATURES.swimming || !wet))) {
+      } else if (state.air > 2 || swim.inWater || state.onWater || (steep < (state.riding ? RIDE.climb : body.climbLimit) && (FEATURES.swimming || !wet))) {
         state.x = nx;
         state.z = nz;
         if (steep > CLIMB_START && !state.air) skills.add('climbing', dt);
@@ -551,6 +558,7 @@ export default class Player {
     if (melee.slam > 0) return [state.moving ? 'throw' : 'slam', 0.25];
     if (melee.guarding) return ['guard', 0.05];
     if (melee.charging) return [melee.charge < 0.4 ? 'charge' : melee.charge < 0.8 ? 'gather' : 'peak', 0.08 - melee.charge * 0.18];
+    if (state.riding && state.air < 1.5) return ['ride', 0.05, { gallop: state.riding.galloping }];
     if (state.flying) return ['fly', state.moving ? 1.25 : 0.2];
     if (state.air > 0.4) {
       if (state.rise > 1) return ['rising', 0.1];
@@ -567,7 +575,7 @@ export default class Player {
   pose(camera, time) {
     const { state, swim, melee, hero } = this;
     // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
-    const heroY = swim.inWater ? -1.2 * this.body.heroScale + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air + melee.lift + (this.stepOff ?? 0);
+    const heroY = swim.inWater ? -1.2 * this.body.heroScale + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air + melee.lift + (this.stepOff ?? 0) + (state.riding ? SADDLE : 0);
     const pose = melee.pose, [name, lean, options] = this.motion(pose, time);
     hero.update(state.x, heroY, state.z, state.dir, name, lean, time, options);
     hero.punch(pose, pose?.chain === 1 ? 1 : 0);

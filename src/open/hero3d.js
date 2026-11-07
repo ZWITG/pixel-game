@@ -112,6 +112,7 @@ const POSES = {
   // A slow, heavy breath: chest forward, chin down, fists held away from the body, watching.
   idle: (p, t) => set(p, { waist: 0.07, chest: 0.04 + Math.sin(t * 1.3) * 0.022, head: 0.16 + Math.sin(t * 0.5) * 0.03, ax0: 0.06, ax1: 0.06, as0: 0.34 + Math.sin(t * 1.3) * 0.015, as1: 0.34 + Math.sin(t * 1.3) * 0.015, ae0: 0.32, ae1: 0.32, ls0: 0.11, ls1: 0.11 }),
   walk: (p, t) => { gait(p, t * 7.5, 0.55, 0.85, 0.5, 0.35); p.waist = 0.04; },
+  ride: (p, t, arm, o) => set(p, { air: 1, lx0: 1.25, lx1: 1.25, lk0: 1.55, lk1: 1.55, ls0: 0.42, ls1: 0.42, waist: o?.gallop ? 0.38 : 0.12, chest: (o?.gallop ? 0.1 : 0) + Math.sin(t * (o?.gallop ? 14 : 6)) * 0.03, head: o?.gallop ? -0.25 : 0.05, ax0: 0.85, ax1: 0.85, as0: 0.18, as1: 0.18, ae0: 1.1, ae1: 1.1 }),
   run: (p, t) => { gait(p, t * 12, 0.95, 1.5, 0.9, 1.45, 0.12); p.waist = 0.14; },
   dash: (p, t) => { gait(p, t * 22, 1.15, 1.8, 0, 0.2, 0.15); set(p, { ax0: -1.25, ax1: -1.25, as0: 0.2, as1: 0.2, waist: 0.2, head: -0.25 }); },
   swim: (p, t) => {
@@ -603,7 +604,8 @@ export default class HeroModel {
   }
 
   // What's needed each view: the figure is posed once per frame however many screens show it.
-  update(x, y, z, dir, name, lean, time, { arm = 0, run = 1 } = {}) {
+  update(x, y, z, dir, name, lean, time, options = {}) {
+    const { arm = 0, run = 1 } = options;
     const dt = Math.min(0.05, time - this.lastTime);
     if (dt <= 0) {
       this.mesh.position.set(x, y, z);
@@ -611,7 +613,7 @@ export default class HeroModel {
     }
     this.lastTime = time;
     const goal = Object.assign(this.goal, blank());
-    POSES[name](goal, time * run, arm);
+    POSES[name](goal, time * run, arm, options);
     const k = 1 - Math.exp(-dt * (name === 'punch' || name === 'windup' || name === 'uppercut' || name === 'hurt' ? EASE_FAST : EASE));
     const p = this.pose;
     for (const key in goal) p[key] += (goal[key] - p[key]) * k;

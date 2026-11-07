@@ -257,6 +257,8 @@ export default class Roadside {
       return undefined;
     } });
     rows.push({ label: 'Ask what travellers have been saying', act: () => hud.message(this.rumour(h, p)) });
+    const animals = this.world.animals;
+    if (animals) rows.push({ label: `Buy a saddled horse from the stable: ${animals.price} gold${animals.steed ? ' (your own goes back to the wild)' : ''}`, done: true, act: () => animals.buy(h) });
     const town = this.market(p);
     if (town) rows.push({ label: `Trade (prices as in ${town.name})`, act: () => h.market.open({ place: town }) });
     rows.push({ label: 'Leave', done: true, act: () => {} });

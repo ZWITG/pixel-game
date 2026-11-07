@@ -27,7 +27,8 @@ export const ACTIONS = {
   guard: { keys: ['KeyG'], pad: ['L2'] },                // held
   roll: { keys: ['KeyK'], pad: ['CIRCLE'] },
   target: { keys: ['KeyT'], pad: ['R3'] },
-  pack: { keys: ['KeyI'], pad: ['TRIANGLE'] },           // open world: the Satchel
+  pack: { keys: ['KeyI'], pad: ['TRIANGLE'] },
+  whistle: { keys: ['KeyH'], pad: ['L3'] },            // open world: call your horse           // open world: the Satchel
   packTab: { keys: ['Tab'], pad: ['L1', 'R1'] },
   jump: { keys: ['Space'], pad: ['CROSS'] },             // open world; a door in reach goes first
   lock: { keys: ['KeyQ', 'Tab'], pad: ['L2', 'R3'] },

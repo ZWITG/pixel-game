@@ -22,6 +22,7 @@ import Smoke, { FireLights } from './smoke.js';
 import Roadside from './roadside.js';
 import Fairs from './fairs.js';
 import Events from './events.js';
+import Animals from './animals.js';
 import { useVoxels, cut } from './raze.js';
 import Quake from './quake.js';
 import StartMenu, { loadSettings } from './startMenu.js';
@@ -143,6 +144,7 @@ world.fireLights = FEATURES.atmosphere ? new FireLights(scene) : null;
 world.roadside = FEATURES.roadside ? new Roadside(scene, world) : null;
 world.fairs = FEATURES.fairs ? new Fairs(scene, world) : null;
 world.events = FEATURES.fairs ? new Events(scene, world) : null;
+world.animals = FEATURES.animals ? new Animals(scene, world) : null;
 world.scars = new Scars(world);
 world.pick = new ConquerorPick();
 world.sites = new Sites(scene, monsters, work, players);
@@ -320,6 +322,7 @@ function buttonRows(usePad) {
     [p('roll'), 'Roll'],
     [p('target'), 'Lock on'],
     [p('pack'), 'Satchel'],
+    [p('whistle'), 'Call your horse'],
     [usePad ? btn('D-pad') : `${key('Digit1')}${key('Digit2')}${key('Digit3')}${key('Digit4')}`, 'Powers'],
     [p('pause'), 'Menu'],
   ];
@@ -661,6 +664,7 @@ function step(dt) {
     world.roadside?.update(dt);
     world.fairs?.update(dt);
     world.events?.update(dt);
+    world.animals?.update(dt);
     world.fireLights?.update(dt, [...(world.voxels?.fires ?? []), ...world.scars.fires()], players[0].state);
     world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);
