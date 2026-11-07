@@ -419,8 +419,8 @@ export default class Melee {
     if ((this.active && !this.active.landed) || this.rolling > 0 || state.air) return undefined; // the follow-through can be cut short
     const e = this.monsters.within(state.x, state.z, GRAB_REACH).sort((a, b) => Math.hypot(a.x - state.x, a.z - state.z) - Math.hypot(b.x - state.x, b.z - state.z))[0];
     if (!e) return undefined;
-    // Big ones must be dazed first, unless you outweigh them.
-    if (e.boss || ((e.def.name.startsWith('Elder') || e.tier >= 4) && e.mode !== 'reeling' && this.body.massScale < 4)) {
+    // Big ones must be dazed first, unless you're far along enough to lift them anyway.
+    if (e.boss || ((e.def.name.startsWith('Elder') || e.tier >= 4) && e.mode !== 'reeling' && this.body.level < 60)) {
       this.hud.float('Too heavy!', e.x, e.group.position.y + 4, e.z, '#ff7a6a');
       return undefined;
     }

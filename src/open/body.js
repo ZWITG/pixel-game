@@ -4,7 +4,6 @@ export const ATTRIBUTES = {
   strength: { name: 'Strength', color: '#ff8a4c', icon: 'fist' },
   speed: { name: 'Speed', color: '#ffe27a', icon: 'boot' },
   endurance: { name: 'Endurance', color: '#7fe38a', icon: 'heart' },
-  mass: { name: 'Mass', color: '#c9a0ff', icon: 'anvil', full: 300 },
 };
 
 const BASE_CLIMB = 1.0;  // steepest slope (rise per tile) a beginner can walk up
@@ -28,7 +27,8 @@ export default class Body {
   get strength() { return this.skills.attribute('strength'); }
   get speed() { return this.skills.attribute('speed'); }
   get endurance() { return this.skills.attribute('endurance'); }
-  get mass() { return this.skills.attribute('mass') + this.bonus('mass'); }
+  // Mass no longer grows with training (v0.31.2): a body is 60, and only heavy gear adds to it.
+  get mass() { return 60 + this.bonus('mass'); }
 
   // Movement, on land and in water. Early points of Speed add about 1.5% each, then it levels
   // off, so a sprint stays a sprint and Superspeed always has room above it.
@@ -40,12 +40,12 @@ export default class Body {
   get breathScale() { return (1 + (this.endurance - 10) * 0.03) * (1 + this.bonus('breath')); }
   // Strength lets the hero haul up steeper ground.
   get climbLimit() { return BASE_CLIMB + (this.strength - 10) * 0.03 + (this.nature?.climb ?? 0); }
-  // Mass is how much hero there is. Compared to a beginner's 60: it multiplies every blow,
-  // spreads shockwaves, softens hits and shrugs off knockback, and the hero visibly grows.
+  // Heavy gear against a bare body's 60: it adds to every blow, spreads shockwaves and softens hits.
   get massScale() { return this.mass / 60; }
   // The hero's level: their whole build, before gear. Monsters evolve against it.
   get level() { return this.skills.heroLevel(); }
-  get heroScale() { return (1 + Math.min(0.6, (this.mass - 60) * 0.004)) * (this.conq?.size ?? 1); }
+  // The hero grows a little as they rise, up to a quarter again by level 60.
+  get heroScale() { return (1 + Math.min(0.25, (this.level - 1) * 0.004)) * (this.conq?.size ?? 1); }
   // Heavy enough, and just landing from a jump shakes the ground. Tiles of reach, 0 for none.
   get stompReach() { return Math.max(0, (this.mass - 90) * 0.06); }
   get maxHealth() { return (20 + (this.endurance - 10) * 2.5) * (this.conq?.health ?? 1) + this.bonus('health'); }

@@ -74,8 +74,8 @@ const BLOWS = 7, trains = (id, name) => SKILLS[id].trains[name] ?? 0;
 const perKill = (level, old) => {
   const tier = tierFor(level), punching = BLOWS, fighting = old ? BLOWS + 3 * (1 + tier) : BLOWS * COMBAT.xp.hit + COMBAT.xp.kill.fighter * (1 + tier * COMBAT.xp.tier);
   const pace = old ? 1 : paceAt(level), d = (name) => (punching * trains('punching', name) + fighting * trains('fighting', name)) * pace;
-  const mass = d('strength') * 1.5 + d('endurance') * 1.2 + fighting * pace * 0.3;
-  return mass / 18 + d('speed') / 10;
+  const build = d('strength') * 1.5 + d('endurance') * 1.2 + fighting * pace * 0.3;
+  return build / 18 + d('speed') / 10;
 };
 console.log('  level   kills now   kills before');
 const kills = {};

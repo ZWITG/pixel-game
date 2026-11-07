@@ -61,7 +61,7 @@ export const ICONS = {
   heart: ['.........', '.##...##.', '####.####', '#########', '#########', '.#######.', '..#####..', '...###...', '....#....'],
 };
 const DIGITS = ['###,#.#,#.#,#.#,###', '.#.,##.,.#.,.#.,###', '###,..#,###,#..,###', '###,..#,.##,..#,###', '#.#,#.#,###,..#,..#', '###,#..,###,..#,###', '###,#..,###,#.#,###', '###,..#,.#.,.#.,.#.', '###,#.#,###,#.#,###', '###,#.#,###,..#,###'].map((d) => d.split(','));
-const ATTR_ORDER = ['strength', 'speed', 'endurance', 'mass'];
+const ATTR_ORDER = ['strength', 'speed', 'endurance'];
 const ATTR_FULL = 100; // gauges fill at this value, for now
 
 // Bough paths on the 320 x 180 map. `out`: which way left/right moves toward the tip.

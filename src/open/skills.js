@@ -150,11 +150,12 @@ export const SKILLS = {
 for (const [id, skill] of Object.entries(SKILLS)) skill.id = id;
 
 export const ATTRIBUTE_START = 10;
-// Mass isn't trained directly: it builds on a stronger, tougher body and on time spent fighting.
-const MASS = { start: 60, strength: 1.5, endurance: 1.2, fighting: 0.3 };
+// The hero's level is their whole build: Strength, Endurance and time spent fighting, in units of
+// 18, plus Speed in units of 10. (This was Mass until v0.31.2, so old heroes keep their level.)
+const BUILD = { strength: 1.5, endurance: 1.2, fighting: 0.3, per: 18, speed: 10 };
 // The body grows ever slower as the hero rises: practice still earns skill levels and power ranks
-// at full rate, but only 1 / (1 + (level - 1) / LEVEL_PACE) of it builds Strength, Speed, Endurance
-// and Mass, which are what the hero's level is made of. Raise LEVEL_PACE to level faster.
+// at full rate, but only 1 / (1 + (level - 1) / LEVEL_PACE) of it builds Strength, Speed and
+// Endurance, which with Fighting are what the hero's level is made of. Raise LEVEL_PACE to level faster.
 export const LEVEL_PACE = 3;
 export const paceAt = (level) => 1 / (1 + Math.max(0, level - 1) / LEVEL_PACE);
 const SAVE_EVERY = 2000; // ms; practice ticks every frame
@@ -187,10 +188,6 @@ export default class Skills {
 
   // Attributes are worked out from trained practice, so they can never drift from what you've done.
   attribute(name) {
-    if (name === 'mass') {
-      return MASS.start + (this.attribute('strength') - ATTRIBUTE_START) * MASS.strength
-        + (this.attribute('endurance') - ATTRIBUTE_START) * MASS.endurance + (this.trained.fighting ?? 0) * MASS.fighting;
-    }
     let value = ATTRIBUTE_START;
     for (const [id, skill] of Object.entries(SKILLS)) value += (this.trained[id] ?? 0) * (skill.trains[name] ?? 0);
     return value;
@@ -198,12 +195,13 @@ export default class Skills {
 
   // The hero's level: their whole build, before gear. Monsters evolve against it.
   heroLevel() {
-    return 1 + Math.floor((this.attribute('mass') - MASS.start) / 18 + (this.attribute('speed') - ATTRIBUTE_START) / 10);
+    const build = (this.attribute('strength') - ATTRIBUTE_START) * BUILD.strength + (this.attribute('endurance') - ATTRIBUTE_START) * BUILD.endurance + (this.trained.fighting ?? 0) * BUILD.fighting;
+    return 1 + Math.floor(build / BUILD.per + (this.attribute('speed') - ATTRIBUTE_START) / BUILD.speed);
   }
 
   add(id, amount) {
     const skill = SKILLS[id], before = this.level(id);
-    const whole = [...Object.keys(skill.trains), 'mass'].map((a) => [a, Math.floor(this.attribute(a))]);
+    const whole = Object.keys(skill.trains).map((a) => [a, Math.floor(this.attribute(a))]);
     this.trained[id] = (this.trained[id] ?? 0) + amount * paceAt(this.heroLevel());
     this.practice[id] = (this.practice[id] ?? 0) + amount;
     const after = this.level(id);
