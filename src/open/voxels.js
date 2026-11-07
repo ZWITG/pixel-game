@@ -32,6 +32,10 @@ const STEP_UP = 1.1;                 // tiles a hero can step up onto rubble or 
 const BODY = [0.5, 1.4, 2.3];        // heights at which a hero's body meets walls
 const PIECE = 7;                     // voxels across a piece when a whole structure comes down
 const MESHES_PER_FRAME = 4;
+// Fire in timber: how long a cube burns, the chance a tick that it lights each neighbour (more
+// upward), the most cubes alight at once, how often fire is worked out, and how dark it chars.
+const BURN_TIME = 5, CATCH = 0.14, CATCH_UP = 0.3, MOST_BURNING = 1800, FIRE_TICK = 0.25, CHAR = 0.32;
+const GLASS = MATERIALS.findIndex((m) => m?.name === 'glass');
 const BIG = 60000, WINDOW = 12;     // cells past which a volume checks support only near a cut, and how far round it
 const SECTOR_NEAR = 330, SECTOR_FAR = 480, STONE_VOXEL = 1; // city walls and castles: tiles, and their coarser voxels
 const HOUSE_NEAR = 170, HOUSE_FAR = 240, MOST_HOUSES = 36, HOUSE_CHECK = 0.5; // tiles; houses become voxels near a hero
@@ -266,6 +270,8 @@ export default class Voxels {
     this.bits.castShadow = true;
     scene.add(this.bits);
     this.flying = [];
+    this.burning = new Set();
+    this.fires = [];
     this.towns = TOWNS; // for debugging: the walled places this works on
     // Draw one of each kind far under the ground from the start, so their shaders are ready
     // before the first wall comes down (the first collapse otherwise stalls a quarter second).
@@ -359,6 +365,110 @@ export default class Voxels {
     if (!this.queue.includes(entry)) this.queue.push(entry);
   }
 
+  // ---- fire ----
+  // Fire reaches a structure: the timber within `r` of the point catches (thatch, wood).
+  ignite(x, y, z, r, hero) {
+    for (const e of this.list) {
+      if (!e.ready || e.owner.dig || !e.at) continue;
+      if (Math.abs(e.at.x - x) > e.reach + r || Math.abs(e.at.z - z) > e.reach + r) continue;
+      e.group.updateMatrixWorld(true);
+      const vol = e.vol, l = e.group.worldToLocal(new THREE.Vector3(x, y, z)), [ci, cj, ck] = vol.cell(l.x, l.y, l.z), span = Math.ceil(r / vol.s);
+      let lit = 0;
+      for (let k = Math.max(0, ck - span); k <= Math.min(vol.nz - 1, ck + span) && lit < 12; k++) {
+        for (let j = Math.max(0, cj - span); j <= Math.min(vol.ny - 1, cj + span) && lit < 12; j++) {
+          for (let i = Math.max(0, ci - span); i <= Math.min(vol.nx - 1, ci + span) && lit < 12; i++) {
+            const at = vol.at(i, j, k), m = vol.mat[at];
+            if (!m || !MATERIALS[m].burns || e.fire?.has(at) || (i - ci) ** 2 + (j - cj) ** 2 + (k - ck) ** 2 > span * span) continue;
+            (e.fire ??= new Map()).set(at, -1);
+            lit++;
+          }
+        }
+      }
+      if (lit) {
+        e.burner = hero ?? e.burner;
+        this.burning.add(e);
+      }
+    }
+  }
+
+  // Every tick: burning cubes char, light their neighbours and burn away; what they held falls.
+  // Flames lick from the burning cubes, smoke rises from each burning structure, and its centre
+  // goes in `fires` for the fire light.
+  burn(dt) {
+    if ((this.fireWait = (this.fireWait ?? 0) - dt) > 0) return;
+    this.fireWait = FIRE_TICK;
+    this.fires = [];
+    let total = 0;
+    for (const e of this.burning) total += e.fire.size;
+    for (const e of [...this.burning]) {
+      const vol = e.vol, { nx, ny } = vol, layer = nx * ny, gone = [], lit = [];
+      let sx = 0, sy = 0, sz = 0, n = 0, changed = false;
+      for (const [at, t] of e.fire) {
+        if (!vol.mat[at]) {
+          e.fire.delete(at);
+          continue;
+        }
+        if (t < 0) {
+          // Catching: the cube goes black, a little red in it.
+          const c = vol.col[at];
+          vol.col[at] = (Math.round(((c >> 16) & 255) * CHAR + 30) << 16) | (Math.round(((c >> 8) & 255) * CHAR + 8) << 8) | Math.round((c & 255) * CHAR);
+          changed = true;
+        }
+        const now = Math.max(0, t) + FIRE_TICK;
+        if (now > BURN_TIME * (0.7 + ((at * 2654435761) % 997) / 1660)) {
+          gone.push(at);
+          e.fire.delete(at);
+          continue;
+        }
+        e.fire.set(at, now);
+        const k = Math.floor(at / layer), rest = at - k * layer, j = Math.floor(rest / nx), i = rest - j * nx;
+        for (const [d, ok, up] of [[1, i < nx - 1, 0], [-1, i > 0, 0], [nx, j < ny - 1, 1], [-nx, j > 0, 0], [layer, k < vol.nz - 1, 0], [-layer, k > 0, 0]]) {
+          const to = at + d, m = vol.mat[to];
+          if (!ok || !m || !MATERIALS[m].burns || e.fire.has(to) || total >= MOST_BURNING) continue;
+          if (Math.random() < (up ? CATCH_UP : CATCH)) {
+            lit.push(to);
+            total++;
+          }
+        }
+        if (n < 400) {
+          const [px, py, pz] = vol.centre(i, j, k);
+          sx += px;
+          sy += py;
+          sz += pz;
+          n++;
+        }
+      }
+      for (const at of lit) if (!e.fire.has(at)) e.fire.set(at, -1);
+      if (gone.length) {
+        for (const at of gone) vol.mat[at] = 0;
+        const k = Math.floor(gone[0] / layer), rest = gone[0] - k * layer, j = Math.floor(rest / nx), i = rest - j * nx;
+        const loose = vol.unsupported(vol.mat.length > BIG ? vol.window(i, j, k, WINDOW + 6) : null);
+        e.group.updateMatrixWorld(true);
+        const at = e.group.localToWorld(new THREE.Vector3(...vol.centre(i, j, k)));
+        if (loose.length) this.drop(e, vol.pieces(loose), e.burner, at.x, at.y, at.z);
+        e.left = vol.count() / vol.total;
+        changed = true;
+      }
+      if (changed) this.remesh(e);
+      if (n) {
+        e.group.updateMatrixWorld(true);
+        const c = e.group.localToWorld(new THREE.Vector3(sx / n, sy / n, sz / n)), strength = Math.min(3, 0.4 + e.fire.size / 120);
+        this.fires.push({ x: c.x, y: c.y, z: c.z, strength });
+        this.world.smoke?.column(c.x, c.y + 1, c.z, strength, 1.5);
+        // Flames from a handful of the burning cubes.
+        let shown = 0;
+        for (const at of e.fire.keys()) {
+          if (shown++ > 5 + strength * 3) break;
+          if (Math.random() < 0.5) continue;
+          const k = Math.floor(at / layer), rest = at - k * layer, j = Math.floor(rest / nx), i = rest - j * nx;
+          const p = e.group.localToWorld(new THREE.Vector3(...vol.centre(i, j, k)));
+          this.world.fx?.flame(p.x, p.y - 0.3, p.z, 1.4 + Math.random() * 1.2 + strength * 0.4, 0.5 + Math.random() * 0.4, 0);
+        }
+      }
+      if (!e.fire.size) this.burning.delete(e);
+    }
+  }
+
   // ---- breaking them ----
   // A blow on a structure: cut, then let fall whatever has lost its support. `r` in tiles.
   hit(owner, x, y, z, r, hero, only, low) {
@@ -449,6 +559,13 @@ export default class Voxels {
     }
     const mats = [...new Set(out.slice(0, 30).map((o) => MATERIALS[o[4]].dust))];
     this.world.work.burst(x, y, z, mats, 10, 4);
+    this.world.smoke?.dust(x, y, z, mats[0], Math.min(3, out.length / 90), Math.min(5, 1 + out.length / 160));
+    // Glass bursts into glinting shards.
+    const glass = out.filter((o) => o[4] === GLASS);
+    if (glass.length) {
+      const [gx, gy, gz] = glass[0], at = entry.group.localToWorld(new THREE.Vector3(gx, gy, gz));
+      this.burst(at, 0xeefaff, Math.min(14, 4 + glass.length), 7);
+    }
   }
 
   burst(at, color, count, speed) {
@@ -469,6 +586,7 @@ export default class Voxels {
     }
     for (const c of this.chunks) if (!c.asleep) this.fall(c, dt);
     this.updateBits(dt);
+    this.burn(dt);
     if ((this.houseCheck = (this.houseCheck ?? 0) - dt) <= 0) {
       this.houseCheck = HOUSE_CHECK;
       this.houses();
@@ -588,6 +706,10 @@ export default class Voxels {
   land(c, speed) {
     const p = c.pivot.position, color = c.vol.col.find((x) => x) ?? 0xc9bcc4;
     this.world.work.burst(p.x, p.y, p.z, ['#c9bcc4', '#a89a8c', `#${color.toString(16).padStart(6, '0')}`], Math.min(10, 2 + c.count / 20), 2 + c.radius);
+    if (!c.dusted) {
+      c.dusted = true;
+      this.world.smoke?.dust(p.x, p.y, p.z, MATERIALS[c.vol.mat.find((m) => m) ?? 5]?.dust ?? '#c9bcc4', Math.min(3, c.count / 50), c.radius + 1);
+    }
     if (speed > SHATTER_SPEED && !c.hard) {
       c.hard = true;
       this.burst(p.clone(), color, Math.min(10, Math.floor(c.count / 10) + 2), 5);
@@ -662,6 +784,7 @@ export default class Voxels {
   forget(owner) {
     const e = owner.vox;
     if (!e) return;
+    this.burning.delete(e);
     this.list.splice(this.list.indexOf(e), 1);
     this.queue = this.queue.filter((q) => q !== e);
     e.mesh?.geometry.dispose();

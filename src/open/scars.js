@@ -233,6 +233,10 @@ export default class Scars {
   eatWorks() {
     const { sites } = this.world;
     for (const c of this.cells.values()) {
+      if (c.burn > 0) {
+        this.world.voxels?.ignite(c.x, c.y + 0.8, c.z, CELL * 0.7, c.owner);
+        this.world.smoke?.column(c.x, c.y, c.z, 0.5, 1.2);
+      }
       if (!c.owner) continue;
       if (c.burn > 0 || c.rupture > 0) {
         sites.scorch(c.x, c.z, c.owner.body.might * BURN_WORKS * c.owner.nature.pyromancy, c.owner);
@@ -240,6 +244,19 @@ export default class Scars {
       }
       else if (c.frost > 0.5) sites.chill(c.x, c.z);
     }
+  }
+
+  // Where the ground is burning, a few spots for the fire light: the burning cells, gathered
+  // into clumps a few cells wide.
+  fires() {
+    const out = [];
+    for (const c of this.cells.values()) {
+      if (c.burn <= 0) continue;
+      const near = out.find((f) => Math.hypot(f.x - c.x, f.z - c.z) < CELL * 4);
+      if (near) near.strength = Math.min(2, near.strength + 0.15);
+      else if (out.length < 8) out.push({ x: c.x, y: c.y, z: c.z, strength: 0.5 });
+    }
+    return out;
   }
 
   // Fire and rot set by a nation hurt the heroes who stand in them.

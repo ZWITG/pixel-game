@@ -18,6 +18,7 @@ import SplitView from './splitView.js';
 import Sites from './sites.js';
 import Voxels from './voxels.js';
 import Digs from './digs.js';
+import Smoke, { FireLights } from './smoke.js';
 import { useVoxels, cut } from './raze.js';
 import Quake from './quake.js';
 import StartMenu, { loadSettings } from './startMenu.js';
@@ -134,6 +135,8 @@ const shared2 = { yaw: 0, pitch: 0.2, recenter: null }; // the camera both heroe
 const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'morning', clock: 0.3, clockHold: 0, setTime, travel, splash };
 
 world.fx = new PowerFx(scene);
+world.smoke = FEATURES.atmosphere ? new Smoke(scene, sun, hemi) : null;
+world.fireLights = FEATURES.atmosphere ? new FireLights(scene) : null;
 world.scars = new Scars(world);
 world.pick = new ConquerorPick();
 world.sites = new Sites(scene, monsters, work, players);
@@ -648,6 +651,8 @@ function step(dt) {
     world.voxels?.update(dt);
     world.digs?.update(dt);
     world.fx.update(dt);
+    world.smoke?.update(dt);
+    world.fireLights?.update(dt, [...(world.voxels?.fires ?? []), ...world.scars.fires()], players[0].state);
     world.people.update(dt);
     for (const p of players) p.melee.update(dt, p.state);
     work.update(dt);
