@@ -30,6 +30,7 @@ import StartMenu, { loadSettings } from './startMenu.js';
 import GameMenu from './gameMenu.js';
 import ConquerorPick from './conquerorPick.js';
 import { PowerFx } from './powers.js';
+import Vfx from './vfx.js';
 import { CONQUERORS } from './conquerors.js';
 import Nations from './nations.js';
 import Scars from './scars.js';
@@ -56,6 +57,7 @@ const SLOW_MO = 0.35;                    // how fast the world runs in a slow-mo
 const PAUSED_FRAME = 0.1;                 // a frame this long is a hidden tab or a stall, not slowness
 const SCALE_WAIT = 2.5;                   // seconds between changes, since each one costs a hitch
 const CAMERA_DIST = 9.5;   // tiles behind the hero
+const CINE_PULL = 16;      // tiles further back while an ultimate plays
 const CAMERA_GROWTH = 5;   // extra distance per unit of hero scale, so a huge hero still fits
 const CAMERA_LIFT = 7;     // how fast the camera follows the ground up and down
 const LOOK_HEIGHT = 1.9;   // the point followed, above the feet
@@ -141,6 +143,7 @@ const shared2 = { yaw: 0, pitch: 0.2, recenter: null }; // the camera both heroe
 const world = { scene, renderer, chunks, work, monsters, marks, players, shared: shared2, together: false, paused: false, time: 'morning', clock: 0.3, clockHold: 0, setTime, travel, splash };
 
 world.fx = new PowerFx(scene);
+world.vfx = new Vfx(scene);
 world.smoke = FEATURES.atmosphere ? new Smoke(scene, sun, hemi) : null;
 world.fireLights = FEATURES.atmosphere ? new FireLights(scene) : null;
 world.roadside = FEATURES.roadside ? new Roadside(scene, world) : null;
@@ -464,7 +467,8 @@ function solidStop(ax, az, bx, bz) {
 // rather than hiding the way ahead. It eases after the hero, and climbs over hills behind them,
 // only moving in if it can't get high enough.
 function personal(p, dt) {
-  const s = p.state, big = p.body.heroScale, cp = Math.cos(s.pitch), eyeY = Math.max(s.y, -0.3);
+  // An ultimate pulls the camera back and up to take it all in.
+  const s = p.state, big = p.body.heroScale, cine = p.cine ?? 0, pitch = s.pitch + cine * 0.3, cp = Math.cos(pitch), eyeY = Math.max(s.y, -0.3);
   // A long jump in position (travel, waking up, doors) starts the camera fresh, not catching up.
   if (Math.hypot(s.x - (p.camX ?? s.x), s.z - (p.camZ ?? s.z)) > TELEPORT) p.camY = p.camLift = p.camDist = undefined;
   p.camX = s.x;
@@ -478,8 +482,8 @@ function personal(p, dt) {
   // Eased, so starting and stopping don't bump the camera.
   p.camRun = (p.camRun ?? 0) + ((s.moving ? 1 : 0) - (p.camRun ?? 0)) * Math.min(1, dt * 2);
   const room = players.length > 1 ? split.amount : 0;
-  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) + p.camRun * SPLIT_RUN * room + rush * RUSH_PULL;
-  const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(s.pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
+  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) + p.camRun * SPLIT_RUN * room + rush * RUSH_PULL + cine * CINE_PULL;
+  const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
   const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz);
   // Backed against a wall, it moves in and rises to look down past the shoulder.
   const open = inside || s.air > HIGH_UP ? 1 : solidStop(s.x, s.z, cx, cz), lift = Math.min(need, MAX_HILL_LIFT) + (1 - open) * WALL_RISE;
@@ -488,7 +492,7 @@ function personal(p, dt) {
   const want = Math.min(need > MAX_HILL_LIFT ? far * Math.max(0.45, MAX_HILL_LIFT / need) : far, far * Math.max(0.18, open));
   p.camDist = (p.camDist ?? want) + (want - (p.camDist ?? want)) * Math.min(1, dt * (want < (p.camDist ?? want) ? 10 : 2.5));
   const d = p.camDist;
-  tmp.set(s.x + Math.sin(s.yaw) * cp * d, lookY + Math.sin(s.pitch) * d + p.camLift, s.z + Math.cos(s.yaw) * cp * d);
+  tmp.set(s.x + Math.sin(s.yaw) * cp * d, lookY + Math.sin(pitch) * d + p.camLift, s.z + Math.cos(s.yaw) * cp * d);
   // At speed the bumps underfoot go past too quickly to follow, so the height is smoothed out.
   p.camHigh = rush > 0.02 ? (p.camHigh ?? tmp.y) + (tmp.y - (p.camHigh ?? tmp.y)) * Math.min(1, dt * (14 - rush * 6)) : tmp.y;
   tmp.y = p.camHigh;
@@ -626,6 +630,10 @@ function renderView(v, p, dir) {
   fin.uImpact.value = FEATURES.impactFrames && settings.impact !== false && work.impact > 0 ? 1 : 0;
   fin.uLines.value = Math.min(1, (work.lines ?? 0) * 4);
   fin.uTime.value = time;
+  const { mood } = world.vfx;
+  fin.uTint.value.copy(mood.color);
+  fin.uTintAmt.value = mood.amount;
+  fin.uGray.value = mood.gray;
   hemi.intensity = world.light.amb * (p.rooms.house?.dark ? CAVE_LIGHT : 1);
   v.post.render(dir);
 }
@@ -675,6 +683,7 @@ function step(dt) {
     world.voxels?.update(dt);
     world.digs?.update(dt);
     world.fx.update(dt);
+    world.vfx.update(dt);
     world.smoke?.update(dt);
     world.roadside?.update(dt);
     world.fairs?.update(dt);

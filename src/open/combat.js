@@ -58,6 +58,15 @@ export const COMBAT = {
   // Fighting practice: a little for each blow that lands (anything a wave reaches counts), more for
   // a kill, by role, a little more for evolved forms. See LEVEL_PACE in skills.js for the body.
   xp: { hit: 0.3, kill: { fodder: 1.5, fighter: 2.5, brute: 4, machine: 2, ruler: 25 }, tier: 0.25 },
+  // Wrath fills from fighting, 0..1 (ultimate.js). `hurt` is per share of the hero's health lost.
+  wrath: { hit: 0.008, smash: 0.015, execute: 0.06, perfect: 0.04, parry: 0.02, vanish: 0.02, kill: 0.025, hurt: 0.6 },
+  // Surge: seconds; Spirit a second; blows this much harder; powers cool this much faster; a sixth hit.
+  surge: { secs: 12, spirit: 0.25, power: 1.2, cool: 1.5, hit: 1.9, hitTime: 1.3 },
+  // Spirit Arts (spiritArts.js): a shot and a held beam, in blows and Spirit pips.
+  arts: {
+    shot: { power: 0.5, cost: 1 / 3, every: 0.18, speed: 70, range: 45 },
+    wave: { cost: 2, charge: 0.45, secs: 1.4, least: 0.4, tick: 0.1, power: 0.25, reach: 40, width: 2.2 },
+  },
 };
 
 export const ROLE_POSTURE = (role) => COMBAT.posture[role] ?? COMBAT.posture.fighter;

@@ -207,7 +207,8 @@ export default class Melee {
     }
     if (this.held) return this.pileDrive(state);
     if (this.broken > 0) return;
-    const air = this.inAir, table = air ? COMBAT.airChain : COMBAT.chain;
+    // In a Surge the chain runs to a sixth hit.
+    const air = this.inAir, table = air ? COMBAT.airChain : this.surging ? [...COMBAT.chain, COMBAT.surge.hit] : COMBAT.chain;
     if (this.idle >= COMBAT.chainWindow && !air) this.restart();
     let n = air ? this.airHits : this.hits;
     if (n >= table.length) {
@@ -216,7 +217,8 @@ export default class Melee {
       n = 0;
     }
     this.chain = n;
-    this.start(state, { kind: 'light', air, chain: n, last: n === table.length - 1, time: this.body.punchTime * (air ? 0.8 : COMBAT.chainTime[n]), hitAt: HIT_AT });
+    this.start(state, { kind: 'light', air, chain: n, mult: table[n], last: n === table.length - 1, time: this.body.punchTime * (air ? 0.8 : COMBAT.chainTime[n] ?? COMBAT.surge.hitTime), hitAt: HIT_AT });
+    if (this.surging) this.handTrail(n % 2, this.active.time);
   }
 
   // Triangle: a smash, which one depending on how far the chain has come; on a Broken foe, an Execute.
@@ -239,6 +241,24 @@ export default class Melee {
     }
     this.used.add(name);
     this.start(state, { kind: 'smash', name, air, power, chain: 4, time: def.time * (this.body.punchTime / 0.34), hitAt: SMASH_AT }, target);
+    this.handTrail(0, this.active.time);
+    this.handTrail(1, this.active.time);
+  }
+
+  get surging() {
+    return this.player.wrath?.surge > 0;
+  }
+
+  // Feeds the hero's Wrath (ultimate.js).
+  rage(amount) {
+    this.player.wrath?.gain(amount);
+  }
+
+  // A streak of light behind a fist for the length of a blow.
+  handTrail(arm, secs) {
+    const hero = this.player.hero, bone = hero.bones?.[`hand${arm}`];
+    if (!bone || !this.player.world.vfx) return;
+    this.player.world.vfx.trail((out) => bone.getWorldPosition(out), this.aura, 0.55 * this.body.heroScale, secs + 0.1);
   }
 
   start(state, move, target = this.pick(state)) {
@@ -275,7 +295,7 @@ export default class Melee {
 
   // A blow from this hero at their current punch, before the combo adds to it.
   get force() {
-    return PUNCHES[this.stage].power * this.body.damageScale * this.body.massScale;
+    return PUNCHES[this.stage].power * this.body.damageScale * this.body.massScale * (this.surging ? COMBAT.surge.power : 1);
   }
 
   // Rolls toward (x, z) in world terms, or the way the hero is facing.
@@ -366,6 +386,7 @@ export default class Melee {
       const d = Math.hypot(from.x - state.x, from.z - state.z) || 1, back = vanish.behind + (from.radius ?? 1);
       this.blink(state, from.x + ((from.x - state.x) / d) * back, from.z + ((from.z - state.z) / d) * back, from);
       say('Vanish!', this.aura);
+      this.rage(COMBAT.wrath.vanish);
       this.wear(hero.vanish);
       this.countering = counter.secs;
       this.counterBy = counter.plain;
@@ -391,6 +412,7 @@ export default class Melee {
       this.countering = counter.secs;
       this.counterBy = perfect ? counter.perfect : counter.plain;
       this.gain(perfect ? COMBAT.spirit.perfect : COMBAT.spirit.parry);
+      this.rage(perfect ? COMBAT.wrath.perfect : COMBAT.wrath.parry);
       this.wear(perfect ? hero.perfect : hero.parry);
       if (from) this.monsters.wear(from, perfect ? COMBAT.parryPosture.perfect : COMBAT.parryPosture.plain);
       return { avoided: true, parried: true, perfect };
@@ -697,7 +719,7 @@ export default class Melee {
     const p = PUNCHES[this.stage], smash = a.kind === 'smash' ? COMBAT.smash[a.name] : null, heavy = this.body.massScale, spread = Math.sqrt(heavy);
     // The end of a chain, and every smash, throws the punch's full wave; a light hit, its plain one.
     const finisher = a.kind === 'smash' || a.last;
-    let force = this.force * (smash ? a.power : (a.air ? COMBAT.airChain : COMBAT.chain)[a.chain]);
+    let force = this.force * (smash ? a.power : a.mult);
     let posture = smash ? smash.posture : 1, react = smash ? smash.react : a.last && !a.air ? 'fly' : 'flinch';
     if (this.countering > 0) {
       force *= this.counterBy;
@@ -714,6 +736,7 @@ export default class Melee {
       t.posture = 0;
       posture = 0;
       this.gain(COMBAT.spirit.execute);
+      this.rage(COMBAT.wrath.execute);
       this.hud.float('Execute!', t.x, t.group.position.y + 4, t.z, '#ff5a5a');
       this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.slow.execute);
     }
@@ -726,6 +749,7 @@ export default class Melee {
     if (t && !t.def) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);
     if (t?.def) {
       this.gain(smash ? COMBAT.spirit.smash : COMBAT.spirit.hit);
+      this.rage(smash ? COMBAT.wrath.smash : COMBAT.wrath.hit);
       if (a.air) {
         t.hang = this.monsters.time + COMBAT.hover;
         this.hover = COMBAT.hover;
@@ -745,6 +769,12 @@ export default class Melee {
       this.work.burst(x, this.height(x, z) + 1.1 + (a.air ? state.air : 0), z, [p.color, '#fff8ea', '#94808a'], p.chips, 4 + this.stage * 1.5);
       this.work.stop = Math.max(p.stop * (finisher ? 1.6 : 1), a.name === 'execute' ? COMBAT.stop.execute : smash ? COMBAT.stop.smash : COMBAT.stop.light);
       if (smash && struck) this.work.impact = COMBAT.impact;
+      // Sparks off every blow; a ring of force off every smash.
+      const vfx = this.player.world.vfx, gy = this.height(x, z) + (a.air ? state.air : 0);
+      if (vfx && struck) {
+        vfx.burst(x, gy + 1.4, z, [this.aura, '#ffffff', p.color], smash ? 26 : 8, smash ? 16 : 9);
+        if (smash) vfx.shock(x, this.height(x, z), z, Math.max(5, reach * 1.2) * (a.name === 'execute' ? 2 : 1), this.aura, 0.35);
+      }
     }
     this.work.shake = Math.max(this.work.shake, (struck || reach ? Math.max(p.shake, smash ? 0.18 : 0.05) : 0) * (finisher ? 1.5 : 1));
     if (this.dropString) {
@@ -941,7 +971,8 @@ export default class Melee {
     this.barFor -= dt;
     const foe = this.lock ?? (this.barFor > 0 ? this.barOn : null);
     this.hud.setFoe(foe && !foe.dying ? foe.def.name : '', foe ? Math.max(0, foe.hp) / (foe.maxHp || 1) : 0, foe?.postureMax ? (foe.posture ?? 0) / foe.postureMax : 0, foe?.brokenUntil > this.monsters.time);
-    this.hud.setFight(this.spirit, this.posture, this.broken > 0);
+    const w = this.player.wrath;
+    this.hud.setFight(this.spirit, this.posture, this.broken > 0, w?.wrath ?? 0, w?.surge > 0 ? w.surge / COMBAT.surge.secs : 0, this.player.controls.device);
     this.threats(state);
   }
 

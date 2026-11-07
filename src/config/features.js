@@ -44,5 +44,7 @@ export const FEATURES = {
   voxels: true,         // open world: raze works and kingdom buildings are breakable voxels (voxels.js); off = the painted models fall whole
   wanderingVillagers: true, // villagers stroll and patrol instead of standing still
   combatCore: true,     // open world: rush chain + Triangle smashes, air combos, Vanish, Structure, Spirit, edge arrows (combat.js)
+  wrath: true,          // open world: Wrath bar, Surge (L1 + R1 held) and an ultimate for each Conqueror (L1 + R1) (ultimate.js)
+  spiritArts: true,     // open world: L1 + Square Spirit Shot, L1 + Triangle (hold) Spirit Wave beam (spiritArts.js)
   impactFrames: true,   // open world: two-tone ink frames on smashes and Perfect parries (also a Settings switch)
 };

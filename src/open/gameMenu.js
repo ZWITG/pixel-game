@@ -1,4 +1,5 @@
 import { PLACES, TOWNS, WORLD } from './terrain.js';
+import { powerOrder, branchOf } from './branches.js';
 import { prompt } from '../ui/glyphs.js';
 import { QUALITY, saveSettings } from './startMenu.js';
 import { svg, MAX_RANK } from './powers.js';
@@ -274,16 +275,16 @@ export default class GameMenu {
       this.page.innerHTML = '';
       return;
     }
-    const ids = Object.keys(c.powers), pid = ids[this.at], def = c.powers[pid], rank = set.rank(pid), open = set.open(pid);
+    const ids = powerOrder(set.id, c.powers), pid = ids[this.at], def = c.powers[pid], rank = set.rank(pid), open = set.open(pid);
     const slots = DIRS.map((dir, i) => {
       const worn = set.loadout[i];
       return `<div data-slot="${i}" class="cross-${dir} ${this.assigning ? 'choosing' : ''}" style="color:${c.color}" title="${worn ? c.powers[worn].name : ''}">${worn ? svg(c.powers[worn].kind, 30) : ''}</div>`;
     }).join('');
     const pips = (id) => Array.from({ length: MAX_RANK + 1 }, (_, i) => `<i class="${i <= set.rank(id) ? 'on' : ''}"></i>`).join('');
     const cards = ids.map((id, i) => {
-      const q = c.powers[id], ok = set.open(id), worn = set.loadout.indexOf(id);
-      return `<button data-card="${i}" class="${i === this.at ? 'at' : ''} ${ok ? '' : 'locked'}" style="--c:${c.color}">
-        ${svg(ok ? q.kind : 'lock', 34)}<b>${q.name}</b><span class="pips">${ok ? pips(id) : `Mastery ${q.mastery}`}</span>${worn >= 0 ? `<em>${DIR_NAMES[worn]}</em>` : ''}
+      const q = c.powers[id], ok = set.open(id), worn = set.loadout.indexOf(id), br = branchOf(set.id, id);
+      return `<button data-card="${i}" class="${i === this.at ? 'at' : ''} ${ok ? '' : 'locked'}" style="--c:${br?.color ?? c.color}">
+        ${svg(ok ? q.kind : 'lock', 34)}<b>${q.name}</b>${br ? `<small class="branch">${br.name}</small>` : ''}<span class="pips">${ok ? pips(id) : `Mastery ${q.mastery}`}</span>${worn >= 0 ? `<em>${DIR_NAMES[worn]}</em>` : ''}
       </button>`;
     }).join('');
     const skill = this.owner.skills.all().find((s) => s.id === set.skillOf(pid));
@@ -294,7 +295,7 @@ export default class GameMenu {
         <div class="cross">${slots}</div>
         <div class="power-grid">${cards}</div>
       </div>
-      <div class="power-info"><b>${def.name}</b>${open ? `<span>Rank ${rank + 1} of ${MAX_RANK + 1}</span>` : `<span>Opens at Mastery ${def.mastery}. You are at ${set.mastery}.</span>`}<p>${def.text}</p>${open ? stats : ''}</div>
+      <div class="power-info"><b>${def.name}</b>${open ? `<span>Rank ${rank + 1} of ${MAX_RANK + 1}</span>` : `<span>Opens at Mastery ${def.mastery}. You are at ${set.mastery}.</span>`}<p>${def.text}</p>${branchOf(set.id, pid) ? `<p style="color:${branchOf(set.id, pid).color}">${branchOf(set.id, pid).name}: ${branchOf(set.id, pid).text}</p>` : ''}${open ? stats : ''}</div>
     </div>`;
   }
 
@@ -318,7 +319,7 @@ export default class GameMenu {
   }
 
   place(slot) {
-    const set = this.owner.powers, pid = Object.keys(set.def.powers)[this.at];
+    const set = this.owner.powers, pid = powerOrder(set.id, set.def.powers)[this.at];
     set.wear(pid, slot);
     this.assigning = false;
     this.drawPage();
@@ -333,13 +334,13 @@ export default class GameMenu {
       if (dir >= 0) this.place(dir);
       return;
     }
-    const n = Object.keys(set.def.powers).length, before = this.at;
+    const n = powerOrder(set.id, set.def.powers).length, before = this.at;
     if (just.left) this.at = (this.at + n - 1) % n;
     if (just.right) this.at = (this.at + 1) % n;
     if (just.up || just.down) this.at = (this.at + POWER_COLS) % n;
     if (this.at !== before) this.drawPage();
     if (just.confirm) {
-      const pid = Object.keys(set.def.powers)[this.at];
+      const pid = powerOrder(set.id, set.def.powers)[this.at];
       if (!set.open(pid)) return;
       this.assigning = true;
       this.drawPage();

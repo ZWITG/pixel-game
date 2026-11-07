@@ -83,13 +83,21 @@ export default class WorldHud {
   }
 
   // Spirit pips, and the hero's own Structure (hidden while it's empty).
-  setFight(spirit, posture, broken) {
+  // Wrath under them: full, it names the buttons; in a Surge it shows the time left.
+  setFight(spirit, posture, broken, wrath = 0, surge = 0, device = 'pad') {
     const box = this.$('fight');
     if (!this.pips) {
-      box.innerHTML = `<div class="pips">${'<i><b></b></i>'.repeat(5)}</div><div class="post"><u></u></div>`;
+      box.innerHTML = `<div class="pips">${'<i><b></b></i>'.repeat(5)}</div><div class="post"><u></u></div><div class="wrath"><u></u><span></span></div>`;
       this.pips = [...box.querySelectorAll('.pips i')];
       this.postFill = box.querySelector('.post u');
+      this.wrathBar = box.querySelector('.wrath');
     }
+    const full = wrath >= 1 && !surge;
+    this.wrathBar.firstChild.style.width = `${(surge || wrath) * 100}%`;
+    this.wrathBar.classList.toggle('full', full);
+    this.wrathBar.classList.toggle('surge', surge > 0);
+    const say = full ? (device === 'pad' ? 'L1 + R1' : 'Y') : '';
+    if (this.wrathSay !== say) this.wrathBar.lastChild.textContent = this.wrathSay = say;
     this.pips.forEach((pip, i) => {
       const k = Math.max(0, Math.min(1, spirit - i));
       pip.firstChild.style.transform = `scaleX(${k})`;

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CONQUERORS, MAX_RANK, svg } from './conquerors.js';
 import { stagger } from './foes.js';
 import { prompt } from '../ui/glyphs.js';
+import { COMBAT } from './combat.js';
 import { Flames, makeBolt, shapeBolt } from './elementFx.js';
 
 // What a power does when it's used, by `kind`, and the light it makes. Each hero has a PowerSet;
@@ -746,7 +747,8 @@ export default class PowerSet {
 
   update(dt) {
     if (!this.id) return;
-    for (const pid of Object.keys(this.waits)) this.waits[pid] = Math.max(0, this.waits[pid] - dt);
+    const cool = this.player.wrath?.surge > 0 ? COMBAT.surge.cool : 1; // a Surge cools powers faster
+    for (const pid of Object.keys(this.waits)) this.waits[pid] = Math.max(0, this.waits[pid] - dt * cool);
     this.casting = Math.max(0, this.casting - dt);
     // Sparks of the Conqueror's element drift up around them, always.
     if ((this.mote = (this.mote ?? 0) - dt) <= 0) {

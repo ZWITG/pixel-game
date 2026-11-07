@@ -9,6 +9,9 @@ import { shared, SCAR_CELLS, SCAR_SIZE } from './materials.js';
 //   void   rots slowly outward, draining whatever stands on it
 //   storm  barely crawls on land, but a charged lake carries it from shore to shore
 //   earth  ruptures outward in a spreading line of stone spikes
+// Where two meet they react (REACTIONS): fire and ice make blinding steam, earth on fire makes magma,
+// lightning runs through a sheet of ice as through water, and void blights whatever it touches so
+// it spreads further. A co-op pair's powers mix the same way.
 // The grid goes to the shaders as a texture: R scorch, G frost, B rot, A heat.
 const CELL = SCAR_SIZE / SCAR_CELLS;  // tiles
 const TICK = 0.25;           // seconds between spreads
@@ -25,6 +28,14 @@ const REGROW = 15 * 60000;   // ms before a burnt tree grows back
 const ZAPS_PER_TICK = 5, ROCKS_PER_TICK = 4;
 const WET = 0.4;             // ground under this is water
 const SNOW_LINE = 285;
+const STEAM_SECS = 3, MAGMA_SECS = 7, BLIGHT_GEN = 2, MAGMA_BITE = 1.6;
+const REACTS_PER_TICK = 6;   // reactions shown each tick (they all still happen)
+export const REACTIONS = {
+  steam: { name: 'Steam', color: '#e8f0f4' },
+  magma: { name: 'Magma', color: '#ff7a2a' },
+  conduct: { name: 'Conducted', color: '#fff48a' },
+  blight: { name: 'Blight', color: '#b06aff' },
+};
 const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const mod = (a) => ((a % SCAR_CELLS) + SCAR_CELLS) % SCAR_CELLS;
 
@@ -36,6 +47,7 @@ export default class Scars {
     this.dirty = false;
     this.data = shared.uScars.value.image.data;
     this.burning = 0;
+    this.reacts = REACTS_PER_TICK;
   }
 
   get(i, j) {
@@ -54,7 +66,7 @@ export default class Scars {
     const x = (i + 0.5) * CELL, z = (j + 0.5) * CELL, y = height(x, z), bad = region(x, z)[0];
     // Grass carries a fire; forest feeds it; bare badlands, roads and snow give it nothing.
     const fuel = y < 1.5 || y > SNOW_LINE || roadDistance(x, z) < 4 ? 0 : (0.45 + forest(x, z) * 0.55) * (1 - bad * 0.85);
-    c = { i, j, k, x, z, y, wet: y < WET, fuel, char: 0, frost: 0, rot: 0, burn: 0, charge: 0, rupture: 0, gen: 0, owner: null, force: 1, trees: null, shown: [] };
+    c = { i, j, k, x, z, y, wet: y < WET, fuel, char: 0, frost: 0, rot: 0, burn: 0, charge: 0, rupture: 0, steam: 0, magma: 0, gen: 0, owner: null, force: 1, trees: null, shown: [] };
     this.cells.set(k, c);
     return c;
   }
@@ -73,9 +85,15 @@ export default class Scars {
 
   // One cell catches. Fire and ice undo each other; water will not burn.
   take(c, kind, owner, gen, force) {
+    // Void rots its way into any element already there, and sends it further.
+    if (kind === 'void' && (c.burn > 0 || c.frost > 0.2 || c.charge > 0 || c.rupture > 0)) {
+      c.gen += BLIGHT_GEN;
+      this.react('blight', c, owner);
+    }
     if (kind === 'fire') {
       if (c.frost > 0.2) {
         c.frost = 0;
+        this.react('steam', c, owner);
         this.dirty = true;
         return false;
       }
@@ -86,6 +104,7 @@ export default class Scars {
       if (c.burn > 0) {
         c.burn = 0;
         this.burning--;
+        this.react('steam', c, owner);
       }
       if (c.frost >= 1) return false;
       c.frost = 1;
@@ -95,7 +114,13 @@ export default class Scars {
     } else if (kind === 'storm') {
       if (c.charge > 0) return false;
       c.charge = CHARGE_SECS;
+      if (c.frost > ICE_SOLID) this.react('conduct', c, owner);
     } else {
+      // Stone driven through fire comes up molten.
+      if (c.burn > 0 || c.char > 0.7) {
+        c.magma = MAGMA_SECS;
+        this.react('magma', c, owner);
+      }
       if (c.rupture > 0 || c.wet) return false;
       c.rupture = RUPTURE_SECS;
       c.char = Math.max(c.char, 0.55);
@@ -128,9 +153,11 @@ export default class Scars {
       const n = this.make(c.i + di, c.j + dj);
       if (!n) continue;
       // Forest keeps a fire going; open ground uses it up. A charged lake carries it whole.
-      const cost = kind === 'fire' ? (Math.random() < n.fuel * 0.82 ? 0 : 1) : kind === 'storm' && n.wet ? 0 : 1;
+      // Ice carries lightning as well as water does.
+      const sheet = (cell) => cell.wet || cell.frost > ICE_SOLID;
+      const cost = kind === 'fire' ? (Math.random() < n.fuel * 0.82 ? 0 : 1) : kind === 'storm' && sheet(n) ? 0 : 1;
       if (kind === 'fire' && Math.random() > n.fuel) continue;
-      if (kind === 'storm' && !n.wet && !c.wet) continue;
+      if (kind === 'storm' && !sheet(n) && !sheet(c)) continue;
       this.take(n, kind, c.owner, c.gen - cost, c.force);
     }
   }
@@ -183,7 +210,7 @@ export default class Scars {
     if (c.charge > 0) {
       c.charge -= dt;
       if (c.gen > 0) {
-        this.spread(c, 'storm', c.wet ? 0.95 : SPREAD.storm);
+        this.spread(c, 'storm', c.wet || c.frost > ICE_SOLID ? 0.95 : SPREAD.storm);
         c.gen = 0;
       }
       if (this.zaps-- > 0) {
@@ -198,7 +225,34 @@ export default class Scars {
         c.gen = 0;
       }
     }
+    if (c.steam > 0) {
+      c.steam -= dt;
+      if (Math.random() < 0.35) this.world.smoke?.puff(c.x + (Math.random() - 0.5) * CELL, Math.max(c.y, 0) + 0.5, c.z + (Math.random() - 0.5) * CELL, { size: 3, grow: 2.2, life: 2.5, tint: '#eef2f4', alpha: 0.55, lift: 2.5 });
+    }
+    if (c.magma > 0) {
+      c.magma -= dt;
+      c.char = 1;
+      if (Math.random() < 0.4) fx.flame(c.x + (Math.random() - 0.5) * CELL, c.y + 0.1, c.z + (Math.random() - 0.5) * CELL, 1.8 + Math.random() * 1.6, 0.6, 0);
+      if (Math.random() < 0.2) fx.glow(c.x, c.y + 0.4, c.z, CELL * 1.4, '#ff5a1a', 0.5, 1.1);
+    }
     if (c.char > 0 && !c.burn) c.char = Math.max(0, c.char - dt / CHAR_SECS);
+  }
+
+  // Two elements met in this cell. Everything a reaction does to foes is in harm(); this is the show.
+  react(kind, c, owner) {
+    if (kind === 'steam') c.steam = STEAM_SECS;
+    if (this.reacts-- <= 0) return;
+    const { fx, smoke } = this.world, y = Math.max(c.y, 0), r = REACTIONS[kind];
+    if (kind === 'steam') smoke?.puff(c.x, y + 0.6, c.z, { size: 5, grow: 2.6, life: 3, tint: '#f4f8fa', alpha: 0.7, lift: 3, spread: 1.4 });
+    else if (kind === 'magma') fx.impact('fire', c.x, y, c.z, CELL * 1.2);
+    else if (kind === 'conduct') fx.lightning({ x: c.x, y: y + 3, z: c.z }, { x: c.x + (Math.random() - 0.5) * CELL * 3, y, z: c.z + (Math.random() - 0.5) * CELL * 3 }, r.color, 0.18, 0.2);
+    else fx.flame(c.x, y + 0.2, c.z, 3, 0.8, 1);
+    // Named once in a while, so the player learns what made it happen.
+    const now = performance.now();
+    if (owner?.hud && now - (this.named?.[kind] ?? 0) > 4000) {
+      (this.named ??= {})[kind] = now;
+      owner.hud.float(`${r.name}!`, c.x, y + 3, c.z, r.color);
+    }
   }
 
   // What the ground does to the enemies standing on it.
@@ -226,6 +280,12 @@ export default class Scars {
         e.rise = Math.max(e.rise ?? 0, 9);
         e.air = Math.max(e.air ?? 0, 0.01);
       }
+      if (c.magma > 0) {
+        powers.sting(e, bite * MAGMA_BITE);
+        powers.burns.set(e, { left: 3, dps: body.might * c.force * 0.2 });
+      }
+      // Lost in the steam: it can't see to fight.
+      if (c.steam > 0 && !e.boss) stagger(e, TICK + 0.1, monsters.time, true);
     }
   }
 
@@ -295,9 +355,10 @@ export default class Scars {
     if (!this.cells.size) return;
     const { players, fx } = this.world;
     this.zaps = ZAPS_PER_TICK;
+    this.reacts = REACTS_PER_TICK;
     for (const c of [...this.cells.values()]) {
       this.live(c);
-      const idle = !c.char && !c.frost && !c.rot && !c.burn && c.charge <= 0 && c.rupture <= 0;
+      const idle = !c.char && !c.frost && !c.rot && !c.burn && c.charge <= 0 && c.rupture <= 0 && c.steam <= 0 && c.magma <= 0;
       const far = players.every((p) => Math.hypot(p.state.x - c.x, p.state.z - c.z) > STAY);
       if (idle || far) {
         if (c.burn > 0) this.burning--;

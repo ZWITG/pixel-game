@@ -18,6 +18,8 @@ import Body, { ATTRIBUTES } from './body.js';
 import { Bag } from './work.js';
 import { ITEMS } from './items.js';
 import Melee from './melee.js';
+import Wrath from './ultimate.js';
+import SpiritArts from './spiritArts.js';
 import Rooms from './rooms.js';
 import Cave, { CaveLevel } from './cave.js';
 
@@ -99,6 +101,8 @@ export default class Player {
     this.nature = this.body.nature = new Nature(this);
     this.body.powers = this.powers;
     this.bar = new PowerBar(prefix);
+    this.wrath = new Wrath(this);
+    this.arts = new SpiritArts(this);
     this.hero = new HeroModel(world.scene, this.powers.def?.look ?? LOOKS[index]);
     this.compass = new Compass(index ? 'p2-' : '');
     this.state = { x: SPAWN.x, z: SPAWN.z, y: 0, yaw: 2.6, pitch: 0.16, recenter: null, phase: 0, moving: false, dir: [0, -1], steepAt: 0, air: 0, rise: 0 };
@@ -168,7 +172,10 @@ export default class Player {
     const door = !rooms.house && !swim.inWater && world.work.door(state);
     const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.animals?.spot(this) ?? world.events?.spot(this) ?? world.fairs?.spot(this) ?? world.roadside?.spot(this) ?? world.caravans.spot(this) ?? world.people.spot(this) ?? world.caravans.market(this);
     // With Destructive Blow, the button waits to see if it's a tap or a hold (see updateCharge).
-    const fights = !rooms.house || rooms.house.hostile;
+    // While an ultimate plays the hero does nothing else.
+    const fights = (!rooms.house || rooms.house.hostile) && !this.wrath.ult;
+    // L1 held is the Spirit shift: Square and Triangle become Spirit Arts, and R1 waits on the ultimate.
+    const shift = !!(this.controls.padHeld.L1 || this.controls.held.has('KeyQ'));
     // On horseback: Circle gets you down. Anywhere: the whistle calls your horse.
     if (just.whistle) world.animals?.whistle(this);
     if (state.riding && just.roll) {
@@ -180,7 +187,20 @@ export default class Player {
         const m = this.controls.move(), yaw = world.viewYaw(this), sy = Math.sin(yaw), cy = Math.cos(yaw);
         melee.dodge(state, cy * m.x + sy * m.y, -sy * m.x + cy * m.y);
       }
-      if (just.grab) melee.grab(state);
+      // With Wrath full, R1 grabs on release, so pressing it with L1 for an ultimate never grabs.
+      const r1 = !!(this.controls.padHeld.R1 || this.controls.held.has('KeyF'));
+      if (!this.wrath.full) {
+        if (just.grab && !shift) melee.grab(state);
+      } else {
+        if (r1 && shift) this.r1Combo = true;
+        if (!r1 && this.r1Was && !this.r1Combo) melee.grab(state);
+        if (!r1) this.r1Combo = false;
+      }
+      this.r1Was = r1;
+      if (shift && FEATURES.spiritArts && !state.air) {
+        if (just.punch) this.arts.shot();
+        if (just.heavy) this.arts.waveStart();
+      }
       if (just.target) melee.aim(state);
       if (melee.lock && just.targetLeft) melee.shiftAim(state, -1);
       if (melee.lock && just.targetRight) melee.shiftAim(state, 1);
@@ -188,8 +208,9 @@ export default class Player {
     }
     // Square: the rush chain. Triangle: a smash, which once Destructive Blow is open throws on release.
     const reach = !state.air || melee.hover > 0;
-    if (FEATURES.punching && just.punch && fights && reach) melee.punch(state);
-    if (FEATURES.punching && just.heavy && fights && reach && (!melee.blowReady || melee.hover > 0)) melee.heavy(state);
+    const arts = shift && FEATURES.spiritArts;
+    if (FEATURES.punching && just.punch && fights && reach && !arts) melee.punch(state);
+    if (FEATURES.punching && just.heavy && fights && reach && !arts && (!melee.blowReady || melee.hover > 0)) melee.heavy(state);
     if (!spot) {
       hud.setAction('');
       return false;
@@ -296,7 +317,12 @@ export default class Player {
     // Together, both heroes steer from the one shared camera.
     const aim = world.together ? world.shared : state;
     if (!this.frozen && !world.gameMenu.isOpen) {
-      if (!hud.open && just.recenter) aim.recenter = Math.atan2(-state.dir[0], -state.dir[1]);
+      // V recenters at once; L1 only if it was let go without being used as the Spirit shift.
+      const l1 = !!controls.padHeld.L1;
+      if (l1 && (just.punch || just.heavy || just.grab || just.power0 || just.power1 || just.power2 || just.power3)) this.l1Used = true;
+      if (l1 && !this.l1Was) this.l1Used = false;
+      if (!hud.open && ((just.recenter && controls.held.has('KeyV')) || (!l1 && this.l1Was && !this.l1Used))) aim.recenter = Math.atan2(-state.dir[0], -state.dir[1]);
+      this.l1Was = l1;
       if (!hud.open && just.camera && !world.players.some((p) => p.rooms.house)) world.travel(this);
       // In co-op the Satchel opens in this hero's own half, so the other can play on.
       if (world.players.length > 1 && (hud.packOpen ? just.back || just.pack || just.pause : !hud.open && just.pack)) {
@@ -311,10 +337,12 @@ export default class Player {
     if (!world.paused) reachPin(this);
     const used = busy ? false : this.act(just);
     const free = !hud.open && !this.frozen;
-    if (free && !melee.active && this.powers.def) {
+    if (free && !melee.active && this.powers.def && !this.wrath.ult) {
       for (let i = 0; i < 4; i++) if (just[`power${i}`]) this.powers.use(i);
     }
     if (!world.paused) {
+      this.wrath.update(dt);
+      this.arts.update(dt);
       this.powers.update(dt);
       this.nature.update(dt);
     }
@@ -341,7 +369,7 @@ export default class Player {
     }
     aim.pitch = THREE.MathUtils.clamp(aim.pitch + look.y, -0.25, 1.2);
 
-    const m = !free || melee.active || melee.rolling > 0 || melee.hover > 0 || melee.pursuing || melee.broken > 0 ? { x: 0, y: 0 } : controls.move(false), amount = Math.min(1, Math.hypot(m.x, m.y));
+    const m = !free || melee.active || melee.rolling > 0 || melee.hover > 0 || melee.pursuing || melee.broken > 0 || this.wrath.ult || this.arts.wave ? { x: 0, y: 0 } : controls.move(false), amount = Math.min(1, Math.hypot(m.x, m.y));
     if (!world.paused) {
       this.updateSuper(dt, !!(controls.held.has('ShiftLeft') || controls.padHeld.R2), amount > 0.05 && free);
       melee.updateMoves(dt, state);

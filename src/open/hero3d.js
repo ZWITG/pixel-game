@@ -710,6 +710,8 @@ export default class HeroModel {
   // Turns the figure hot red for a moment when the hero is hit.
   flinch(on) {
     this.material.emissive.set(on ? '#b02818' : '#000000');
+    // In a Surge the whole figure burns with the Conqueror's light.
+    if (!on && this.glow) this.material.emissive.set(this.glow).multiplyScalar(this.glowAmount ?? 0.25);
   }
 }
 

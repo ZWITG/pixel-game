@@ -144,6 +144,7 @@ export default class Monsters {
     this.work.actor?.nature.killed();
     // Evolved monsters teach more and drop more.
     this.work.skills.add('fighting', (COMBAT.xp.kill[roleName(e)] ?? 2) * (1 + e.tier * COMBAT.xp.tier) * (e.elder ? 2 : 1));
+    this.work.actor?.wrath?.gain(COMBAT.wrath.kill);
     const drops = {};
     for (const { item, chance } of e.def.drops) if (Math.random() < chance * (1 + e.tier * 0.4)) drops[item] = 1 + Math.floor(e.tier / 2);
     this.work.give(drops);
@@ -343,6 +344,7 @@ export default class Monsters {
     amount = answer.amount;
     const heavy = p.body.massScale, taken = Math.max(0.5, (amount * (1 - p.body.guard)) / Math.sqrt(heavy));
     p.hp -= taken;
+    p.wrath?.gain((taken / p.body.maxHealth) * COMBAT.wrath.hurt);
     // A smash in progress shrugs the blow off and carries on.
     if (!p.melee.armored) {
       p.flinch = 0.28;
@@ -478,6 +480,11 @@ export default class Monsters {
       this.pushing = e;
       // One broken monster is taken out of the world; it must never stop the game.
       const wasX = e.group.position.x, wasZ = e.group.position.z;
+      // Held still by Stillness: no thought, no motion, a pale glow.
+      if (e.frozenUntil > this.time && !e.dying) {
+        e.model.mat.emissive?.set('#4a9ad8');
+        continue;
+      }
       try {
         e.update(dt);
         // Ice underfoot steals most of every step.
@@ -533,6 +540,10 @@ export default class Monsters {
       }
     }
     for (const o of this.orbs) {
+      if (o.held) {
+        o.held = false;
+        continue;
+      }
       o.life -= dt;
       o.orb.position.x += o.dx * o.speed * dt;
       o.orb.position.z += o.dz * o.speed * dt;

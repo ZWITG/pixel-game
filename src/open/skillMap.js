@@ -1,6 +1,7 @@
 // The skill map: the Spirit Tree at night, drawn in pixels. Each skill is a bough of nodes that
 // light up as levels are reached. Undiscovered boughs stay dark, with only their buds showing.
 import { ATTRIBUTES } from './body.js';
+import { boughOrder, branchOf } from './branches.js';
 
 const W = 520, H = 292;
 const INK = '#0a0f22';
@@ -167,13 +168,16 @@ export default class SkillMap {
     // Each Conqueror grows its own tree: the boughs it can use, under its own names, plus its discipline.
     const { nature, conq } = body, own = nature?.own;
     const key = conq ? conq.name : '';
-    const ids = FAN.filter((id) => !conq || !EVOLVED[id] || conq[EVOLVED[id]]).concat(own ? [own.discipline.id] : []);
+    // Grouped by the Conqueror's three branches, without the boughs it doesn't grow (branches.js).
+    const cid = body.powers?.id;
+    const ids = boughOrder(cid, FAN.filter((id) => !conq || !EVOLVED[id] || conq[EVOLVED[id]]).concat(own ? [own.discipline.id] : []));
     const tree = this.trees[key] ??= (() => { const boughs = fanOf(ids); return { boughs, backdrop: paintBackdrop(boughs) }; })();
     this.backdrop = tree.backdrop;
     this.nature = nature;
     this.skills = ids.map((id) => {
       const s = skills.find((a) => a.id === id), shown = nature?.named(s) ?? s, mine = own && (own.boughs[id] || s.discipline);
-      return { ...shown, ...tree.boughs[id], color: mine ? conq.color : s.color };
+      const branch = branchOf(cid, id);
+      return { ...shown, ...tree.boughs[id], branch, color: branch?.color ?? (mine ? conq.color : s.color) };
     });
     this.body = body;
     this.age = 0;
@@ -190,7 +194,7 @@ export default class SkillMap {
   showTag() {
     const s = this.skills[this.bough], node = s.levels[this.focus];
     const twist = this.nature?.twistAt(s.id, this.focus), lit = this.focus < s.level;
-    this.tag.textContent = `${lit ? `${s.name} · ${node.title}` : twist ? s.name : '?'}${twist ? ` · ${lit ? 'Gift' : 'Opens'}: ${twist.text}` : ''}`;
+    this.tag.textContent = `${s.branch ? `${s.branch.name} · ` : ''}${lit ? `${s.name} · ${node.title}` : twist ? s.name : '?'}${twist ? ` · ${lit ? 'Gift' : 'Opens'}: ${twist.text}` : ''}`;
     this.tag.style.color = lit ? s.color : '#7a84b0';
   }
 
