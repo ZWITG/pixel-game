@@ -5,32 +5,15 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { STONEWORK, wall, tower, gatehouse, citadel, broken, brokenTower, tent } from './fortress.js';
 import { paint, rock, spike, aimed, block, shine } from './kit.js';
 import { nationAt } from './nations.js';
-import { walkPose } from '../render/models.js';
-import { makeFigure } from './figures.js';
-import { LOOKS } from '../art/looks.js';
 import { TOWNS } from './terrain.js';
 import { placeHouse } from './landmarks.js';
-import { ITEMS } from './items.js';
 import { townPlans } from './cityPlan.js';
-import { nearSolids } from './solidGrid.js';
 
 // Built places: walled cities, villages, bandit camps and ruined keeps. Every layout comes from
 // the town's name, so it's the same each visit. Houses are ordinary houses: enter or wreck them.
 const SECTORS = 8;          // a city's stonework is drawn and turned to voxels in this many parts, and the castle
 const STONE = '#a89a8c', STONE_DARK = '#7c6e68', WOOD = '#7a5230', WOOD_DARK = '#5a3a22', PAVE = '#b8a98e';
 const ROOFS = [['#b13e53', '#8a2e40'], ['#3b5dc9', '#2c4498'], ['#e8a33a', '#b87a22'], ['#257179', '#1a535a'], ['#7a5a9e', '#5a4078']];
-const FOLK_NEAR = 160;      // tiles past a town's edge that people start to appear
-const CROWD = { village: 10, city: 44 };
-const TALK = 3.6;
-const GREET = 8;
-const FOLK_SEEN = 200;      // tiles (as the crow walks the grid) at which a townsperson is drawn            // tiles at which townsfolk stop and wave
-const WANDER = 2.4;         // townsfolk walking speed
-const TRADE_COST = 5;
-const FOLK = [LOOKS.merchant, LOOKS.kid, LOOKS.smith, LOOKS.bard, LOOKS.elder, LOOKS.guard];
-const CHATTER = {
-  village: ['Quiet here, and I like it so.', 'The well has never once run dry.', 'Keep to the lanterns after dark.'],
-  city: ['The walls have stood for three hundred winters.', 'Everything comes through the south gate eventually.', 'Mind the keep guards. They have no humor.'],
-};
 
 function seeded(text) {
   let seed = [...text].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 2147483646 + 1;
@@ -294,117 +277,3 @@ export function addTowns(scene, marks) {
 }
 
 // Townsfolk walk about while someone's near, and can be spoken to.
-export class People {
-  constructor(scene, world) {
-    Object.assign(this, { scene, world });
-    this.list = [];
-    this.live = new Set();
-  }
-
-  fill(T) {
-    this.live.add(T);
-    const rand = seeded(`${T.name}folk`), spread = T.kind === 'city' ? T.r * 0.5 : 26, plan = townPlans().get(T.name);
-    // Out on the streets, the busy ones near the middle.
-    const streets = plan.streets.filter((st) => st.type !== 'lane'), at = () => {
-      const st = streets[Math.floor(rand() * streets.length)], p = st.pts[Math.floor(rand() * st.pts.length)];
-      return [T.x + p[0], T.z + p[1]];
-    };
-    for (let i = 0; i < CROWD[T.kind]; i++) {
-      const model = makeFigure(FOLK[i % FOLK.length]);
-      const job = i === 0 ? 'healer' : i === 1 ? 'trader' : 'folk';
-      const [x, z] = at();
-      model.group.position.set(x, T.y, z);
-      model.group.scale.setScalar(2.3);
-      this.scene.add(model.group);
-      this.list.push({ T, home: [x, z], model, job, phase: rand() * 6, dir: rand() * 6.28, turn: rand() * 4, moving: true, spread: 40, line: CHATTER[T.kind][i % CHATTER[T.kind].length] });
-    }
-  }
-
-  empty(T) {
-    this.live.delete(T);
-    this.list = this.list.filter((f) => {
-      if (f.T !== T) return true;
-      this.scene.remove(f.model.group);
-      return false;
-    });
-  }
-
-  blocked(x, z) {
-    return nearSolids(this.world.marks, x, z).some((s) => !s.off && (s.r ? Math.hypot(x - s.x, z - s.z) < s.r + 1 : x > s.x0 - 1 && x < s.x1 + 1 && z > s.z0 - 1 && z < s.z1 + 1));
-  }
-
-  update(dt) {
-    const { players } = this.world;
-    for (const T of TOWNS) {
-      if (!CROWD[T.kind]) continue;
-      const near = players.some((p) => Math.hypot(p.state.x - T.x, p.state.z - T.z) < T.r + FOLK_NEAR);
-      if (near && !this.live.has(T)) this.fill(T);
-      else if (!near && this.live.has(T)) this.empty(T);
-      for (const p of players) {
-        const inside = !p.rooms.house && Math.hypot(p.state.x - T.x, p.state.z - T.z) < T.r * 0.8;
-        if (inside && p.town !== T) {
-          p.town = T;
-          p.hud.message(T.name, true);
-        } else if (!inside && p.town === T) p.town = null;
-      }
-    }
-    for (const f of this.list) {
-      // Only those near enough to see are drawn and walked: a big city's crowd is mostly far off.
-      const g0 = f.model.group.position, seen = players.some((p) => Math.abs(p.state.x - g0.x) + Math.abs(p.state.z - g0.z) < FOLK_SEEN);
-      f.model.group.visible = seen;
-      if (!seen) continue;
-      if ((f.turn -= dt) <= 0) {
-        f.turn = 2 + Math.random() * 5;
-        f.moving = Math.random() < 0.7;
-        f.dir = Math.random() * 6.28;
-      }
-      // Someone close by gets a look and a wave.
-      const friend = players.find((p) => Math.hypot(p.state.x - f.model.group.position.x, p.state.z - f.model.group.position.z) < GREET);
-      if (friend) {
-        const g = f.model.group;
-        g.rotation.y = Math.atan2(friend.state.x - g.position.x, friend.state.z - g.position.z);
-        walkPose(f.model, f.phase, 0);
-        f.model.arms[0].rotation.set(-2.6 + Math.sin(performance.now() * 0.012) * 0.3, 0, 0);
-        continue;
-      }
-      const g = f.model.group, nx = g.position.x + Math.sin(f.dir) * WANDER * dt, nz = g.position.z + Math.cos(f.dir) * WANDER * dt;
-      const stray = Math.max(Math.abs(nx - f.home[0]), Math.abs(nz - f.home[1])) > f.spread;
-      if (f.moving && !stray && !this.blocked(nx, nz)) {
-        g.position.x = nx;
-        g.position.z = nz;
-        g.rotation.y = f.dir;
-        f.phase += dt * 8;
-        walkPose(f.model, f.phase, 1);
-      } else {
-        if (f.moving) f.dir += 2;
-        walkPose(f.model, f.phase, 0);
-      }
-    }
-  }
-
-  spot(p) {
-    const f = this.list.find((k) => Math.hypot(k.model.group.position.x - p.state.x, k.model.group.position.z - p.state.z) < TALK);
-    if (!f) return null;
-    return { label: f.job === 'healer' ? 'Be healed' : f.job === 'trader' ? `Trade ${TRADE_COST} goods` : 'Talk', person: f };
-  }
-
-  talk(p, f) {
-    const { hud, bag, body } = p;
-    if (f.job === 'healer') {
-      p.hp = body.maxHealth;
-      hud.setHealth(1);
-      hud.message('Rest easy. You\'re mended.');
-    } else if (f.job === 'trader') {
-      const pile = Object.keys(bag.items).find((id) => ITEMS[id].kind === 'material' && bag.items[id] >= TRADE_COST);
-      if (!pile) return hud.message(`Bring ${TRADE_COST} of anything and I'll make you a salve.`);
-      bag.remove(pile, TRADE_COST);
-      bag.items.salve = (bag.items.salve ?? 0) + 1;
-      bag.save();
-      hud.message(`${TRADE_COST} ${ITEMS[pile].name} for a Healing Salve.`);
-    } else {
-      const site = p.site;
-      hud.message(site && Math.random() < 0.6 ? `They say there's a ${site.cat.name} about ${Math.round(p.siteDist)} m from here.` : f.line);
-    }
-    return undefined;
-  }
-}

@@ -160,11 +160,31 @@ const OUTFITS = {
 // Which outfit a look wears, where the names differ.
 const WEARS = { legion: 'legion', rime: 'rime', ruler: 'chiefRuler', thornqueen: 'queen' };
 
-export function makeFigure(look, { sword = false } = {}) {
+// What townsfolk carry and wear over their outfit (folk.js picks them by trade): parts for the
+// body, head and hands, in the figure's own frame (front is +z, the hand hangs at -0.27 on an arm).
+const GEAR = {
+  apron: (F, C, w) => F.body.push(paint(block(w * 1.9, 0.4, 0.025).translate(0, 0.4, w * 0.74), '#d8ccb6'), paint(block(w * 1.9, 0.03, 0.03).translate(0, 0.6, w * 0.74), '#8a7a5e')),
+  hood: (F, C) => F.head.push(paint(ball(0.185, 1, 1.05, 1.08).translate(0, 0.035, -0.03), C.hood ?? '#5a4a3a'), paint(limb(0.1, 0.02, 0.18).rotateX(-2.4).translate(0, 0.08, -0.17), C.hood ?? '#5a4a3a')),
+  sack: (F) => F.body.push(paint(ball(0.15, 1.1, 0.85, 1).translate(0.13, 0.72, -0.13), '#c9b089'), paint(block(0.05, 0.05, 0.05).translate(0.13, 0.84, -0.13), '#8a6a40')),
+  lute: (F) => F.body.push(paint(ball(0.11, 1, 1.25, 0.45).translate(-0.05, 0.42, 0.2), '#b07840'), paint(block(0.035, 0.32, 0.03).rotateZ(-0.7).translate(0.08, 0.6, 0.21), '#4a3020')),
+  hammer: (F) => F.arm[0].push(paint(block(0.03, 0.22, 0.03).translate(0, -0.36, 0.05), '#6a4428'), paint(block(0.1, 0.06, 0.06).translate(0, -0.47, 0.05), '#5a5a64')),
+  broom: (F) => F.arm[0].push(paint(block(0.025, 0.7, 0.025).translate(0, -0.42, 0.05), '#8a6a40'), paint(block(0.12, 0.16, 0.05).translate(0, -0.8, 0.05), '#c9a654')),
+  pitchfork: (F) => F.arm[0].push(paint(block(0.025, 0.8, 0.025).translate(0, -0.3, 0.05), '#8a6a40'), ...[-1, 0, 1].map((k) => paint(block(0.012, 0.12, 0.012).translate(k * 0.035, -0.75, 0.05), '#8a8a94'))),
+  ledger: (F) => F.arm[1].push(paint(block(0.12, 0.16, 0.035).translate(0, -0.3, 0.05), '#7a2a2a')),
+  mug: (F) => F.arm[1].push(paint(limb(0.035, 0.035, 0.07).translate(0, -0.27, 0.05), '#8a6a40')),
+  lantern: (F) => {
+    F.arm[0].push(paint(block(0.01, 0.06, 0.01).translate(0, -0.3, 0.04), '#3a3230'), paint(block(0.07, 0.03, 0.07).translate(0, -0.34, 0.04), '#3a3230'));
+    F.glow.arm[0].push(paint(block(0.06, 0.07, 0.06).translate(0, -0.39, 0.04), '#ffd06a'));
+  },
+};
+
+// `build`: changes to the body (bulk, thin, long, lean, big; height via `tall`). `gear`: names in GEAR.
+export function makeFigure(look, { sword = false, build = null, gear = [] } = {}) {
   const name = typeof look === 'string' ? look : Object.keys(LOOKS).find((k) => LOOKS[k] === look);
-  const C = LOOKS[name] ?? look, outfit = OUTFITS[WEARS[name] ?? name] ?? OUTFITS.guard, B = { bulk: 1, big: 1, arms: 1, thin: 1, lean: 0, long: 1, ...outfit.build };
+  const C = LOOKS[name] ?? look, outfit = OUTFITS[WEARS[name] ?? name] ?? OUTFITS.guard, B = { bulk: 1, big: 1, arms: 1, thin: 1, lean: 0, long: 1, ...outfit.build, ...build };
   const mat = toon(), group = new THREE.Group(), root = new THREE.Group();
   root.scale.setScalar(C.scale ?? 1);
+  if (B.tall) root.scale.y *= B.tall;
   group.add(root);
   const torso = new THREE.Group();
   torso.rotation.x = B.lean;
@@ -199,6 +219,7 @@ export function makeFigure(look, { sword = false } = {}) {
   }
   if (sword) F.arm[0].push(paint(block(0.15, 0.03, 0.04).translate(0, -0.29, 0.06), '#ffcd75'), paint(aimed(spike(0.03, 0.56, 4).scale(1, 1, 0.4), 0, -0.29, 0.06, 0, 0, 1), '#dfe6ee'));
   outfit.dress(F, C);
+  for (const g of gear) GEAR[g]?.(F, C, w);
 
   skin(torso, F.body, mat, INK);
   const head = new THREE.Group();
