@@ -23,19 +23,20 @@ export const ACTIONS = {
   dodge: { keys: ['ShiftLeft', 'ShiftRight', 'KeyK'], pad: ['CIRCLE'] },
   interact: { keys: ['KeyE'], pad: ['CROSS'] },
   punch: { keys: ['KeyJ'], pad: ['SQUARE'] },            // open world
+  heavy: { keys: ['KeyU'], pad: ['TRIANGLE'] },          // open world: smash; hold for Destructive Blow
   grab: { keys: ['KeyF'], pad: ['R1'] },                 // open world
   guard: { keys: ['KeyG'], pad: ['L2'] },                // held
   roll: { keys: ['KeyK'], pad: ['CIRCLE'] },
   target: { keys: ['KeyT'], pad: ['R3'] },
-  pack: { keys: ['KeyI'], pad: ['TRIANGLE'] },
-  whistle: { keys: ['KeyH'], pad: ['L3'] },            // open world: call your horse           // open world: the Satchel
+  pack: { keys: ['KeyI'], pad: ['TOUCHPAD'] },          // open world: the Satchel
+  whistle: { keys: ['KeyH'], pad: ['L3'] },            // open world: call your horse
   packTab: { keys: ['Tab'], pad: ['L1', 'R1'] },
   jump: { keys: ['Space'], pad: ['CROSS'] },             // open world; a door in reach goes first
   lock: { keys: ['KeyQ', 'Tab'], pad: ['L2', 'R3'] },
   targetLeft: { keys: ['KeyZ'], pad: ['FLICK_LEFT'] },   // while locked on; otherwise Z / X turn the camera
   targetRight: { keys: ['KeyX'], pad: ['FLICK_RIGHT'] },
   recenter: { keys: ['KeyV'], pad: ['L1'] },                      // swing the camera behind the hero
-  camera: { keys: ['KeyC'], pad: ['TOUCHPAD', 'CREATE'] },         // switch view (only with FEATURES.topDownCamera)
+  camera: { keys: ['KeyC'], pad: ['CREATE'] },         // switch view (only with FEATURES.topDownCamera)
   pause: { keys: ['Escape', 'KeyP'], pad: ['OPTIONS'] },
   restart: { keys: ['KeyR'], pad: ['CROSS', 'OPTIONS'] },
   power0: { keys: ['Digit1'], pad: ['UP'] },              // open world: the four worn powers

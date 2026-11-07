@@ -52,6 +52,7 @@ const QUERY = new URLSearchParams(location.search);
 // What the picture gives up, in turn, to hold the frame rate: smoothing first, then resolution.
 const LEVELS = [{ scale: 1, aa: 4 }, { scale: 1, aa: 0 }, { scale: 0.85, aa: 0 }, { scale: 0.72, aa: 0 }, { scale: 0.6, aa: 0 }, { scale: 0.5, aa: 0 }];
 const SLOW = 0.021, FAST = 0.0178;        // seconds per frame that lower or raise the resolution
+const SLOW_MO = 0.35;                    // how fast the world runs in a slow-motion moment
 const PAUSED_FRAME = 0.1;                 // a frame this long is a hidden tab or a stall, not slowness
 const SCALE_WAIT = 2.5;                   // seconds between changes, since each one costs a hitch
 const CAMERA_DIST = 9.5;   // tiles behind the hero
@@ -318,9 +319,10 @@ function buttonRows(usePad) {
     [usePad ? btn('R2') : key('ShiftLeft'), 'Sprint'],
     [p('jump'), 'Jump'],
     [p('punch'), PUNCHES[p1.melee.stage].name],
+    [p('heavy'), p1.melee.blowReady ? 'Smash / hold: Blow' : 'Smash'],
     [p('grab'), 'Grab'],
-    [p('guard'), 'Guard'],
-    [p('roll'), 'Roll'],
+    [p('guard'), 'Guard / Parry'],
+    [p('roll'), 'Roll / Vanish'],
     [p('target'), 'Lock on'],
     [p('pack'), 'Satchel'],
     [p('whistle'), 'Call your horse'],
@@ -619,6 +621,11 @@ function renderView(v, p, dir) {
   water.position.x = v.camera.position.x;
   water.position.z = v.camera.position.z;
   v.post.indoors = !!p.rooms.house;
+  // Impact frames and speed lines from the fight.
+  const fin = v.post.finish.uniforms;
+  fin.uImpact.value = FEATURES.impactFrames && settings.impact !== false && work.impact > 0 ? 1 : 0;
+  fin.uLines.value = Math.min(1, (work.lines ?? 0) * 4);
+  fin.uTime.value = time;
   hemi.intensity = world.light.amb * (p.rooms.house?.dark ? CAVE_LIGHT : 1);
   v.post.render(dir);
 }
@@ -626,6 +633,13 @@ function renderView(v, p, dir) {
 function step(dt) {
   holdPace(dt);
   dt = Math.min(dt, 0.05);
+  // Impact frames and speed lines run on real time; slow motion stretches the world's.
+  work.impact = Math.max(0, (work.impact ?? 0) - dt);
+  work.lines = Math.max(0, (work.lines ?? 0) - dt);
+  if (work.slow > 0) {
+    work.slow -= dt;
+    dt *= SLOW_MO;
+  }
   // Hit-stop: the world all but freezes for an instant, so a heavy blow feels heavy.
   if (work.stop > 0) {
     work.stop -= dt;

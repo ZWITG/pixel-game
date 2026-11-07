@@ -10,7 +10,7 @@ const FADE = 0.4;          // seconds to fade to black on the way into the game
 const SETTINGS_KEY = 'lumen.settings', KEEP = 'lumen.old.';
 export const QUALITY = [['auto', 'Auto', 'Keeps the game smooth on its own'], ['high', 'High', 'Sharpest picture'], ['balanced', 'Balanced', 'A little softer, much faster'], ['fast', 'Fast', 'For an older computer']];
 
-const DEFAULTS = { quality: 'auto', hints: 'auto', compass: true };
+const DEFAULTS = { quality: 'auto', hints: 'auto', compass: true, impact: true };
 
 export function loadSettings() {
   try {

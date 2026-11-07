@@ -71,7 +71,30 @@
       @keyframes gain { 0% { opacity: 0; transform: translateY(10px); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
       #act, #p2-act { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); color: #f3ead8; font: 700 18px 'Zen Maru Gothic', sans-serif; text-shadow: 0 2px 0 #141a28; white-space: nowrap; pointer-events: none; }
       #lv, #p2-lv { position: fixed; left: 246px; top: 12px; color: #f3ead8; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
-      #goal, #p2-goal { position: fixed; left: 16px; top: 36px; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
+      #goal, #p2-goal { position: fixed; left: 16px; top: 50px; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
+      /* The fight: Spirit pips and the hero's Structure under the health bar; Structure under a foe's. */
+      .fight { position: fixed; left: 16px; top: 31px; display: flex; gap: 9px; align-items: center; pointer-events: none; }
+      .fight .pips { display: flex; gap: 4px; }
+      .fight .pips i { position: relative; width: 17px; height: 8px; overflow: hidden; background: #141a28cc; box-shadow: 0 0 0 1px #f3ead855; transform: skewX(-22deg); }
+      .fight .pips b { position: absolute; inset: 0; background: linear-gradient(#e4fbff, #4ac0f0); transform-origin: left; }
+      .fight .pips i.full { box-shadow: 0 0 0 1px #bff4ff, 0 0 6px #4ac0f0aa; }
+      .fight .post { width: 92px; height: 5px; background: #141a28cc; box-shadow: 0 0 0 1px #f3ead833; transition: opacity 0.4s; }
+      .fight .post u { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffd24a, #ff5a5a); }
+      .fight.calm .post { opacity: 0; }
+      .fight.broken .post u { background: #ff5a5a; animation: tell 0.12s infinite alternate; }
+      #p2-fight { left: auto; right: 12px; }
+      body.two #p2-fight { left: 12px; right: auto; top: calc(50% + 25px); }
+      .foe-post { width: 70%; height: 4px; margin: 3px auto 0; background: #141a28; }
+      .foe-post u { display: block; height: 100%; width: 0; background: #ffd24a; }
+      .foe-post.broken u { background: #ffffff; box-shadow: 0 0 8px #ffd24a; animation: tell 0.12s infinite alternate; }
+      /* Arrows at the edge of the view for attackers you can't see; red as they strike. */
+      .threats { position: fixed; inset: 0; pointer-events: none; }
+      body.two .threats.p1 { bottom: 50%; }
+      body.two .threats.p2 { top: 50%; }
+      .threats i { position: absolute; width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 18px solid #f3ead8cc; transform: translate(-50%, -50%) rotate(var(--a)); filter: drop-shadow(0 0 3px #000a); }
+      .threats i.tell { border-bottom-color: #ff4a4a; animation: tell 0.12s infinite alternate; }
+      @keyframes tell { to { opacity: 0.45; } }
+      body.title .fight, body.title .threats, body.in-menu .fight, body.in-menu .threats { display: none; }
       body.two #p2-lv { top: calc(50% + 5px); }
       body.two #p2-goal { top: calc(50% + 26px); }
       #hp, #p2-hp { position: fixed; left: 16px; top: 16px; width: 220px; height: 11px; padding: 2px; box-sizing: border-box; border-radius: 7px; background: #141a28cc; box-shadow: 0 0 0 1px #f3ead855; }
@@ -322,14 +345,18 @@
     <div id="p2-compass" class="compass p2"></div>
     <div id="place" class="place"></div>
     <div id="p2-place" class="place p2"></div>
-    <div id="foe" hidden><div id="foe-name"></div><div id="foe-bar"><div id="foe-fill"></div></div></div>
-    <div id="p2-foe" hidden><div id="p2-foe-name"></div><div id="p2-foe-bar"><div id="p2-foe-fill"></div></div></div>
+    <div id="foe" hidden><div id="foe-name"></div><div id="foe-bar"><div id="foe-fill"></div></div><div id="foe-post" class="foe-post"><u></u></div></div>
+    <div id="p2-foe" hidden><div id="p2-foe-name"></div><div id="p2-foe-bar"><div id="p2-foe-fill"></div></div><div id="p2-foe-post" class="foe-post"><u></u></div></div>
+    <div id="threats" class="threats p1"></div>
+    <div id="p2-threats" class="threats p2"></div>
     <div id="lv"></div>
     <div id="goal"></div>
     <div id="p2-hp" class="p2"><div id="p2-hp-fill"></div></div>
     <div id="p2-lv" class="p2"></div>
     <div id="p2-goal" class="p2"></div>
     <div id="hp"><div id="hp-fill"></div></div>
+    <div id="fight" class="fight"></div>
+    <div id="p2-fight" class="fight p2"></div>
     <div id="pad-status"></div>
     <div id="help"></div>
     <div id="blink"></div>

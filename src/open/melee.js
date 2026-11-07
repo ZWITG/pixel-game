@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import { height as landHeight, dentAt, PLACES, SPAWN, TOWNS } from './terrain.js';
 import { SPAWN_CLEAR } from './work.js';
 import { FEATURES } from '../config/features.js';
+import { COMBAT, smashFor, clampSpirit } from './combat.js';
 
-// Punching. Square throws a three-hit chain anywhere, at anything. The punch itself grows in
+// Punching. Square throws a five-hit rush chain anywhere, at anything; Triangle branches it into a
+// smash (see combat.js). The punch itself grows in
 // stages: each needs both practice (`level` of the Punching skill) and Strength, so the hero
 // has to use their fists and build their body to get the next one.
 // `power` multiplies damageScale; `radius` and `crater` are in tiles; `stop` is hit-stop in seconds.
@@ -16,10 +18,13 @@ export const PUNCHES = [
   { name: 'Worldbreaker', level: 5, strength: 55, power: 3.6, radius: 24, crater: 12, shake: 0.9, stop: 0.14, chips: 60, color: '#9fe8ff' },
 ];
 
-const CHAIN = [1, 1.25, 2];  // left, right, finisher
 const FINISHER_REACH = 1.3;  // the finisher's wave goes this much further
-const CHAIN_WINDOW = 0.5;    // seconds after a punch to keep the chain going
 const HIT_AT = 0.4;          // how far through the punch the blow lands
+const SMASH_AT = 0.5;        // and through a smash
+const HOMING_MOST = 34;      // tiles per second a blow can close in on its target
+// What the body does for each smash, and for the last hit of a chain.
+const SMASH_POSE = { breaker: 'punch', launcher: 'uppercut', sweep: 'sweep', driver: 'kick', slam: 'slam', finisher: 'punch', spike: 'slam', execute: 'kick' };
+const PURSUE_TIME = 0.18;    // seconds to fly up to a launched foe
 const LUNGE = 3;             // tiles per second, stepping into the punch
 const WAVE_SPEED = 45;       // tiles per second; things break as the wave reaches them
 const AIR_PRACTICE = 0.1;
@@ -36,12 +41,7 @@ const BLOW_COLOR = '#ffb020';
 const ROLL_TIME = 0.42;      // seconds of a dodge roll
 const ROLL_SAFE = 0.3;       // of which nothing can touch you
 const ROLL_GAP = 0.2;        // seconds before you can roll again
-const PARRY = 0.22;          // seconds after raising your guard that a hit is turned aside
-const BLOCKED = 0.2;         // share of a hit that gets past a guard
-const CRUSHED = 0.6;         // share of a heavy one, which also knocks the guard down
 const GUARD_DOWN = 0.9;      // seconds a broken guard stays down
-const COUNTER = 1.8;         // seconds after a parry that your next punch is a counter
-const COUNTER_FORCE = 3;
 const GRAB_REACH = 4.5;
 const GRAB_HOLD = 3.5;       // seconds before a held monster squirms free
 const THROW = 34;            // tiles per second
@@ -121,7 +121,24 @@ export default class Melee {
     this.active = null;
     this.queued = false;
     this.chain = 0;
-    this.idle = CHAIN_WINDOW; // the first punch starts a fresh chain
+    this.idle = COMBAT.chainWindow; // the first punch starts a fresh chain
+    // The string of blows being thrown: light hits so far, smashes used, Vanishes spent.
+    this.hits = 0;
+    this.airHits = 0;
+    this.used = new Set();
+    this.vanishes = 0;
+    this.spirit = 1;           // pips, fractions included
+    this.posture = 0;          // the hero's own Structure, 0..1; full is Broken
+    this.postureAt = -9;
+    this.broken = 0;           // seconds left Broken
+    this.counterBy = 1;
+    this.rollAt = -9;          // when Circle was last pressed, for a Vanish
+    this.chase = null;         // a foe knocked flying, that a Vanish can catch up with
+    this.pursuit = null;       // a launched foe that Cross flies up to
+    this.pursuing = null;
+    this.airFoe = null;
+    this.hover = 0;            // seconds left hanging in the air mid-combo
+    this.armored = false;
     this.waves = [];
     this.monsters = null;
     this.stage = punchStage(this.skills, this.body);
@@ -164,18 +181,96 @@ export default class Melee {
     this.craters = Array.from({ length: CRATERS }, () => makeCrater(scene, map));
   }
 
+  // What a blow turns toward: the locked foe, the nearest one, or a tree or rock.
+  pick(state) {
+    const lock = this.lock && !this.lock.dying ? this.lock : null;
+    return lock ?? this.monsters.target(state) ?? (this.player.rooms.house ? null : this.work.target(state));
+  }
+
+  get inAir() {
+    return this.hover > 0 && this.player.state.air > 0.8;
+  }
+
+  // A new string of blows: the chain and the record of smashes start again.
+  restart() {
+    this.hits = 0;
+    this.airHits = 0;
+    this.used.clear();
+    this.vanishes = 0;
+  }
+
+  // Square: the next light hit of the rush chain, on the ground or in the air.
   punch(state) {
     if (this.active) {
-      this.queued = true; // remembered, so mashing Square keeps the chain going
+      this.queued = 'light'; // remembered, so mashing Square keeps the chain going
       return;
     }
     if (this.held) return this.pileDrive(state);
-    const target = this.lock ?? this.monsters.target(state) ?? (this.player.rooms.house ? null : this.work.target(state));
+    if (this.broken > 0) return;
+    const air = this.inAir, table = air ? COMBAT.airChain : COMBAT.chain;
+    if (this.idle >= COMBAT.chainWindow && !air) this.restart();
+    let n = air ? this.airHits : this.hits;
+    if (n >= table.length) {
+      if (air) return;
+      this.restart();
+      n = 0;
+    }
+    this.chain = n;
+    this.start(state, { kind: 'light', air, chain: n, last: n === table.length - 1, time: this.body.punchTime * (air ? 0.8 : COMBAT.chainTime[n]), hitAt: HIT_AT });
+  }
+
+  // Triangle: a smash, which one depending on how far the chain has come; on a Broken foe, an Execute.
+  heavy(state) {
+    if (this.active) {
+      this.queued = 'heavy';
+      return;
+    }
+    if (this.held) return this.pileDrive(state);
+    if (this.broken > 0) return;
+    const air = this.inAir, target = this.pick(state), t = this.monsters.time;
+    if (this.idle >= COMBAT.chainWindow && !air) this.restart();
+    const close = target?.def && Math.hypot(target.x - state.x, target.z - state.z) - target.radius < COMBAT.homing;
+    const name = !air && close && target.brokenUntil > t ? 'execute' : smashFor(this.hits, air);
+    const def = COMBAT.smash[name];
+    let power = def.power;
+    if (this.used.has(name)) {
+      power *= COMBAT.repeat;
+      this.dropString = true;
+    }
+    this.used.add(name);
+    this.start(state, { kind: 'smash', name, air, power, chain: 4, time: def.time * (this.body.punchTime / 0.34), hitAt: SMASH_AT }, target);
+  }
+
+  start(state, move, target = this.pick(state)) {
     if (target) state.dir = [target.x - state.x, target.z - state.z];
     const len = Math.hypot(...state.dir) || 1;
-    this.chain = this.idle < CHAIN_WINDOW ? (this.chain + 1) % CHAIN.length : 0;
     this.guarding = false;
-    this.active = { target, t: 0, time: this.body.punchTime * (this.chain === 2 ? 1.3 : 1), fx: state.dir[0] / len, fz: state.dir[1] / len, landed: false, chain: this.chain };
+    this.armored = move.kind === 'smash' && !!COMBAT.smash[move.name].armored;
+    this.active = { ...move, target, t: 0, fx: state.dir[0] / len, fz: state.dir[1] / len, landed: false };
+  }
+
+  spend(pips) {
+    if (this.spirit < pips) return false;
+    this.spirit = clampSpirit(this.spirit - pips);
+    return true;
+  }
+
+  gain(pips) {
+    this.spirit = clampSpirit(this.spirit + pips);
+  }
+
+  // The hero's own Structure moves; full, and they're Broken: open, with no guard, for a moment.
+  wear(amount) {
+    this.posture = Math.max(0, Math.min(1, this.posture + amount));
+    if (amount > 0) this.postureAt = this.clock;
+    if (this.posture < 1) return;
+    const { hud, state } = this.player;
+    hud.float('Broken!', state.x, state.y + 3.4, state.z, '#ff5a5a');
+    this.broken = COMBAT.broken.hero;
+    this.guarding = false;
+    this.guardDown = COMBAT.broken.hero;
+    this.posture = 0.6;
+    this.active = null;
   }
 
   // A blow from this hero at their current punch, before the combo adds to it.
@@ -200,36 +295,120 @@ export default class Melee {
     return this.rolling > ROLL_TIME - ROLL_SAFE;
   }
 
-  // An attack reaches this hero: does it land, and how hard? Roll past it, parry it, or block it.
-  defend(amount, x, z, heavy) {
+  // Circle: a Breakout when caught, a Vanish after a foe knocked flying, or a roll. Pressed just
+  // before a blow lands, the roll becomes a defensive Vanish (see defend).
+  dodge(state, x, z) {
+    this.rollAt = this.clock;
+    if ((this.player.flinch > 0 || this.broken > 0) && this.breakout(state)) return;
+    if (this.chase && this.clock < this.chase.until && this.vanishes < COMBAT.vanish.most && this.comboVanish(state)) return;
+    if (this.broken <= 0) this.roll(state, x, z);
+  }
+
+  // Blinks to (x, z): afterimages where the hero was and where they land, and the world slows.
+  blink(state, x, z, face) {
+    const ground = this.height(state.x, state.z);
+    this.work.burst(state.x, ground + 1.6, state.z, [this.aura, '#ffffff'], 14, 5, true);
+    state.x = x;
+    state.z = z;
+    state.dir = [face.x - x, face.z - z];
+    this.work.burst(x, this.height(x, z) + 1.6, z, [this.aura, '#ffffff'], 14, 5, true);
+    this.rolling = 0;
+    this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.slow.vanish);
+    this.work.lines = Math.max(this.work.lines ?? 0, 0.25);
+  }
+
+  get aura() {
+    return this.player.powers.def?.color ?? '#9fe8ff';
+  }
+
+  // Caught in a combo or Broken: burst free, throwing everything near back.
+  breakout(state) {
+    if (!this.spend(COMBAT.cost.breakout)) return false;
+    const { reach, power, safe } = COMBAT.breakout;
+    this.broken = 0;
+    this.guardDown = 0;
+    this.player.flinch = 0;
+    this.player.guard = Math.max(this.player.guard, safe);
+    this.work.actor = this.player;
+    this.blast(state.x, state.z, this.force * power, reach, 0, this.aura, null, 'knockdown', true);
+    this.work.burst(state.x, state.y + 1.4, state.z, [this.aura, '#ffffff'], 30, 10);
+    this.work.shake = Math.max(this.work.shake, 0.3);
+    this.work.shakeAt = state;
+    this.player.hud.float('Breakout!', state.x, state.y + 3.4, state.z, this.aura);
+    return true;
+  }
+
+  // After a blow that sends a foe flying: appear in its path and carry the string on.
+  comboVanish(state) {
+    const e = this.chase.e;
+    if (e.dying || !this.monsters.list.includes(e) || !this.spend(COMBAT.cost.vanish)) return false;
+    // Into its path; if it has already stopped, behind it.
+    const v = Math.hypot(e.vel.x, e.vel.y), d = Math.hypot(e.x - state.x, e.z - state.z) || 1, ahead = 2.4 + e.radius;
+    const [ux, uz] = v > 2 ? [e.vel.x / v, e.vel.y / v] : [(e.x - state.x) / d, (e.z - state.z) / d];
+    this.blink(state, e.x + ux * ahead, e.z + uz * ahead, e);
+    e.vel.set(0, 0);
+    e.flungUntil = 0;
+    this.chase = null;
+    this.vanishes++;
+    this.hits = 0;
+    this.idle = 0;
+    this.player.guard = Math.max(this.player.guard, 0.2);
+    return true;
+  }
+
+  // An attack reaches this hero: does it land, and how hard? Vanish, roll past it, parry it, or block it.
+  defend(amount, x, z, heavy, from = null) {
     const { hud, state } = this.player;
     const say = (text, color) => hud.float(text, state.x, state.y + 3.4, state.z, color);
+    const { vanish, parry, hero, counter } = COMBAT;
+    // Circle a breath before it lands, with Spirit to spend: gone, and behind them.
+    if (from && this.clock - this.rollAt < vanish.window && this.broken <= 0 && this.spend(COMBAT.cost.vanish)) {
+      const d = Math.hypot(from.x - state.x, from.z - state.z) || 1, back = vanish.behind + (from.radius ?? 1);
+      this.blink(state, from.x + ((from.x - state.x) / d) * back, from.z + ((from.z - state.z) / d) * back, from);
+      say('Vanish!', this.aura);
+      this.wear(hero.vanish);
+      this.countering = counter.secs;
+      this.counterBy = counter.plain;
+      return { avoided: true, vanished: true };
+    }
     if (this.rolling > 0 && this.rollSafe) {
       say('Dodged!', '#9fe8ff');
       this.work.stop = 0.1;
+      this.wear(hero.dodge);
       return { avoided: true };
     }
     const facing = Math.hypot(...state.dir) || 1, dx = x - state.x, dz = z - state.z, d = Math.hypot(dx, dz) || 1;
     const front = (dx * state.dir[0] + dz * state.dir[1]) / (d * facing) > 0;
     if (!this.guarding || !front) return { amount };
-    if (this.clock - this.guardAt < PARRY) {
-      say('Parry!', '#ffd24a');
-      this.work.stop = 0.14;
+    const since = this.clock - this.guardAt, perfect = since < parry.perfect;
+    // A Perfect parry turns anything; a plain one only what isn't heavy.
+    if (perfect || (since < parry.plain && !heavy)) {
+      say(perfect ? 'Perfect!' : 'Parry!', perfect ? '#ffffff' : '#ffd24a');
+      this.work.stop = COMBAT.stop.perfect;
       this.work.shake = Math.max(this.work.shake, 0.2);
-      this.work.burst(state.x, state.y + 1.6, state.z, ['#ffd24a', '#ffffff'], 18, 7);
-      this.countering = COUNTER;
-      return { avoided: true, parried: true };
+      this.work.burst(state.x, state.y + 1.6, state.z, perfect ? ['#ffffff', this.aura, '#ffd24a'] : ['#ffd24a', '#ffffff'], perfect ? 28 : 18, 7);
+      if (perfect) this.work.impact = COMBAT.impact;
+      this.countering = counter.secs;
+      this.counterBy = perfect ? counter.perfect : counter.plain;
+      this.gain(perfect ? COMBAT.spirit.perfect : COMBAT.spirit.parry);
+      this.wear(perfect ? hero.perfect : hero.parry);
+      if (from) this.monsters.wear(from, perfect ? COMBAT.parryPosture.perfect : COMBAT.parryPosture.plain);
+      return { avoided: true, parried: true, perfect };
     }
     this.work.burst(state.x, state.y + 1.6, state.z, ['#c9d4e2', '#ffffff'], 8, 4);
-    if (!heavy) return { amount: amount * BLOCKED };
+    if (!heavy) {
+      this.wear(hero.block);
+      return { amount: amount * COMBAT.blocked };
+    }
     say('Guard broken!', '#ff7a6a');
     this.guarding = false;
     this.guardDown = GUARD_DOWN;
-    return { amount: amount * CRUSHED };
+    this.wear(hero.heavy);
+    return { amount: amount * COMBAT.crushed };
   }
 
   setGuard(on) {
-    const up = on && this.guardDown <= 0 && !this.active && !this.held && this.rolling <= 0 && !this.charging;
+    const up = on && this.guardDown <= 0 && this.broken <= 0 && !this.active && !this.held && this.rolling <= 0 && !this.charging;
     if (up && !this.guarding) this.guardAt = this.clock;
     this.guarding = up;
   }
@@ -313,6 +492,63 @@ export default class Melee {
     state.rise = -DIVE;
   }
 
+  // Cross after a Launcher: fly up to the foe and carry the fight into the air.
+  pursue(state) {
+    const p = this.pursuit;
+    if (!p || this.clock > p.until || p.e.dying || !this.monsters.list.includes(p.e) || this.active) return false;
+    this.pursuit = null;
+    this.pursuing = { e: p.e, t: 0, x: state.x, z: state.z, air: state.air };
+    this.airHits = 0;
+    p.e.hang = this.monsters.time + PURSUE_TIME + 0.3;
+    this.work.lines = Math.max(this.work.lines ?? 0, PURSUE_TIME + 0.15);
+    this.work.burst(state.x, state.y + 0.3, state.z, [this.aura, '#ffffff'], 12, 5);
+    return true;
+  }
+
+  // Each frame of a Pursuit, then hanging there mid-combo with the foe.
+  updateAir(dt, state) {
+    const q = this.pursuing;
+    if (q) {
+      q.t += dt;
+      const e = q.e, k = Math.min(1, q.t / PURSUE_TIME), d = Math.hypot(e.x - q.x, e.z - q.z) || 1, off = e.radius + 1.3;
+      const x = e.x - ((e.x - q.x) / d) * off, z = e.z - ((e.z - q.z) / d) * off;
+      state.x = q.x + (x - q.x) * k;
+      state.z = q.z + (z - q.z) * k;
+      state.air = Math.max(0.9, q.air + (e.group.position.y - 0.4 - state.y - q.air) * k);
+      state.rise = 0;
+      state.dir = [e.x - state.x, e.z - state.z];
+      this.hover = 0.3;
+      if (k >= 1 || e.dying) {
+        this.pursuing = null;
+        this.airFoe = e.dying ? null : e;
+        this.hover = COMBAT.hover;
+        if (!e.dying) e.hang = this.monsters.time + COMBAT.hover;
+      }
+      return;
+    }
+    if (this.hover <= 0) {
+      this.airFoe = null;
+      return;
+    }
+    this.soft = true; // coming down from an air combo is no stomp
+    this.hover -= dt;
+    const e = this.airFoe;
+    if (e && !e.dying && e.hang > this.monsters.time) {
+      // Keep level with the foe, just in front of it.
+      state.air += (e.group.position.y - 0.4 - state.y - state.air) * Math.min(1, dt * 12);
+      state.rise = 0;
+    }
+  }
+
+  // A spiked foe meets the ground: it craters, and everything near is knocked down.
+  spikeLanded(e) {
+    this.work.actor = this.player;
+    this.blast(e.x, e.z, this.force * 1.2, 5 + this.stage, 2, PUNCHES[this.stage].color, null, 'knockdown', true);
+    this.work.shake = Math.max(this.work.shake, 0.35);
+    this.work.shakeAt = this.player.state;
+    this.work.impact = COMBAT.impact;
+  }
+
   landDive(state) {
     this.blast(state.x, state.z, this.force * 1.5, 6 + this.stage, 0, '#ffb547', null);
     this.work.shake = Math.max(this.work.shake, 0.25);
@@ -360,8 +596,8 @@ export default class Melee {
       this.orb.visible = this.orbAge < 9;
       return;
     }
-    // Once the Blow is open a punch throws when the button comes up, so holding never punches.
-    if (!held && this.heldFor > 0 && !this.charging && this.blowReady && !state.air && (!house || house.hostile)) this.punch(state);
+    // Once the Blow is open a smash throws when Triangle comes up, so holding never smashes.
+    if (!held && this.heldFor > 0 && !this.charging && this.blowReady && !state.air && (!house || house.hostile)) this.heavy(state);
     this.heldFor = held ? this.heldFor + dt : 0;
     this.slam = Math.max(0, this.slam - dt);
     if (!this.charging) {
@@ -447,7 +683,9 @@ export default class Melee {
   // For the sprite: null when not punching.
   get pose() {
     const a = this.active;
-    return a && { t: a.t / a.time, chain: a.chain, stage: this.stage, color: PUNCHES[this.stage].color };
+    if (!a) return null;
+    const arm = a.chain % 2, move = a.kind === 'smash' ? SMASH_POSE[a.name] : a.last && !a.air ? 'kick' : a.air && a.last ? 'uppercut' : 'punch';
+    return { t: a.t / a.time, chain: a.chain, arm, move, stage: this.stage, color: PUNCHES[this.stage].color };
   }
 
   // Inside a cave the ground is the cave floor, whatever the land does above.
@@ -456,32 +694,79 @@ export default class Melee {
   }
 
   land(a, state) {
-    const p = PUNCHES[this.stage], finisher = a.chain === 2, heavy = this.body.massScale, spread = Math.sqrt(heavy);
-    let force = this.force * CHAIN[a.chain];
+    const p = PUNCHES[this.stage], smash = a.kind === 'smash' ? COMBAT.smash[a.name] : null, heavy = this.body.massScale, spread = Math.sqrt(heavy);
+    // The end of a chain, and every smash, throws the punch's full wave; a light hit, its plain one.
+    const finisher = a.kind === 'smash' || a.last;
+    let force = this.force * (smash ? a.power : (a.air ? COMBAT.airChain : COMBAT.chain)[a.chain]);
+    let posture = smash ? smash.posture : 1, react = smash ? smash.react : a.last && !a.air ? 'fly' : 'flinch';
     if (this.countering > 0) {
-      force *= COUNTER_FORCE;
+      force *= this.counterBy;
+      posture += 1;
       this.countering = 0;
       this.hud.float('Counter!', state.x, state.y + 3.4, state.z, '#ffd24a');
     }
     const t = a.target && !a.target.dying && !this.work.chunks.gone.has(a.target.id) ? a.target : null;
     const r = t ? (t.r ?? t.radius) : 0;
     const x = t ? t.x - a.fx * r : state.x + a.fx * 1.2, z = t ? t.z - a.fz * r : state.z + a.fz * 1.2;
-    const reach = p.radius * (finisher ? FINISHER_REACH : 1) * spread;
-    const crater = !this.player.rooms.house && (finisher || this.stage >= 3) ? p.crater * spread * (finisher ? FINISHER_REACH : 1) : 0;
-
-    const struck = this.blast(x, z, force, reach, crater, p.color, t);
+    if (a.name === 'execute' && t?.def) {
+      force *= this.cornered(t, a.fx, a.fz) ? 1.5 : 1;
+      t.brokenUntil = 0;
+      t.posture = 0;
+      posture = 0;
+      this.gain(COMBAT.spirit.execute);
+      this.hud.float('Execute!', t.x, t.group.position.y + 4, t.z, '#ff5a5a');
+      this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.slow.execute);
+    }
+    const reach = smash?.reach ?? p.radius * (finisher ? FINISHER_REACH : 1) * spread;
+    const crater = !this.player.rooms.house && (finisher || this.stage >= 3) && !a.air ? p.crater * spread * (finisher ? FINISHER_REACH : 1) : 0;
+    // A sweep or a finisher knocks down all it reaches; anything else throws only its target.
+    const all = a.name === 'sweep' || a.name === 'finisher';
+    const struck = this.blast(x, z, force, reach, crater, p.color, t, react, all, posture);
     this.skills.add('punching', struck ? 1 : AIR_PRACTICE);
     if (t && !t.def) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);
-    if (struck || reach) {
-      this.work.burst(x, this.height(x, z) + 1.1, z, [p.color, '#fff8ea', '#94808a'], p.chips, 4 + this.stage * 1.5);
-      this.work.stop = p.stop * (finisher ? 1.6 : 1);
+    if (t?.def) {
+      this.gain(smash ? COMBAT.spirit.smash : COMBAT.spirit.hit);
+      if (a.air) {
+        t.hang = this.monsters.time + COMBAT.hover;
+        this.hover = COMBAT.hover;
+        this.airFoe = t;
+      }
+      if (react === 'launch') this.pursuit = { e: t, until: this.clock + 0.9 };
+      if (react === 'fly') this.chase = { e: t, until: this.clock + COMBAT.vanish.combo };
+      if (react === 'spike') {
+        t.hang = 0;
+        this.hover = 0;
+        state.rise = -30;
+      }
     }
-    this.work.shake = Math.max(this.work.shake, (struck || reach ? p.shake : 0) * (finisher ? 1.5 : 1));
+    if (a.kind === 'light') a.air ? this.airHits++ : this.hits++;
+    else this.hits = 0;
+    if (struck || reach) {
+      this.work.burst(x, this.height(x, z) + 1.1 + (a.air ? state.air : 0), z, [p.color, '#fff8ea', '#94808a'], p.chips, 4 + this.stage * 1.5);
+      this.work.stop = Math.max(p.stop * (finisher ? 1.6 : 1), a.name === 'execute' ? COMBAT.stop.execute : smash ? COMBAT.stop.smash : COMBAT.stop.light);
+      if (smash && struck) this.work.impact = COMBAT.impact;
+    }
+    this.work.shake = Math.max(this.work.shake, (struck || reach ? Math.max(p.shake, smash ? 0.18 : 0.05) : 0) * (finisher ? 1.5 : 1));
+    if (this.dropString) {
+      this.dropString = false;
+      this.restart();
+      this.idle = COMBAT.chainWindow;
+    }
     this.refreshStage();
+  }
+
+  // Up against a wall, a cliff or water: an Execute drives the foe into it, and hurts far more.
+  cornered(e, fx, fz) {
+    const x = e.x + fx * 4, z = e.z + fz * 4, here = landHeight(e.x, e.z), there = landHeight(x, z);
+    return this.monsters.walled(x, z, e) || there < 0.5 || here - there > 5;
   }
 
   // Landing from a jump: mass alone is enough to shake the ground.
   stomp(state, fell) {
+    if (this.soft) {
+      this.soft = false;
+      return;
+    }
     const hard = fell > HARD_LANDING, reach = this.body.stompReach * (hard ? 1 : HOP_STOMP);
     if (!reach) return;
     this.blast(state.x, state.z, this.body.massScale * this.body.damageScale, reach, hard ? reach * 0.6 : 0, '#c9a0ff', null);
@@ -490,13 +775,14 @@ export default class Melee {
   }
 
   // One blow going out from a point. Returns true if it met anything.
-  blast(x, z, force, reach, crater, color, target) {
+  // `react` is how the target (or, with `all`, everything) is thrown; `posture`, the Structure it wears.
+  blast(x, z, force, reach, crater, color, target, react = null, all = false, posture = 1) {
     const queue = [];
-    if (target) queue.push(target.def ? { m: target, at: 0, force } : { o: target, at: 0, force });
+    if (target) queue.push(target.def ? { m: target, at: 0, force, react, posture } : { o: target, at: 0, force });
     const falloff = (d) => force * (1 - 0.6 * Math.min(1, d / Math.max(reach, 1)));
     for (const m of this.monsters.within(x, z, Math.max(reach, MONSTER_REACH))) {
       const d = Math.hypot(m.x - x, m.z - z);
-      if (m !== target) queue.push({ m, at: d / WAVE_SPEED, force: falloff(d) });
+      if (m !== target) queue.push({ m, at: d / WAVE_SPEED, force: falloff(d), react: all ? react : null, posture: all ? 1 : 0.5 });
     }
     const inside = !!this.player.rooms.house;
     if (reach) {
@@ -606,9 +892,14 @@ export default class Melee {
   updateWave(w, dt) {
     w.t += dt;
     while (w.queue.length && w.queue[0].at <= w.t) {
-      const { o, m, h, foe, force, at } = w.queue.shift();
+      const { o, m, h, foe, force, at, react, posture } = w.queue.shift();
       if (foe) this.hitHero(foe, force, w.x, w.z);
-      else if (m) this.monsters.hit(m, force, w.x, w.z);
+      else if (m) {
+        // The health bar stays on the foe being fought, not whatever the wave reaches later.
+        const keep = this.struck;
+        this.monsters.hit(m, force, w.x, w.z, react, posture);
+        if (at > 0) this.struck = keep ?? (this.barFor > 0 && this.barOn && !this.barOn.dying ? null : m);
+      }
       else if (h) w.broke = this.work.hitHouse(h, force, { x: w.x, z: w.z, reach: w.reach ?? 0, y: this.player.state.y + 1.3 }) || w.broke;
       else if (!this.work.chunks.gone.has(o.id)) w.broke = this.work.hit(o, force, w.drops, at > 0) || w.broke;
     }
@@ -622,6 +913,12 @@ export default class Melee {
   // Timers, the lock, and the enemy's health bar.
   updateMoves(dt, state) {
     this.clock += dt;
+    this.broken = Math.max(0, this.broken - dt);
+    if (this.clock - this.postureAt > COMBAT.hero.rest) this.posture = Math.max(0, this.posture - COMBAT.hero.back * dt);
+    // Spirit fades back toward one pip once the fighting is over.
+    if (this.player.calm > COMBAT.spirit.rest && this.spirit > 1) this.spirit = Math.max(1, this.spirit - COMBAT.spirit.drain * dt);
+    if (this.chase && this.clock > this.chase.until) this.chase = null;
+    this.updateAir(dt, state);
     this.guardDown = Math.max(0, this.guardDown - dt);
     this.countering = Math.max(0, this.countering - dt);
     this.rollWait = Math.max(0, this.rollWait - dt);
@@ -643,7 +940,23 @@ export default class Melee {
     }
     this.barFor -= dt;
     const foe = this.lock ?? (this.barFor > 0 ? this.barOn : null);
-    this.hud.setFoe(foe && !foe.dying ? foe.def.name : '', foe ? Math.max(0, foe.hp) / (foe.maxHp || 1) : 0);
+    this.hud.setFoe(foe && !foe.dying ? foe.def.name : '', foe ? Math.max(0, foe.hp) / (foe.maxHp || 1) : 0, foe?.postureMax ? (foe.posture ?? 0) / foe.postureMax : 0, foe?.brokenUntil > this.monsters.time);
+    this.hud.setFight(this.spirit, this.posture, this.broken > 0);
+    this.threats(state);
+  }
+
+  // Monsters coming for this hero from outside the view, as angles off the camera's forward.
+  threats(state) {
+    const yaw = this.player.world.viewYaw(this.player), fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), list = [];
+    if (FEATURES.combatCore && !this.player.rooms.house) {
+      for (const e of this.monsters.within(state.x, state.z, 32)) {
+        const tell = e.mode === 'tell' || e.mode === 'strike';
+        if ((!e.turn && !tell) || e.foe !== this.player) continue;
+        const dx = e.x - state.x, dz = e.z - state.z, a = Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz);
+        if (Math.abs(a) > 1.05) list.push({ a, tell });
+      }
+    }
+    this.hud.setThreats(list.slice(0, 6));
   }
 
   update(dt, state) {
@@ -664,18 +977,25 @@ export default class Melee {
     if (a) {
       a.t += dt;
       if (!a.landed) {
-        state.x += a.fx * LUNGE * dt;
-        state.z += a.fz * LUNGE * dt;
-        if (a.t >= a.time * HIT_AT) {
+        // Steps in to meet the target, closing the gap by the moment the blow lands.
+        const e = a.target?.def && !a.target.dying ? a.target : null;
+        const gap = e ? Math.hypot(e.x - state.x, e.z - state.z) - e.radius - 1.3 : 0;
+        const pace = e && gap > 0 && gap < COMBAT.homing + 2 ? Math.min(HOMING_MOST, gap / Math.max(0.03, a.time * a.hitAt - a.t)) : a.air ? 0 : LUNGE;
+        state.x += a.fx * pace * dt;
+        state.z += a.fz * pace * dt;
+        if (a.t >= a.time * a.hitAt) {
           a.landed = true;
           this.land(a, state);
         }
       }
       if (a.t >= a.time) {
         this.active = null;
+        this.armored = false;
         this.idle = 0;
-        if (this.queued) this.punch(state);
+        const next = this.queued;
         this.queued = false;
+        if (next === 'light') this.punch(state);
+        else if (next === 'heavy') this.heavy(state);
       }
     }
     for (const w of this.waves) this.updateWave(w, dt);

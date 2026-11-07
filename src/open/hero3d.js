@@ -141,6 +141,10 @@ const POSES = {
     const r = `${arm}`, o = `${1 - arm}`;
     set(p, { lx0: 0.55, lx1: -0.5, lk0: 0.35, lk1: 0.2, twist: arm ? 0.6 : -0.6, waist: 0.2, [`ax${r}`]: 1.55, [`ae${r}`]: 0.05, [`as${r}`]: -0.12, [`ax${o}`]: -0.55, [`ae${o}`]: 1.8, [`as${o}`]: 0.2 });
   },
+  // A straight kick, the leg driven through the target: the end of a rush chain.
+  kick: (p) => set(p, { lx0: 1.65, lk0: 0.05, lx1: -0.3, lk1: 0.25, waist: -0.28, chest: -0.12, twist: 0.35, head: 0.2, ax0: -0.7, ax1: 0.9, as0: 0.5, as1: 0.4, ae0: 1.3, ae1: 1.5 }),
+  // Low and spinning, one leg swept out wide.
+  sweep: (p, t) => { crouch(p, 1.3, 2.1); set(p, { lx1: 0.25, lk1: 0.1, ls1: 1.25, waist: 0.65, twist: 0.8 + Math.sin(t * 30) * 0.08, ax0: 0.5, ax1: 0.5, as0: 1, as1: 1, ae0: 0.4, ae1: 0.4, head: -0.3 }); },
   uppercut: (p, t, arm) => {
     const r = `${arm}`, o = `${1 - arm}`;
     set(p, { lx0: 0.2, lx1: -0.3, lk0: 0.1, lk1: 0.25, twist: arm ? 0.35 : -0.35, waist: -0.18, chest: -0.2, head: 0.25, [`ax${r}`]: 2.85, [`ae${r}`]: 0.75, [`ax${o}`]: -0.4, [`ae${o}`]: 1.5 });

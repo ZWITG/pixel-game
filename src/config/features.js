@@ -43,4 +43,6 @@ export const FEATURES = {
   voxelWorld: true,     // open world: the land, trees, rocks and grass are cubes (half a tile); off = the smooth land
   voxels: true,         // open world: raze works and kingdom buildings are breakable voxels (voxels.js); off = the painted models fall whole
   wanderingVillagers: true, // villagers stroll and patrol instead of standing still
+  combatCore: true,     // open world: rush chain + Triangle smashes, air combos, Vanish, Structure, Spirit, edge arrows (combat.js)
+  impactFrames: true,   // open world: two-tone ink frames on smashes and Perfect parries (also a Settings switch)
 };

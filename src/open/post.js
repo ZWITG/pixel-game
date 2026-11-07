@@ -34,7 +34,7 @@ const shafts = () => pass(/* glsl */`varying vec2 vUv; uniform sampler2D tMap; u
     gl_FragColor=vec4(vec3(s/10.),1.);
   }`, { tMap: { value: null }, uSun: { value: new THREE.Vector2() } });
 
-const finish = () => pass(/* glsl */`varying vec2 vUv; uniform sampler2D tMap,tGlow,tShaft; uniform vec3 uSunCol,uShadow; uniform float uGlow,uShaft,uSat,uExposure;
+const finish = () => pass(/* glsl */`varying vec2 vUv; uniform sampler2D tMap,tGlow,tShaft; uniform vec3 uSunCol,uShadow; uniform float uGlow,uShaft,uSat,uExposure,uImpact,uLines,uTime;
   float ign(vec2 p){ return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715)))); }
   vec3 curve(vec3 x){ return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.); }
   void main(){
@@ -47,10 +47,20 @@ const finish = () => pass(/* glsl */`varying vec2 vUv; uniform sampler2D tMap,tG
     c+=uShadow*.06*(1.-smoothstep(0.,.35,l));   // colored shadows, never dead black
     vec2 v=vUv-.5; c*=1.-dot(v,v)*.28;
     c=pow(max(c,vec3(0.)),vec3(1./2.2));
+    // An impact frame: the picture turns to ink on paper, light and dark swapped, for an instant.
+    float g=dot(c,vec3(.299,.587,.114));
+    c=mix(c,mix(vec3(.97,.94,.86),vec3(.05,.03,.08),smoothstep(.36,.46,g)),uImpact);
+    // Speed lines streaking in from the edges.
+    if(uLines>0.){
+      vec2 q=vUv-.5; q.x*=1.6;
+      float r=length(q),n=fract(sin(floor(atan(q.y,q.x)*70.)+floor(uTime*24.)*3.17)*43758.5453);
+      c=mix(c,vec3(1.),step(.8,n)*smoothstep(.25,.6,r)*uLines*.6);
+    }
     c+=(ign(gl_FragCoord.xy)-.5)/255.;          // hides banding in soft skies
     gl_FragColor=vec4(c,1.);
   }`, {
   tMap: { value: null }, tGlow: { value: null }, tShaft: { value: null }, uGlow: { value: 0.3 }, uShaft: { value: 0 }, uSat: { value: 1 }, uExposure: { value: 1 },
+  uImpact: { value: 0 }, uLines: { value: 0 }, uTime: { value: 0 },
   uSunCol: { value: new THREE.Color() }, uShadow: { value: new THREE.Color() },
 });
 

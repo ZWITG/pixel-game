@@ -25,7 +25,8 @@ const ROLE_OF = { slime: 'fodder', sporeling: 'fodder', bat: 'fodder', puffcap: 
 const GROWTH_KEPT = 0.85;     // monsters keep up with a hero's might, but only this far: strength is felt
 const BLOW = 1.3;             // an average blow in a chain, of a hero's might
 const ELDER_HITS = 2.4, ELDER_BITE = 1.3;
-export const roleOf = (e) => ROLES[e.def.boss ? 'ruler' : e.def.machine ? 'machine' : ROLE_OF[e.kind] ?? 'fighter'];
+export const roleName = (e) => (e.def.boss ? 'ruler' : e.def.machine ? 'machine' : ROLE_OF[e.kind] ?? 'fighter');
+export const roleOf = (e) => ROLES[roleName(e)];
 const EVOLVE_TIME = 2.4; // seconds of shaking and glowing before the new form breaks out
 const box3 = new THREE.Box3(), up = new THREE.Vector3(0, 1, 0);
 

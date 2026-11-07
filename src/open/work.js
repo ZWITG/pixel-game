@@ -137,6 +137,9 @@ export default class Work {
     this.actor = null; // the player whose blow is being worked out
     this.rumble = 0;
     this.stop = 0; // hit-stop: seconds of slowed time after a heavy blow
+    this.slow = 0; // slow motion, seconds of real time
+    this.impact = 0; // an impact frame, seconds of real time
+    this.lines = 0; // speed lines, seconds of real time
     this.hurt = new Map();
     this.shaking = null;
     this.falling = [];

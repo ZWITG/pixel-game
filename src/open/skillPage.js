@@ -68,14 +68,52 @@ export default class WorldHud {
     });
   }
 
-  // The name and health of the enemy being fought.
-  setFoe(name, amount) {
+  // The name, health and Structure of the enemy being fought.
+  setFoe(name, amount, posture = 0, broken = false) {
     if (name !== this.foeName) {
       this.foeName = name;
       this.$('foe').hidden = !name;
       this.$('foe-name').textContent = name;
     }
-    if (name) this.$('foe-fill').style.width = `${amount * 100}%`;
+    if (!name) return;
+    this.$('foe-fill').style.width = `${amount * 100}%`;
+    const post = this.$('foe-post');
+    post.firstChild.style.width = `${(broken ? 1 : posture) * 100}%`;
+    post.classList.toggle('broken', broken);
+  }
+
+  // Spirit pips, and the hero's own Structure (hidden while it's empty).
+  setFight(spirit, posture, broken) {
+    const box = this.$('fight');
+    if (!this.pips) {
+      box.innerHTML = `<div class="pips">${'<i><b></b></i>'.repeat(5)}</div><div class="post"><u></u></div>`;
+      this.pips = [...box.querySelectorAll('.pips i')];
+      this.postFill = box.querySelector('.post u');
+    }
+    this.pips.forEach((pip, i) => {
+      const k = Math.max(0, Math.min(1, spirit - i));
+      pip.firstChild.style.transform = `scaleX(${k})`;
+      pip.classList.toggle('full', k >= 1);
+    });
+    this.postFill.style.width = `${(broken ? 1 : posture) * 100}%`;
+    box.classList.toggle('broken', broken);
+    box.classList.toggle('calm', posture < 0.02 && !broken);
+  }
+
+  // Edge arrows for attackers out of sight: `a` is radians clockwise from straight ahead.
+  setThreats(list) {
+    const box = this.$('threats');
+    if (!this.arrows) this.arrows = [];
+    while (this.arrows.length < list.length) this.arrows.push(box.appendChild(document.createElement('i')));
+    this.arrows.forEach((el, i) => {
+      const t = list[i];
+      el.hidden = !t;
+      if (!t) return;
+      el.style.left = `${50 + Math.sin(t.a) * 44}%`;
+      el.style.top = `${50 - Math.cos(t.a) * 40}%`;
+      el.style.setProperty('--a', `${t.a}rad`);
+      el.classList.toggle('tell', t.tell);
+    });
   }
 
   setHealth(amount) {

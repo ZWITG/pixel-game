@@ -169,7 +169,7 @@ export default class GameMenu {
     if (id === 'satchel') {
       p.hud.togglePack(p);
       const key = (action) => prompt(action, p.controls.device);
-      p.hud.pack.hints.innerHTML = `${key('confirm')} Use, wear or craft&nbsp;&nbsp; ${key('punch')} Drop&nbsp;&nbsp; ${key('pack')} Bag or Craft&nbsp;&nbsp; ${key('back')} Close`;
+      p.hud.pack.hints.innerHTML = `${key('confirm')} Use, wear or craft&nbsp;&nbsp; ${key('punch')} Drop&nbsp;&nbsp; ${key('heavy')} Bag or Craft&nbsp;&nbsp; ${key('back')} Close`;
     }
     this.world.checkPause();
     if (id === 'map') this.fit();
@@ -200,6 +200,7 @@ export default class GameMenu {
       { label: 'Graphics', value: choice(QUALITY, settings.quality)[1], note: choice(QUALITY, settings.quality)[2], step: (d) => this.cycle('quality', QUALITY.map(([id]) => id), d) },
       { label: 'Button hints', value: HINTS.find(([, id]) => id === settings.hints)[0], note: 'The list along the bottom of the screen', step: (d) => this.cycle('hints', HINTS.map(([, id]) => id), d) },
       { label: 'Compass', value: settings.compass ? 'On' : 'Off', note: 'Goals, towns and your pin', step: () => this.flip('compass') },
+      { label: 'Impact frames', value: settings.impact !== false ? 'On' : 'Off', note: 'A two-tone flash on the biggest blows', step: () => this.flip('impact') },
       { label: 'Return to title', value: this.sure ? 'Press again' : '', note: 'Your hero and where you stand are saved', step: () => this.leaveGame(), action: true },
     ];
   }
@@ -367,8 +368,8 @@ export default class GameMenu {
       hud.map.handle(just);
       hud.map.update(dt);
     } else if (id === 'satchel') {
-      // L1 and R1 belong to the tabs here, so Triangle swaps between Bag and Craft.
-      hud.pack.handle({ ...just, packTab: just.pack });
+      // L1 and R1 belong to the tabs here, so Triangle (or the touchpad) swaps between Bag and Craft.
+      hud.pack.handle({ ...just, packTab: just.pack || just.heavy });
       hud.pack.update();
     } else if (id === 'settings') {
       const n = this.options().length;

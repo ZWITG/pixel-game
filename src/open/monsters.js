@@ -3,12 +3,13 @@ import { ENEMIES } from '../data/enemies.js';
 import { makeOrb } from '../render/models.js';
 import { height, biome, region, PLACES, SPAWN, TOWNS } from './terrain.js';
 import { CAVE_FLOOR } from './cave.js';
-import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts } from './evolve.js';
+import { TIERS, tierFor, setTier, startEvolving, updateEvolving, animateParts, roleName } from './evolve.js';
+import { COMBAT, ROLE_POSTURE } from './combat.js';
 import { nationAt } from './nations.js';
 import { makeFigure } from './figures.js';
 import { makeCreature } from './creatures.js';
 import { machineMesh, DOCTRINES } from './doctrines.js';
-import { arm, stagger, standDown, TURN_TAKERS, PARRIED } from './foes.js';
+import { arm, stagger, standDown, TURN_TAKERS } from './foes.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
 import { nearSolids } from './solidGrid.js';
 
@@ -84,7 +85,10 @@ export default class Monsters {
       // Land only, so nothing wades in after a swimmer.
       move: (e, dx, dz) => {
         const x = e.group.position.x + dx, z = e.group.position.z + dz;
-        if (e.cave ? !e.cave.walk(x - e.cave.x, z - e.cave.z) : height(x, z) < 0.5 || this.walled(x, z, e)) return;
+        if (e.cave ? !e.cave.walk(x - e.cave.x, z - e.cave.z) : height(x, z) < 0.5 || this.walled(x, z, e)) {
+          if (e.flungUntil > this.time && !e.cave && height(x, z) >= 0.5) this.splat(e);
+          return;
+        }
         e.group.position.x = x;
         e.group.position.z = z;
       },
@@ -134,6 +138,9 @@ export default class Monsters {
 
   onEnemyKilled(e) {
     this.world.realm.slain(e);
+    // The last of a group falls in slow motion.
+    const hero = this.work.actor;
+    if (hero?.state && this.list.length > 1 && !this.within(hero.state.x, hero.state.z, 45).length) this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.slow.last);
     this.work.actor?.nature.killed();
     // Evolved monsters teach more and drop more.
     this.work.skills.add('fighting', 3 * (1 + e.tier));
@@ -240,20 +247,24 @@ export default class Monsters {
     return this.list.filter((e) => !e.dying && Math.hypot(e.x - x, e.z - z) - e.radius < range);
   }
 
-  // A blow on a monster: heavier blows send it further and throw it into the air.
-  hit(e, force, x, z) {
+  // A blow on a monster: heavier blows send it further and throw it into the air. `react` names how
+  // it's thrown (COMBAT.react); without one, it goes as far as the force sends it. `posture` is the
+  // Structure the blow wears down.
+  hit(e, force, x, z, react = null, posture = 1) {
     if (e.dying) return;
     if (e.heldBy) e.heldBy.melee.drop();
     e.takeHit(Math.round(force * this.work.actor.nature.edge(e) * 10) / 10, x, z);
     e.recoil = 1;
     this.work.skills.add('fighting', 1);
+    this.wear(e, posture);
     if (e.boss) {
-      // Far too big to knock about. It only reels from a parry.
+      // Far too big to knock about. It only reels from a parry, or when its Structure breaks.
       e.knockUntil = 0;
       e.vel.set(0, 0);
       this.work.actor.melee.struck = e;
       return;
     }
+    if (react) return this.react(e, force, react);
     const fling = Math.min(KNOCK_LIMIT, 7 + force * 1.5);
     e.vel.normalize().multiplyScalar(fling);
     e.knockUntil = this.time + 0.2 + Math.min(0.8, force * 0.02);
@@ -265,19 +276,80 @@ export default class Monsters {
     if (!e.dying && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
   }
 
+  // Thrown the way a blow says. Big ones shrug off anything but a stagger until their Structure breaks.
+  react(e, force, react) {
+    const broken = e.brokenUntil > this.time, big = roleName(e) === 'brute' || e.elder;
+    if (big && !broken && react !== 'flinch') react = 'stagger';
+    const r = COMBAT.react[react], dir = e.vel.clone().normalize();
+    // Dazed first (which stops it dead), then thrown.
+    if (!e.dying) stagger(e, Math.max(r.stun, broken ? e.brokenUntil - this.time : 0), this.time, react !== 'flinch' || broken);
+    e.vel.copy(dir).multiplyScalar(r.fling);
+    e.knockUntil = this.time + Math.max(0.15, r.fling / 30);
+    if (r.rise > 0 || e.air > 0) {
+      e.rise = r.rise;
+      e.air = Math.max(e.air, 0.01);
+      if (r.rise > 0) e.hang = 0;
+    }
+    if (r.down) e.downUntil = this.time + r.down;
+    if (r.flung) Object.assign(e, { flungUntil: this.time + r.flung, flungBy: this.work.actor, flungForce: force });
+    if (react === 'spike' && e.air > 0) e.spiked = this.work.actor;
+    this.work.actor.melee.struck = e;
+    if (!e.dying && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
+  }
+
+  // Wears down a monster's Structure. Full, it's Broken: dazed, open, and ready to be Executed.
+  wear(e, amount) {
+    if (!amount || e.dying) return;
+    e.postureMax ??= ROLE_POSTURE(roleName(e)) * (e.elder ? 1.5 : 1) * (1 + (e.tier ?? 0) * 0.1);
+    e.posture = Math.min(e.postureMax, (e.posture ?? 0) + amount);
+    e.postureAt = this.time;
+    if (e.posture < e.postureMax || e.brokenUntil > this.time) return;
+    const secs = COMBAT.broken.foe * (e.boss ? 1.5 : 1), y = e.group.position.y;
+    e.brokenUntil = this.time + secs;
+    stagger(e, secs, this.time, true);
+    e.vel.set(0, 0);
+    this.work.burst(e.x, y + 2, e.z, ['#ffffff', '#ffd24a', '#ff5a5a'], 22, 8);
+    const hero = this.work.actor ?? this.players[0];
+    hero.hud?.float('Broken!', e.x, y + 4.5, e.z, '#ffd24a');
+    hero.melee?.ring(e.x, y, e.z, e.radius + 3, '#ffd24a');
+    this.work.shake = Math.max(this.work.shake, 0.18);
+  }
+
+  // A foe sent flying hits a wall: it hurts more, and it's stuck there a moment.
+  splat(e) {
+    const by = e.flungBy, y = e.group.position.y;
+    e.flungUntil = 0;
+    if (by) this.work.actor = by;
+    e.takeHit(Math.round((e.flungForce ?? 1) * COMBAT.wall.power * 10) / 10, e.x + Math.sin(e.group.rotation.y), e.z + Math.cos(e.group.rotation.y));
+    e.vel.set(0, 0);
+    this.wear(e, 2);
+    if (!e.dying) stagger(e, COMBAT.wall.stun, this.time, true);
+    this.work.burst(e.x, y + 1.5, e.z, ['#f3ead8', '#a89a8c', '#ffffff'], 20, 7);
+    by?.hud.float('Wall splat!', e.x, y + 4, e.z, '#ffb547');
+    this.work.shake = Math.max(this.work.shake, 0.25);
+    if (by) this.work.shakeAt = by.state;
+  }
+
   // `from` is the monster striking, if any; `heavy` attacks can't simply be blocked.
   hurt(p, amount, fromX, fromZ, { heavy: crushing = false, from = null } = {}) {
     const s = p.state;
     if (p.guard > 0 || (p.rooms.house && !p.rooms.house.hostile)) return;
-    const answer = p.melee.defend(amount, fromX, fromZ, crushing);
+    const answer = p.melee.defend(amount, fromX, fromZ, crushing, from);
     if (answer.avoided) {
-      if (answer.parried && from) stagger(from, PARRIED, this.time, true);
+      if (answer.parried && from) stagger(from, answer.perfect ? COMBAT.parried.perfect : COMBAT.parried.plain, this.time, true);
+      if (answer.vanished && from && !from.boss) stagger(from, 0.8, this.time, true);
       return;
     }
     amount = answer.amount;
     const heavy = p.body.massScale, taken = Math.max(0.5, (amount * (1 - p.body.guard)) / Math.sqrt(heavy));
     p.hp -= taken;
-    p.flinch = 0.28;
+    // A smash in progress shrugs the blow off and carries on.
+    if (!p.melee.armored) {
+      p.flinch = 0.28;
+      p.melee.active = null;
+      p.melee.hover = 0;
+      p.melee.pursuing = null;
+    }
     p.guard = HURT_GUARD;
     p.calm = 0;
     p.skills.add('fighting', 0.5);
@@ -431,11 +503,27 @@ export default class Monsters {
       }
       // Lunging: a monster about to bite rears up at its target.
       e.model.root.rotation.x = hero && !e.dying && e.evolving === undefined && far < e.radius + 5 ? -0.25 * (1 - far / (e.radius + 5)) : 0;
+      // Knocked flat, or swaying on its feet while Broken.
+      if (e.downUntil > this.time && !e.dying) e.model.root.rotation.x = -1.3 * Math.min(1, (e.downUntil - this.time) * 4);
+      e.model.root.rotation.z = e.brokenUntil > this.time && !e.dying ? Math.sin(this.time * 13) * 0.16 : 0;
       if (e.air > 0 || e.rise > 0) {
-        e.rise -= 40 * dt;
+        // Mid-combo it hangs where it was struck.
+        if (e.hang > this.time) e.rise = 0;
+        else e.rise -= 40 * dt;
         e.air = Math.max(0, e.air + e.rise * dt);
-        if (!e.air) e.rise = 0;
+        if (!e.air) {
+          e.rise = 0;
+          if (e.spiked) {
+            e.spiked.melee.spikeLanded(e);
+            e.spiked = null;
+          }
+        }
       }
+      // Structure comes back once the blows stop; a Broken foe gets some back when it recovers.
+      if (e.brokenUntil && e.brokenUntil <= this.time) {
+        e.brokenUntil = 0;
+        e.posture = e.postureMax * 0.3;
+      } else if (e.posture > 0 && !e.brokenUntil && this.time - e.postureAt > COMBAT.postureRest) e.posture = Math.max(0, e.posture - COMBAT.postureBack * dt);
       e.group.position.y = (e.cave ? CAVE_FLOOR : this.groundY(e.x, e.z, e.group.position.y)) + e.air;
       if (e.heldBy) e.heldBy.melee.carry(e);
       // A thrown monster hits the ground like a bomb.

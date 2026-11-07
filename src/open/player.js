@@ -82,7 +82,7 @@ export default class Player {
       else if (skill.discipline) hud.message(`${skill.levels[level - 1].title}! See Gifts in the menu.`, true);
       else if (skill.power) hud.message(`${skill.name} reached rank ${level + 1}!`, true);
       else if (raw.id === 'jumping' && level === JUMP_MAX && conq?.flight) hud.message('Jumping has evolved into Flight! Jump and hold X to fly.', true, 5000);
-      else if (raw.id === 'punching' && level === 5 && conq?.blow) hud.message('Punching has evolved into Destructive Blow! Hold Square, then let go.', true, 5000);
+      else if (raw.id === 'punching' && level === 5 && conq?.blow) hud.message('Punching has evolved into Destructive Blow! Hold Triangle, then let go.', true, 5000);
       else if (raw.id === 'running' && level === RUN_MAX && conq?.superspeed) hud.message('Running has evolved into Superspeed! While sprinting, press sprint again.', true, 5000);
       else if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
       else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
@@ -178,15 +178,18 @@ export default class Player {
     if (fights && !swim.inWater) {
       if (just.roll) {
         const m = this.controls.move(), yaw = world.viewYaw(this), sy = Math.sin(yaw), cy = Math.cos(yaw);
-        melee.roll(state, cy * m.x + sy * m.y, -sy * m.x + cy * m.y);
+        melee.dodge(state, cy * m.x + sy * m.y, -sy * m.x + cy * m.y);
       }
       if (just.grab) melee.grab(state);
       if (just.target) melee.aim(state);
       if (melee.lock && just.targetLeft) melee.shiftAim(state, -1);
       if (melee.lock && just.targetRight) melee.shiftAim(state, 1);
-      if (just.punch && state.air > 0.8) melee.dive(state);
+      if (just.punch && state.air > 0.8 && melee.hover <= 0 && !melee.pursuing) melee.dive(state);
     }
-    if (FEATURES.punching && just.punch && !melee.blowReady && !state.air && fights) melee.punch(state);
+    // Square: the rush chain. Triangle: a smash, which once Destructive Blow is open throws on release.
+    const reach = !state.air || melee.hover > 0;
+    if (FEATURES.punching && just.punch && fights && reach) melee.punch(state);
+    if (FEATURES.punching && just.heavy && fights && reach && (!melee.blowReady || melee.hover > 0)) melee.heavy(state);
     if (!spot) {
       hud.setAction('');
       return false;
@@ -248,6 +251,12 @@ export default class Player {
   jump(dt, y) {
     const { state, skills, hud, controls } = this, level = skills.level('flight'), most = FLY_TIME[level];
     const hold = controls.padHeld.CROSS || controls.held.has('Space');
+    // Hanging mid-combo: no gravity, and no hard landing to come.
+    if ((this.melee.hover > 0 || this.melee.pursuing) && state.air > 0) {
+      state.rise = 0;
+      state.peak = state.air;
+      return;
+    }
     state.held = hold && state.air > 0 ? (state.held ?? 0) + dt : 0;
     state.flying = this.wings && !this.rooms.house && this.wind > 0 && state.held > TAP;
     if (state.flying) {
@@ -311,14 +320,16 @@ export default class Player {
     }
     this.bar.update(this.powers, controls.device);
     if (this.powers.def) this.growForm();
-    if (FEATURES.jump && just.jump && !used && free && !state.air && !melee.active) {
+    // Cross just after a Launcher flies up after the foe instead of jumping.
+    const pursued = just.jump && !used && free && melee.pursue(state);
+    if (FEATURES.jump && just.jump && !used && !pursued && free && !state.air && !melee.active) {
       // A kick up out of the water is weaker than a jump off the ground, but it gets you out.
       state.rise = body.jumpSpeed * (swim.inWater ? WATER_JUMP : 1);
       world.work.burst(state.x, state.y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], 4, 2);
       state.air = 0.01;
       skills.add('jumping', 1);
       this.nature.jumpedOff();
-    } else if (FEATURES.jump && just.jump && !used && free && state.air > 0.3 && !melee.active) this.nature.airJump();
+    } else if (FEATURES.jump && just.jump && !used && !pursued && free && state.air > 0.3 && !melee.active && melee.hover <= 0) this.nature.airJump();
     const look = free ? controls.look() : { x: 0, y: 0 };
     aim.yaw -= look.x;
     this.looked = look.x || look.y ? 0 : this.looked + dt;
@@ -330,12 +341,12 @@ export default class Player {
     }
     aim.pitch = THREE.MathUtils.clamp(aim.pitch + look.y, -0.25, 1.2);
 
-    const m = !free || melee.active || melee.rolling > 0 ? { x: 0, y: 0 } : controls.move(false), amount = Math.min(1, Math.hypot(m.x, m.y));
+    const m = !free || melee.active || melee.rolling > 0 || melee.hover > 0 || melee.pursuing || melee.broken > 0 ? { x: 0, y: 0 } : controls.move(false), amount = Math.min(1, Math.hypot(m.x, m.y));
     if (!world.paused) {
       this.updateSuper(dt, !!(controls.held.has('ShiftLeft') || controls.padHeld.R2), amount > 0.05 && free);
       melee.updateMoves(dt, state);
       melee.setGuard(free && !!(controls.held.has('KeyG') || controls.padHeld.L2));
-      melee.updateCharge(dt, state, !melee.held && !!(controls.held.has('KeyJ') || controls.padHeld.SQUARE), free);
+      melee.updateCharge(dt, state, !melee.held && !!(controls.held.has('KeyU') || controls.padHeld.TRIANGLE), free);
     }
     if (amount > 0.05) {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
@@ -550,9 +561,10 @@ export default class Player {
   // What the body is doing now, as [pose name, forward lean, options]; the first thing that applies wins.
   motion(pose, time) {
     const { state, swim, melee } = this, pace = state.pace ?? 0;
-    if (this.flinch) return ['hurt', -0.15];
+    if (this.flinch || melee.broken > 0) return ['hurt', -0.15];
     if (this.powers.casting > 0) return [this.powers.pose, 0.05];
-    if (pose) return [pose.t < 0.35 ? 'windup' : pose.chain === 2 ? 'uppercut' : 'punch', 0, { arm: pose.chain === 1 ? 1 : 0 }];
+    if (pose) return [pose.t < 0.35 ? 'windup' : pose.move, 0, { arm: pose.arm }];
+    if (melee.pursuing || melee.hover > 0) return ['rising', 0.1];
     if (melee.rolling > 0) return ['roll', (1 - melee.rolling / 0.42) * Math.PI * 2];
     if (melee.held) return ['hold', 0];
     if (melee.slam > 0) return [state.moving ? 'throw' : 'slam', 0.25];
@@ -578,6 +590,6 @@ export default class Player {
     const heroY = swim.inWater ? -1.2 * this.body.heroScale + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air + melee.lift + (this.stepOff ?? 0) + (state.riding ? SADDLE : 0);
     const pose = melee.pose, [name, lean, options] = this.motion(pose, time);
     hero.update(state.x, heroY, state.z, state.dir, name, lean, time, options);
-    hero.punch(pose, pose?.chain === 1 ? 1 : 0);
+    hero.punch(pose, pose?.arm ?? 0);
   }
 }
