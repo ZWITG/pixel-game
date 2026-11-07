@@ -217,7 +217,7 @@ export default class Melee {
       n = 0;
     }
     this.chain = n;
-    this.start(state, { kind: 'light', air, chain: n, mult: table[n], last: n === table.length - 1, time: this.body.punchTime * (air ? 0.8 : COMBAT.chainTime[n] ?? COMBAT.surge.hitTime), hitAt: HIT_AT });
+    this.start(state, { kind: 'light', air, chain: n, mult: table[n], last: n === table.length - 1, time: this.body.punchTime * (air ? 0.8 : COMBAT.chainTime[n] ?? COMBAT.surge.hitTime) * (this.weapon?.time ?? 1), hitAt: HIT_AT });
     if (this.surging) this.handTrail(n % 2, this.active.time);
   }
 
@@ -254,6 +254,11 @@ export default class Melee {
     this.start(state, { kind: 'smash', name, air, power, chain: 4, time: def.time * (this.body.punchTime / 0.34), hitAt: SMASH_AT }, target);
     this.handTrail(0, this.active.time);
     this.handTrail(1, this.active.time);
+  }
+
+  // The weapon in hand, if the Conqueror's kit has one (the Frostwarden's ice: kits/frost.js WEAPONS).
+  get weapon() {
+    return this.player.powers.kitDef?.weapon?.(this.player.powers) ?? null;
   }
 
   get surging() {
@@ -743,6 +748,11 @@ export default class Melee {
     const finisher = a.kind === 'smash' || a.last;
     let force = this.force * (smash ? a.power : a.mult);
     let posture = smash ? smash.posture : 1, react = smash ? smash.react : a.last && !a.air ? 'fly' : 'flinch';
+    const wpn = this.weapon;
+    if (wpn && !a.air) {
+      force *= wpn.power;
+      posture *= wpn.posture;
+    }
     if (this.countering > 0) {
       force *= this.counterBy;
       posture += 1;
@@ -762,16 +772,18 @@ export default class Melee {
       this.hud.float('Execute!', t.x, t.group.position.y + 4, t.z, '#ff5a5a');
       this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.slow.execute);
     }
+    // A smash on a frozen foe Shatters it (the Frostwarden).
+    if (smash && t?.def) force *= this.player.powers.kitDef?.smashed?.(this.player.powers, t, a) ?? 1;
     // A Conqueror's own Finisher (the Titan's Pillar Uppercut); smashes on a sunken foe hit twice as hard.
     if (a.name === 'finisher' && t?.def) react = this.player.powers.kitDef?.finisher?.(this, t) ?? react;
     if (smash && t?.sunkUntil > this.monsters.time) {
       force *= 2;
       this.hud.float('Sunk!', t.x, t.group.position.y + 3, t.z, '#c8a060');
     }
-    const reach = (smash?.reach ?? p.radius * (finisher ? FINISHER_REACH : 1) * spread) * (1 + this.player.powers.bonus('reach'));
+    const reach = Math.max((smash?.reach ?? p.radius * (finisher ? FINISHER_REACH : 1) * spread) * (1 + this.player.powers.bonus('reach')), a.kind === 'light' ? wpn?.reach ?? 0 : 0);
     const crater = !this.player.rooms.house && (finisher || this.stage >= 3) && !a.air ? p.crater * spread * (finisher ? FINISHER_REACH : 1) : 0;
     // A sweep or a finisher knocks down all it reaches; anything else throws only its target.
-    const all = a.name === 'sweep' || a.name === 'finisher';
+    const all = a.name === 'sweep' || a.name === 'finisher' || (a.kind === 'light' && !!wpn?.all);
     const struck = this.blast(x, z, force, reach, crater, p.color, t, react, all, posture);
     this.skills.add('punching', struck ? 1 : AIR_PRACTICE);
     if (t && !t.def) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);

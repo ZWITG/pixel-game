@@ -209,12 +209,14 @@ const ULTIMATES = {
     name: 'Stillness', secs: 5, color: '#8fe0ff', tint: '#cfeaff', reach: 45, gray: 0.7,
     start(u) {
       const { state } = u.p;
+      // It grows with the Frostwarden: wider with Mastery.
+      u.reach = Math.min(70, this.reach + u.p.powers.mastery * 0.8);
       u.dome = u.world.vfx.dome(state.x, u.ground(state.x, state.z), state.z, '#bfeaff');
-      u.still = u.foes(this.reach);
+      u.still = u.foes(u.reach);
       u.pose('slam');
     },
     tick(u, t) {
-      const r = this.reach, grow = Math.min(1, t / 0.5);
+      const r = u.reach ?? this.reach, grow = Math.min(1, t / 0.5);
       u.world.vfx.shape(u.dome, r * (1 - (1 - grow) ** 3), t < 4.2 ? 0.9 : Math.max(0, 1 - (t - 4.2) * 2));
       // Inside, time has stopped for everything but the Frostwarden.
       for (const e of u.foes(r)) {
@@ -234,7 +236,7 @@ const ULTIMATES = {
           u.world.fx.impact('ice', e.x, u.ground(e.x, e.z), e.z, 4);
         }
         const { x, z } = u.dome.mesh.position;
-        u.world.vfx.shock(x, u.ground(x, z), z, 46, '#ffffff', 0.6);
+        u.world.vfx.shock(x, u.ground(x, z), z, (u.reach ?? 45) + 1, '#ffffff', 0.6);
         u.boom(0.8);
       }],
     ],

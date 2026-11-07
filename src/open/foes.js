@@ -77,6 +77,9 @@ function pickMove(e, dist) {
 function strike(monsters, e, move) {
   const hero = e.foe;
   if (!hero || e.landed) return;
+  // Drawn to a Frost Mirror, its blows go into the ice instead.
+  const decoy = hero.powers?.kitDef?.decoy?.(hero.powers);
+  if (decoy && Math.hypot(e.x - decoy.x, e.z - decoy.z) < 25) return;
   const s = hero.state, d = Math.hypot(s.x - e.x, s.z - e.z);
   if (s.air > 3) return;
   if (d < (move.area ?? move.reach) + e.radius) {

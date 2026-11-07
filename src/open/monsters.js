@@ -335,7 +335,7 @@ export default class Monsters {
   hurt(p, amount, fromX, fromZ, { heavy: crushing = false, from = null } = {}) {
     const s = p.state;
     if (p.guard > 0 || (p.rooms.house && !p.rooms.house.hostile)) return;
-    amount = p.powers.absorb(amount);
+    amount = p.powers.absorb(amount, from);
     const answer = p.melee.defend(amount, fromX, fromZ, crushing, from);
     if (answer.avoided) {
       if (answer.parried && from) stagger(from, answer.perfect ? COMBAT.parried.perfect : COMBAT.parried.plain, this.time, true);
@@ -476,6 +476,12 @@ export default class Monsters {
       if (hero) {
         this.player.x = hero.state.x;
         this.player.z = hero.state.z;
+        // A Frost Mirror near it draws its attention instead.
+        const decoy = hero.powers.kitDef?.decoy?.(hero.powers);
+        if (decoy && Math.hypot(e.x - decoy.x, e.z - decoy.z) < 25) {
+          this.player.x = decoy.x;
+          this.player.z = decoy.z;
+        }
       }
       if (e.evolving !== undefined && !e.dying) updateEvolving(e, dt, this.time, (m, tier) => this.evolved(m, tier));
       this.pushing = e;

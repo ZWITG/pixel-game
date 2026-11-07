@@ -40,9 +40,9 @@ export const BRANCHES = {
   frost: {
     drop: ['running'],
     list: [
-      B('forge', 'Frostforge', '#bfeaff', 'Ice made into weapons and armour.', ['shards', 'lance', 'armor'], ['punching', 'fighting']),
-      B('glacier', 'Glacier', '#8fe0ff', 'Ice as land: walls, fields and moving glaciers.', ['wall', 'field', 'avalanche'], ['swimming', 'climbing', 'mining']),
-      B('stillness', 'Stillness', '#e4f6ff', 'All things stopping: freezing, and time itself.', ['flash', 'zero'], ['jumping', 'woodcutting', 'frost.stillness']),
+      B('forge', 'Frostforge', '#bfeaff', 'Ice made into weapons and armour: the forge, shards, armour, a mirror of yourself.', ['flash', 'shards', 'armor', 'mirror'], ['punching', 'fighting']),
+      B('glacier', 'Glacier', '#8fe0ff', 'Ice as land: walls, hail, rime and moving glaciers, the sea itself frozen.', ['wall', 'lance', 'field', 'avalanche', 'zero'], ['swimming', 'climbing', 'mining']),
+      B('stillness', 'Stillness', '#e4f6ff', 'All things stopping: the Crystal Prison, Shatter, and time itself.', ['prison'], ['jumping', 'woodcutting', 'frost.stillness']),
     ],
   },
 };
