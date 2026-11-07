@@ -217,6 +217,7 @@ export default class Melee {
       n = 0;
     }
     this.chain = n;
+    this.player.world.watchers?.saw(this.player, 'jab', n);
     this.start(state, { kind: 'light', air, chain: n, mult: table[n], last: n === table.length - 1, time: this.body.punchTime * (air ? 0.8 : COMBAT.chainTime[n] ?? COMBAT.surge.hitTime) * (this.weapon?.time ?? 1), hitAt: HIT_AT });
     if (this.surging) this.handTrail(n % 2, this.active.time);
   }
@@ -245,6 +246,7 @@ export default class Melee {
       target = flown;
       this.chase = null;
     }
+    this.player.world.watchers?.saw(this.player, 'smash', this.hits);
     let power = def.power;
     if (this.used.has(name)) {
       power *= COMBAT.repeat;
@@ -343,7 +345,11 @@ export default class Melee {
     this.rollAt = this.clock;
     if ((this.player.flinch > 0 || this.broken > 0) && this.breakout(state)) return;
     if (this.chase && this.clock < this.chase.until && this.vanishes < COMBAT.vanish.most && this.comboVanish(state)) return;
-    if (this.broken <= 0) this.roll(state, x, z);
+    if (this.broken <= 0) {
+      const was = this.rolling;
+      this.roll(state, x, z);
+      if (this.rolling > was) this.player.world.watchers?.saw(this.player, 'dodge', this.player.world.watchers.rollWay(this.player, x, z));
+    }
   }
 
   // Blinks to (x, z): afterimages where the hero was and where they land, and the world slows.
@@ -377,6 +383,7 @@ export default class Melee {
     this.work.shake = Math.max(this.work.shake, 0.3);
     this.work.shakeAt = state;
     this.player.hud.float('Breakout!', state.x, state.y + 3.4, state.z, this.aura);
+    this.player.world.watchers?.saw(this.player, 'breakout');
     return true;
   }
 
@@ -439,8 +446,11 @@ export default class Melee {
       this.rage(perfect ? COMBAT.wrath.perfect : COMBAT.wrath.parry);
       this.wear(perfect ? hero.perfect : hero.parry);
       if (from) this.monsters.wear(from, perfect ? COMBAT.parryPosture.perfect : COMBAT.parryPosture.plain);
+      this.player.world.watchers?.saw(this.player, 'guard', perfect ? 'perfect' : 'plain');
       return { avoided: true, parried: true, perfect };
     }
+    // Guarding, but too soon for a parry.
+    this.player.world.watchers?.saw(this.player, 'guard', 'early');
     this.work.burst(state.x, state.y + 1.6, state.z, ['#c9d4e2', '#ffffff'], 8, 4);
     if (!heavy) {
       this.wear(hero.block);

@@ -18,7 +18,7 @@ const NEAR = 70, FAR = 110, FULL = 40;
 const MARCH = 5, CHARGE = 6, ENGAGE = 120;
 const ARMY_EVERY = 600, FIRST = 60, TRUCE = 600;
 const ROUT = 0.35, BREAK = 0.15;
-const LOSS = { unit: 0.6, captain: 0.12, machine: 0.08, commander: 0.35, supply: 0.15 };  // `unit` is spread over the army's size
+const LOSS = { unit: 0.6, captain: 0.12, machine: 0.08, commander: 0.35, supply: 0.15, watcher: 0.25 };  // `unit` is spread over the army's size
 const MOST_UNITS = 400;
 const LEVY = 0.6, VETERAN = 0.3, PER_SQUAD = 10, PER_TROOP = 4;
 
@@ -99,12 +99,20 @@ export default class Armies {
     add('machine', d.machine, 1);
     add('machine', n.id === 'aurel' ? 'trebuchet' : d.machine, 1);
     add('commander', d.troops[0], 1);
+    // A Watcher marches with it (watchers.js).
+    if (this.world.watchers) add('watcher', this.world.watchers.pick(), 1);
     // In ranks: machines and the Commander at the back, levies in front.
-    const order = { levy: 0, veteran: 1, captain: 2, machine: 3, commander: 3 };
+    const order = { levy: 0, veteran: 1, captain: 2, machine: 3, commander: 3, watcher: 3 };
     squads.sort((a, b) => order[a.role] - order[b.role]).forEach((s, i) => {
       s.ox = ((i % 4) - 1.5) * 9;
       s.oz = -Math.floor(i / 4) * 9;
     });
+    // A Watcher leads it, out in front, and takes the field first (embody goes in order).
+    const lead = squads.findIndex((s) => s.role === 'watcher');
+    if (lead > 0) {
+      Object.assign(squads[lead], { ox: 0, oz: 12 });
+      squads.unshift(...squads.splice(lead, 1));
+    }
     const army = {
       n, nation: n.id, squads, size: squads.reduce((t, s) => t + s.count, 0), morale: 1, state: 'march',
       x: n.x, z: n.z, dx: 0, dz: 1, commander: nameCaptain(n.id), wagon: wagonMesh(n.color), supply: 1, dust: 0,
@@ -126,6 +134,7 @@ export default class Armies {
     let loss = LOSS.unit / Math.max(10, a.size);
     if (s?.role === 'captain') loss += LOSS.captain;
     if (s?.role === 'machine') loss += LOSS.machine;
+    if (s?.role === 'watcher') loss += LOSS.watcher;
     if (s?.role === 'commander') {
       loss += LOSS.commander;
       for (const p of this.world.players) p.hud.message(`Commander ${a.commander} has fallen! The army of ${a.n.name} wavers.`, true, 4000);

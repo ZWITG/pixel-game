@@ -75,7 +75,7 @@ export default class Enemy {
     this.animate(dt);
     const glow = this.model.mat.emissive;
     if (t < this.flashUntil) glow.copy(FLASH);
-    else if (this.state === 'windup') glow.copy(WINDUP_GLOW).multiplyScalar(0.6 + 0.4 * Math.sin(t * 30));
+    else if (this.state === 'windup') glow.copy(this.windupGlow ?? WINDUP_GLOW).multiplyScalar(0.6 + 0.4 * Math.sin(t * 30));
     else glow.copy(this.baseGlow);
   }
 

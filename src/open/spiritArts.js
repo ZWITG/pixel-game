@@ -41,6 +41,7 @@ export default class SpiritArts {
     if (this.cool > 0 || this.wave) return;
     if (!melee.spend(shot.cost)) return this.short();
     this.cool = shot.every;
+    this.p.world.watchers?.saw(this.p, 'shot');
     const aim = powers.aim();
     state.dir = [aim.dx, aim.dz];
     this.hand(FROM, aim.dx, aim.dz);

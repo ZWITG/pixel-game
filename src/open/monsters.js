@@ -8,6 +8,7 @@ import { COMBAT, ROLE_POSTURE } from './combat.js';
 import { nationAt } from './nations.js';
 import { makeFigure } from './figures.js';
 import { makeCreature } from './creatures.js';
+import { makeWatcher } from './watcherForms.js';
 import { machineMesh, DOCTRINES } from './doctrines.js';
 import { arm, stagger, standDown, TURN_TAKERS } from './foes.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
@@ -36,7 +37,7 @@ const GROUPS = [
 ];
 // Everything that walks the open world wears its new body. The old slime, boar, wisp and
 // mushroom models are read as beast shapes here, so one animation drives them all.
-MODELS.human = (def) => makeFigure(def.figure ?? def.look, { sword: !!def.sword });
+MODELS.human = (def) => (def.watcher ? makeWatcher(def.look) : makeFigure(def.figure ?? def.look, { sword: !!def.sword }));
 MODELS.beast = (def) => makeCreature(def.shape ?? def.was, def);
 
 const OLD_SHAPES = ['slime', 'boar', 'wisp', 'mushroom'];
@@ -149,6 +150,7 @@ export default class Monsters {
     this.work.actor?.wrath?.gain(COMBAT.wrath.kill);
     this.work.actor?.powers?.kitDef?.killed?.(this.work.actor.powers, e); // a Gravecaller's kills leave Husks
     this.world.armies?.killed(e);
+    this.world.watchers?.killed(e);
     // What the world makes of it (omega.js).
     if (this.world.players.includes(this.work.actor)) {
       const om = this.world.omega;
@@ -218,8 +220,10 @@ export default class Monsters {
     e.group.position.y = cave ? CAVE_FLOOR : this.groundY(x, z);
     const hero = this.nearest(e) ?? this.players[0];
     e.tough = this.toughness(x, z, hero);
-    setTier(e, e.def.boss ? 0 : Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
+    setTier(e, e.def.boss || e.def.watcher ? 0 : Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
     this.list.push(e);
+    // A Watcher fights by its own rules (watchers.js).
+    if (e.def.watcher) this.world.watchers?.adopt(e, hero);
     // A war machine stands with its crew; without them it can't shoot (siege.js).
     if (e.def.machine && !cave && !noCrew && this.world.siege) this.world.siege.crew(e);
     return e;
@@ -268,13 +272,19 @@ export default class Monsters {
   // Structure the blow wears down.
   hit(e, force, x, z, react = null, posture = 1) {
     if (e.dying) return;
+    // A Watcher may read the blow, or ward against its element (watchers.js).
+    if (e.watch) {
+      const left = this.world.watchers?.struck(e, this.work.actor) ?? 1;
+      if (!left) return;
+      force *= left;
+    }
     if (e.heldBy) e.heldBy.melee.drop();
     e.takeHit(Math.round(force * this.work.actor.nature.edge(e) * 10) / 10, x, z);
     e.recoil = 1;
     this.work.skills.add('fighting', COMBAT.xp.hit);
     this.wear(e, posture);
-    if (e.boss) {
-      // Far too big to knock about. It only reels from a parry, or when its Structure breaks.
+    if (e.boss || (e.watch && !(e.brokenUntil > this.time))) {
+      // Far too big to knock about (a Watcher, until its Structure breaks). It only reels from a parry, or when its Structure breaks.
       e.knockUntil = 0;
       e.vel.set(0, 0);
       this.work.actor.melee.struck = e;
@@ -289,12 +299,12 @@ export default class Monsters {
     if (!e.dying) stagger(e, 0.55, this.time);
     this.work.actor.melee.struck = e;
     // A fight it survives can push it over the edge.
-    if (!e.dying && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
+    if (!e.dying && !e.watch && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
   }
 
   // Thrown the way a blow says. Big ones shrug off anything but a stagger until their Structure breaks.
   react(e, force, react) {
-    const broken = e.brokenUntil > this.time, big = roleName(e) === 'brute' || e.elder;
+    const broken = e.brokenUntil > this.time, big = roleName(e) === 'brute' || e.elder || !!e.watch;
     if (big && !broken && react !== 'flinch') react = 'stagger';
     const r = COMBAT.react[react], dir = e.vel.clone().normalize();
     // Dazed first (which stops it dead), then thrown.
@@ -310,7 +320,7 @@ export default class Monsters {
     if (r.flung) Object.assign(e, { flungUntil: this.time + r.flung, flungBy: this.work.actor, flungForce: force });
     if (react === 'spike' && e.air > 0) e.spiked = this.work.actor;
     this.work.actor.melee.struck = e;
-    if (!e.dying && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
+    if (!e.dying && !e.watch && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
   }
 
   // Wears down a monster's Structure. Full, it's Broken: dazed, open, and ready to be Executed.
@@ -377,7 +387,8 @@ export default class Monsters {
     s.z += ((s.z - fromZ) / d) * push;
     this.work.shake = Math.max(this.work.shake, 0.2);
     this.work.shakeAt = s;
-    if (p.hp <= 0) p.down();
+    // Brought down in a Watcher's Trial, a hero is spared.
+    if (p.hp <= 0 && !this.world.watchers?.spare(p)) p.down();
     p.hud.setHealth(p.hp / p.body.maxHealth);
   }
 
@@ -451,7 +462,7 @@ export default class Monsters {
   stir() {
     for (const e of this.list) {
       const hero = this.nearest(e);
-      if (!hero || e.boss || e.dying || e.evolving !== undefined || e.tier >= tierFor(hero.body.level)) continue;
+      if (!hero || e.boss || e.watch || e.dying || e.evolving !== undefined || e.tier >= tierFor(hero.body.level)) continue;
       if (Math.hypot(e.x - hero.state.x, e.z - hero.state.z) < EVOLVE_WATCH && Math.random() < EVOLVE_ODDS) startEvolving(e);
     }
   }

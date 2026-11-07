@@ -451,6 +451,7 @@ export default class PowerSet {
     state.dir = [aim.dx, aim.dz];
     this.player.world.work.actor = player;
     const own = this.kitDef?.[kind];
+    player.world.watchers?.saw(player, 'power', pid);
     if (own) own(this, job, aim);
     else this[kind](job, aim);
     this.waits[pid] = def.cool * (1 - rank * 0.07);

@@ -59,6 +59,7 @@ for (const [role, r] of Object.entries(ROLES)) {
   if (role === 'fighter') check(A.dmg + smash('execute').power >= hp * 0.95, 'a fighter falls to one string and an Execute');
   if (role === 'brute' || role === 'ruler' || role === 'fighter') check(share < 0.85, `${role} breaks before it falls`);
   if (role === 'ruler') check(strings > 10, 'a ruler takes more than ten strings');
+  if (role === 'watcher') check(share < 0.6 && strings > 4, 'a Watcher breaks early and takes more than four strings');
 }
 
 // Spirit: what a fight pays, and what defence costs.

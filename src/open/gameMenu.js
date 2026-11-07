@@ -8,6 +8,7 @@ import { DOCTRINES } from './doctrines.js';
 import { TIERS, tierOf } from './settlements.js';
 import { GOODS } from './economy.js';
 import { SKILLS } from './skills.js';
+import { WATCHERS, ORDER } from './watchers.js';
 
 // The menu in play: one row of icon tabs over the map, the Spirit Tree, the Satchel, the
 // buttons and the settings. Add a tab by adding an entry to TABS and a case in `show`.
@@ -36,8 +37,9 @@ const SHAPES = {
   landmark: 'M12 2l3 7 7 .7-5.300 4.700 1.600 7.100L12 17.800l-6.300 3.700 1.600-7.100L2 9.700 9 9z',
   goal: 'M12 2 22 12 12 22 2 12z',
   pin: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6z',
+  watchers: 'M12 5C6 5 2 12 2 12s4 7 10 7 10-7 10-7-4-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z',
 };
-const TABS = [['map', 'Map'], ['nations', 'Nations'], ['powers', 'Powers'], ['gifts', 'Gifts'], ['skills', 'Skills'], ['satchel', 'Satchel'], ['controls', 'Controls'], ['settings', 'Settings']];
+const TABS = [['map', 'Map'], ['nations', 'Nations'], ['powers', 'Powers'], ['gifts', 'Gifts'], ['skills', 'Skills'], ['satchel', 'Satchel'], ['watchers', 'Watchers'], ['controls', 'Controls'], ['settings', 'Settings']];
 export const SATCHEL_TAB = 5;
 const TERRITORY = 128;      // cells across the map's overlay of borders
 const POWER_COLS = 4, DIRS = ['up', 'right', 'down', 'left'], DIR_NAMES = ['Up', 'Right', 'Down', 'Left'];
@@ -104,7 +106,8 @@ export default class GameMenu {
       const at = e.target.closest('[data-at]'), card = e.target.closest('[data-card]'), slot = e.target.closest('[data-slot]');
       if (at) {
         this.at = Number(at.dataset.at);
-        this.choose(1);
+        if (TABS[this.tab][0] === 'watchers') this.watcherRows()[this.at]?.go();
+        else this.choose(1);
       } else if (card) {
         this.at = Number(card.dataset.card);
         this.assigning = false;
@@ -165,7 +168,7 @@ export default class GameMenu {
     this.device = p.controls.device;
     [...this.tabs.children].forEach((el, i) => el.classList.toggle('at', i === tab));
     this.mapBox.hidden = id !== 'map';
-    this.page.hidden = id !== 'controls' && id !== 'settings' && id !== 'powers' && id !== 'gifts' && id !== 'nations';
+    this.page.hidden = id !== 'controls' && id !== 'settings' && id !== 'powers' && id !== 'gifts' && id !== 'nations' && id !== 'watchers';
     this.assigning = false;
     if (id === 'skills') p.hud.toggle(p.skills.all(), p.body);
     if (id === 'satchel') {
@@ -192,7 +195,8 @@ export default class GameMenu {
     document.getElementById('menu-next').innerHTML = p('menuRight');
     const pin = this.owner.pin;
     const own = { map: `${p('confirm')} ${pin ? 'Remove pin' : 'Drop pin'}&nbsp;&nbsp; ${p('punch')} Zoom&nbsp;&nbsp;`, satchel: '', powers: '', controls: '', settings: `${p('confirm')} Change&nbsp;&nbsp;` }[id];
-    if (id === 'powers') this.hints.innerHTML = this.assigning ? `${p('left')} ${p('up')} ${p('right')} ${p('down')} Pick a button&nbsp;&nbsp; ${p('heavy')} Other page&nbsp;&nbsp; ${p('back')} Cancel` : `${p('confirm')} Equip&nbsp;&nbsp; ${p('heavy')} Other page&nbsp;&nbsp; ${p('back')} Close`;
+    if (id === 'watchers') this.hints.innerHTML = `${p('confirm')} Choose&nbsp;&nbsp; ${p('left')} ${p('right')} Insight&nbsp;&nbsp; ${p('back')} Close`;
+    else if (id === 'powers') this.hints.innerHTML = this.assigning ? `${p('left')} ${p('up')} ${p('right')} ${p('down')} Pick a button&nbsp;&nbsp; ${p('heavy')} Other page&nbsp;&nbsp; ${p('back')} Cancel` : `${p('confirm')} Equip&nbsp;&nbsp; ${p('heavy')} Other page&nbsp;&nbsp; ${p('back')} Close`;
     else this.hints.innerHTML = id === 'skills' || id === 'satchel' ? '' : `${own ?? ''}${p('back')} Close`;
   }
 
@@ -239,6 +243,7 @@ export default class GameMenu {
     if (id === 'powers') this.drawPowers();
     if (id === 'gifts') this.drawGifts();
     if (id === 'nations') this.drawNations();
+    if (id === 'watchers') this.drawWatchers();
     if (id === 'settings') {
       this.page.innerHTML = this.options().map((o, i) => `<button data-at="${i}" class="${i === this.at ? 'at' : ''}"><b>${o.label}</b><small>${o.note}</small><em>${o.action ? o.value : `‹ ${o.value} ›`}</em></button>`).join('');
     }
@@ -388,8 +393,73 @@ export default class GameMenu {
         this.drawPage();
       } else if (just.confirm) this.choose(1);
       else if ((just.left || just.right) && !this.options()[this.at].action) this.choose(just.right ? 1 : -1);
+    } else if (id === 'watchers') {
+      const rows = this.watcherRows(), n = rows.length;
+      if (!n) return undefined;
+      if (just.up || just.down) {
+        this.at = (this.at + (just.down ? 1 : n - 1)) % n;
+        this.sure = false;
+        this.drawPage();
+      } else if (just.confirm) rows[this.at].go();
+      else if (just.left || just.right) rows[this.at].step?.(just.right ? 1 : -1);
     } else if (id === 'map') this.updateMap(dt, just);
     return undefined;
+  }
+
+  // The Watchers page: a Trial for each one met, at a chosen Insight; learning on or off; forgetting.
+  watcherRows() {
+    const W = this.world.watchers;
+    if (!W) return [];
+    this.trialAt ??= {};
+    const insight = (t) => this.trialAt[t] ?? Math.round(W.insight);
+    const rows = ORDER.filter((t) => W.met[t]).map((t) => ({
+      label: `Trial: ${WATCHERS[t].name}`, note: WATCHERS[t].text, value: `Insight ${insight(t)}`,
+      step: (d) => {
+        this.trialAt[t] = Math.max(0, Math.min(5, insight(t) + d));
+        this.drawPage();
+      },
+      go: () => {
+        const p = this.owner;
+        this.close();
+        W.startTrial(p, t, insight(t));
+      },
+    }));
+    rows.push(
+      { label: 'Learning', note: 'Off: they stop learning from how you fight', value: W.frozen ? 'Off' : 'On', step: () => this.flipLearning(), go: () => this.flipLearning() },
+      { label: 'Forget how I fight', note: 'Clears every habit they have read, and what they made of it', value: this.sure ? 'Press again' : '', action: true, go: () => {
+        if (!this.sure) {
+          this.sure = true;
+          return this.drawPage();
+        }
+        W.forget();
+        this.sure = false;
+        return this.drawPage();
+      } },
+    );
+    return rows;
+  }
+
+  flipLearning() {
+    const W = this.world.watchers;
+    W.frozen = !W.frozen;
+    W.save();
+    this.drawPage();
+  }
+
+  drawWatchers() {
+    const W = this.world.watchers;
+    if (!W) {
+      this.page.innerHTML = '';
+      return;
+    }
+    const rows = this.watcherRows(), { lines, counters } = W.report();
+    this.at = Math.min(this.at, rows.length - 1);
+    const buttons = rows.map((o, i) => `<button data-at="${i}" class="${i === this.at ? 'at' : ''}"><b>${o.label}</b><small>${o.note}</small><em>${o.action ? o.value : `‹ ${o.value} ›`}</em></button>`).join('');
+    const none = ORDER.some((t) => W.met[t]) ? '' : '<p>No Watcher has come yet. They come once the world calls you a Scourge (Omega phase 3).</p>';
+    const read = lines.length ? lines.map((l) => `<li>${l}</li>`).join('') : '<li>Nothing yet. Fight, and they will see.</li>';
+    const favour = counters.map((c) => `<li><b>${c.name}</b><i><u style="width:${Math.round(Math.min(1, c.fit * c.w) * 100)}%"></u></i></li>`).join('');
+    this.page.innerHTML = `<div class="watch-page"><h2>The Watchers · Insight ${W.insight.toFixed(1)} of 5</h2>${none}${buttons}
+      <div class="watch-notes"><div><h3>What they have learned</h3><ul>${read}</ul></div><div><h3>What they favour</h3><ul class="favour">${favour}</ul></div></div></div>`;
   }
 
   // Where the whole world sits on the canvas: [left, top, size].

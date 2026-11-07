@@ -7,7 +7,7 @@ import { DOCTRINES } from './doctrines.js';
 //   1 Rumour   bounties are posted; towns that fear you charge more
 //   2 Menace   townsfolk flee on sight; hunter squads track you through a nation's land
 //   3 Scourge  warbands with siege engines come out; the weakest foes may break and run; cowed towns pay tribute
-//   4, 5       nation armies and coalitions march on you (armies.js)
+//   4, 5       nation armies and coalitions march on you (armies.js); Watchers from 3 (watchers.js)
 // Being feared is power too: Wrath fills faster with every phase. `world.omega`; saved to `lumen.omega`.
 export const PHASES = [
   { name: 'Unknown', from: 0, color: '#9a9aa8' },

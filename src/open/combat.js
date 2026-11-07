@@ -57,7 +57,7 @@ export const COMBAT = {
   impact: 0.06,         // seconds of an anime impact frame
   // Fighting practice: a little for each blow that lands (anything a wave reaches counts), more for
   // a kill, by role, a little more for evolved forms. See LEVEL_PACE in skills.js for the body.
-  xp: { hit: 0.3, kill: { fodder: 1.5, fighter: 2.5, brute: 4, machine: 2, ruler: 25 }, tier: 0.25 },
+  xp: { hit: 0.3, kill: { fodder: 1.5, fighter: 2.5, brute: 4, machine: 2, ruler: 25, watcher: 12 }, tier: 0.25 },
   // Wrath fills from fighting, 0..1 (ultimate.js). `hurt` is per share of the hero's health lost.
   wrath: { hit: 0.008, smash: 0.015, execute: 0.06, perfect: 0.04, parry: 0.02, vanish: 0.02, kill: 0.025, hurt: 0.6 },
   // Surge: seconds; Spirit a second; blows this much harder; powers cool this much faster; a sixth hit.
