@@ -159,9 +159,9 @@ Rules for every kit:
 - **Finisher:** Flashpoint. Storm vanishes and strikes from 4 sides in one instant, then a white-out.
 - **Ultimate: Stormwyrm.** The clouds churn, and a serpent of lightning dives from the sky, coils through the battlefield and strikes everything it passes. It's bigger for each Gather Storm used in the last minute.
 
-### Voidwalker, reborn as a summoner of the fallen
-The user asked for necromancy and summoning that grows with the player until it can be an army.
-- **Signature: the Hollow.** Foes the Voidwalker kills leave a **Husk** for 8 s, a dark silhouette on the ground.
+### Gravecaller (was Voidwalker): a summoner of the fallen
+The user asked for necromancy and summoning that grows with the player until it can be an army, and renamed the Conqueror **Gravecaller** (2026-11-07). The internal id stays `void` and the element stays void, so saves keep working.
+- **Signature: the Hollow.** Foes the Gravecaller kills leave a **Husk** for 8 s, a dark silhouette on the ground.
   - **Rise** turns Husks into **Thralls**: void-black copies that keep the foe's moves and size.
   - Thralls are **stored in the Hollow** when dismissed, and the roster is saved (`lumen.hollow`).
   - Raising a captain, a Watcher or a ruler makes a **Marshal**, who keeps that foe's powers.
@@ -181,10 +181,10 @@ The user asked for necromancy and summoning that grows with the player until it 
 | Hollow Gate | new sub-art | A portal that calls stored Thralls straight from the Hollow, not only from Husks. |
 | Reaping Mark | reworks Reaping Hour | Marks every foe in sight. Marked foes that die rise at once. |
 
-- **Superspeed** stays as Voidwalker's evolution, renamed **Shade Run** (Running).
+- **Superspeed** stays as Gravecaller's evolution, renamed **Shade Run** (Running).
 - **Finisher:** Hollow Grasp. Shadow hands drag the foe down and leave a Husk even if it survives.
-- **Ultimate: The Hollow Opens.** A rift tears open behind the Voidwalker and the whole stored roster pours out for 20 s. Everything killed in that time rises too. Late game this is the "summon an army" moment.
-- **Balance guard:** Thralls deal a share of the Voidwalker's might, not the original foe's. Total Thrall damage per second is capped by a **Command** budget that grows with the tree, so 200 Thralls don't delete a ruler. A large Legion takes Spirit upkeep.
+- **Ultimate: The Hollow Opens.** A rift tears open behind the Gravecaller and the whole stored roster pours out for 20 s. Everything killed in that time rises too. Late game this is the "summon an army" moment.
+- **Balance guard:** Thralls deal a share of the Gravecaller's might, not the original foe's. Total Thrall damage per second is capped by a **Command** budget that grows with the tree, so 200 Thralls don't delete a ruler. A large Legion takes Spirit upkeep.
 
 ### Emberlord (fire: heat that builds until it's a sun)
 - **Signature: Heat.** A 0-100 gauge.
@@ -260,7 +260,7 @@ The Spirit Tree today shares the same boughs (running, jumping, swimming, climbi
 |---|---|---|
 | Titan | **Mountain** (armour, Grounded, Seismic Sense) · **Quake** (Upheaval, Rift, Destructive Blow) · **Forge** (Ironbend, Magma) | Swimming (Bedrock Lungs becomes a Mountain passive) |
 | Stormcaller | **Thunder** (Charge, bolts) · **Sky** (clouds, flight, Stormwyrm) · **Tempest** (wind, Magnet, Plasma) | Climbing (flight makes it pointless) |
-| Voidwalker | **Legion** (Thrall cap, Amalgam) · **Dominion** (Command budget, Marshals, Hollow Gate) · **Hollow** (own void combat, Shade Run) | Swimming, Climbing |
+| Gravecaller | **Legion** (Thrall cap, Amalgam) · **Dominion** (Command budget, Marshals, Hollow Gate) · **Hollow** (own void combat, Shade Run) | Swimming, Climbing |
 | Emberlord | **Pyre** (Brands, Ignite) · **Sun** (Heat stages, Blue Inferno, Second Sun) · **Cinder** (Jet Burst, fire movement) | Swimming |
 | Frostwarden | **Forge** (weapons, Bow) · **Glacier** (terrain, Icebound Sea) · **Stillness** (freeze, Crystal Prison, the ultimate) | Running (ice-skating moves into Glacier) |
 
@@ -325,7 +325,7 @@ The Spirit Tree today shares the same boughs (running, jumping, swimming, climbi
    | Mid | out to 200 tiles | squads of 10 as one AI with instanced bodies (one draw call per block) and shared animation |
    | Far | beyond | banners and dust columns on the map and horizon |
 
-   A squad splits into full fighters as the hero closes in. The same crowd system draws the Voidwalker's Legion.
+   A squad splits into full fighters as the hero closes in. The same crowd system draws the Gravecaller's Legion.
 - **Co-op:** both heroes' Omega adds up, at 70% each, and armies size to the pair.
 
 ## 8. Siege machines that matter
@@ -335,7 +335,7 @@ The Spirit Tree today shares the same boughs (running, jumping, swimming, climbi
   - Every machine has its own projectile and a **ground telegraph** (a red marker that fills before impact).
   - It **leads its shot** (aims where you'll be).
   - It damages **structures** too (voxels, houses), so a siege really wrecks a town.
-  - It has a **crew**. Kill the crew to silence it. Titan's Ironbend crumples it, and a Voidwalker can raise the crew to turn it on its own side.
+  - It has a **crew**. Kill the crew to silence it. Titan's Ironbend crumples it, and a Gravecaller can raise the crew to turn it on its own side.
   - Big hits knock the hero down and break guard. You roll or Vanish them, not tank them.
 
 | Machine (nation) | Projectile | Hit (share of hero health) |
@@ -345,7 +345,7 @@ The Spirit Tree today shares the same boughs (running, jumping, swimming, climbi
 | Thorn Spitter | Fan of 5 thorns, poison | 0.06 each |
 | Frost Cannon | Shell that leaves a freezing field (slows, then freezes) | 0.15 plus freeze |
 | Flame Cannon | Cone of liquid fire that sticks to the ground (burn) | 0.08 per second |
-| Plague Engine | Gas cloud: damage over time, and **raises the dead** on the enemy side (the Voidwalker can steal them) | 0.05 per second |
+| Plague Engine | Gas cloud: damage over time, and **raises the dead** on the enemy side (the Gravecaller can steal them) | 0.05 per second |
 | Bone Engine | Spikes that burrow and burst under the hero's feet | 0.22 |
 
 ## 9. The Watchers
@@ -364,7 +364,7 @@ The Spirit Tree today shares the same boughs (running, jumping, swimming, climbi
   | The Thornwarden | blood-root | drains, roots you in place, heals from the land |
 
 ### How they learn (Killer Instinct style, not the Nemesis pattern)
-- **What's recorded:** while a Watcher fights, the game records the player's **habits** as small counts that fade over time (`lumen.watchers`):
+- **What's recorded:** in every fight (fights with a Watcher, and the Trial arena, count 3x), the game records the player's **habits** as small counts that fade over time (`lumen.watchers`):
   - which chain branches you use, and at which hit
   - how often you open with a power, and which one
   - roll and Vanish direction
@@ -414,7 +414,7 @@ The Spirit Tree today shares the same boughs (running, jumping, swimming, climbi
 | 0.34 | **Stormcaller** | Full kit, Charge, Stormclouds, Stormwyrm, beam clash |
 | 0.35 | **Emberlord** | Full kit, Heat, Brands, Second Sun, glass scars |
 | 0.36 | **Frostwarden** | Full kit, Frostforge weapons, Shatter, Stillness |
-| 0.37 | **Voidwalker** | Husks, Thralls, the Hollow roster, Commands, Amalgam, The Hollow Opens; crowd LOD (shared with armies) |
+| 0.37 | **Gravecaller** | Husks, Thralls, the Hollow roster, Commands, Amalgam, The Hollow Opens; crowd LOD (shared with armies) |
 | 0.38 | **Omega + sieges** | Omega Level, phases 0-3, hunter squads, warbands, new siege machines and Trebuchet |
 | 0.39 | **Armies** | Phase 4-5, marching armies on the map, morale, commanders, LOD squads, truce windows |
 | 0.40 | **Watchers** | The five Watchers, learning, Insight, Trial arena, "What it learned" panel; final balance pass |
@@ -422,12 +422,12 @@ The Spirit Tree today shares the same boughs (running, jumping, swimming, climbi
 - Each version follows the house rules: a `FEATURES` switch per feature, update `FEATURES.md`, test with a fake PS5 pad, bump the version, snapshot the last commit of the previous version, then commit and push.
 - Saves: removed powers map their ranks to their replacements, the new tree reads old skill levels, and the Hollow, Omega and Watchers get their own keys.
 
-## 12. Questions for the user
+## 12. Decisions (the user, 2026-11-07)
 
-1. **Buttons:** OK to move the Satchel from Triangle to the touchpad, so Triangle becomes Heavy/Smash? (Recommended. Every action game puts heavy there.)
-2. **Voidwalker's name:** keep "Voidwalker" for the necromancer, or rename (for example "Gravecaller")? Old Void saves keep their ranks either way.
-3. **Ultimate button:** L1 + R1 together, OK?
-4. **Omega:** ratchet as above (it can fall within a phase but never below it), or never fall at all?
-5. **Watchers training:** should they also learn from your normal open-world fights against other enemies (faster learning), or only from fights with Watchers (purer)?
-6. **Army size:** aim for about 40 full fighters plus up to 300 in squads (smooth on your PC), or push higher at some cost to frame rate?
-7. **Order:** combat core first, then Titan as listed, or start with the Voidwalker rework?
+1. **Buttons:** the Satchel moves from Triangle to the touchpad. Triangle is Heavy/Smash.
+2. **Name:** the Voidwalker is renamed **Gravecaller**. Internal id `void` and save keys stay.
+3. **Ultimate:** L1 + R1 together when Wrath is full; held 1 s for Surge.
+4. **Omega:** ratchets. It can fall back within the current phase when you lie low, never below it.
+5. **Watchers learn from every fight**, and fights with Watchers (and the Trial arena) count 3x.
+6. **Army size:** about 40 full fighters plus up to 300 in squads.
+7. **Order:** as in section 11: combat core (v0.31), effects and ultimates (v0.32), then Titan, Stormcaller, Emberlord, Frostwarden, Gravecaller, then Omega + sieges, armies, Watchers.
