@@ -191,7 +191,7 @@ export default class GameMenu {
     document.getElementById('menu-next').innerHTML = p('menuRight');
     const pin = this.owner.pin;
     const own = { map: `${p('confirm')} ${pin ? 'Remove pin' : 'Drop pin'}&nbsp;&nbsp; ${p('punch')} Zoom&nbsp;&nbsp;`, satchel: '', powers: '', controls: '', settings: `${p('confirm')} Change&nbsp;&nbsp;` }[id];
-    if (id === 'powers') this.hints.innerHTML = this.assigning ? `${p('left')} ${p('up')} ${p('right')} ${p('down')} Pick a button&nbsp;&nbsp; ${p('back')} Cancel` : `${p('confirm')} Equip&nbsp;&nbsp; ${p('back')} Close`;
+    if (id === 'powers') this.hints.innerHTML = this.assigning ? `${p('left')} ${p('up')} ${p('right')} ${p('down')} Pick a button&nbsp;&nbsp; ${p('heavy')} Other page&nbsp;&nbsp; ${p('back')} Cancel` : `${p('confirm')} Equip&nbsp;&nbsp; ${p('heavy')} Other page&nbsp;&nbsp; ${p('back')} Close`;
     else this.hints.innerHTML = id === 'skills' || id === 'satchel' ? '' : `${own ?? ''}${p('back')} Close`;
   }
 
@@ -276,10 +276,10 @@ export default class GameMenu {
       return;
     }
     const ids = powerOrder(set.id, c.powers), pid = ids[this.at], def = c.powers[pid], rank = set.rank(pid), open = set.open(pid);
-    const page = this.page ?? 0;
+    const page = this.powerPage ?? 0;
     const slots = DIRS.map((dir, k) => {
       const i = k + page * 4, worn = set.loadout[i];
-      return `<div data-slot="${i}" class="cross-${dir} ${this.assigning ? 'choosing' : ''}" style="color:${c.color}" title="${worn ? c.powers[worn].name : ''}">${worn ? svg(c.powers[worn].kind, 30) : ''}</div>`;
+      return `<div data-slot="${k}" class="cross-${dir} ${this.assigning ? 'choosing' : ''}" style="color:${c.color}" title="${worn ? c.powers[worn].name : ''}">${worn ? svg(c.powers[worn].kind, 30) : ''}</div>`;
     }).join('');
     const pips = (id) => Array.from({ length: MAX_RANK + 1 }, (_, i) => `<i class="${i <= set.rank(id) ? 'on' : ''}"></i>`).join('');
     const cards = ids.map((id, i) => {
@@ -321,7 +321,7 @@ export default class GameMenu {
 
   place(slot) {
     const set = this.owner.powers, pid = powerOrder(set.id, set.def.powers)[this.at];
-    set.wear(pid, slot + (this.page ?? 0) * 4);
+    set.wear(pid, slot + (this.powerPage ?? 0) * 4);
     this.assigning = false;
     this.drawPage();
     this.drawHints();
@@ -330,15 +330,15 @@ export default class GameMenu {
   updatePowers(just) {
     const set = this.owner.powers;
     if (!set.def) return;
+    // Triangle turns the cross over to the other page of worn powers (L1 + D-pad in play).
+    if (just.heavy) {
+      this.powerPage = this.powerPage ? 0 : 1;
+      this.drawPage();
+      return;
+    }
     if (this.assigning) {
       const dir = DIRS.findIndex((d) => just[d]);
       if (dir >= 0) this.place(dir);
-      return;
-    }
-    // Triangle turns the cross over to the other page of worn powers (L1 + D-pad in play).
-    if (just.heavy) {
-      this.page = this.page ? 0 : 1;
-      this.drawPage();
       return;
     }
     const n = powerOrder(set.id, set.def.powers).length, before = this.at;
