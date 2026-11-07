@@ -33,6 +33,7 @@ const FIGHTERS = {
   bat: ['hop'],
 };
 const TURN_TAKERS = 2;       // monsters attacking one hero at a time
+const ARMY_SIGHT = 140;      // tiles an army's soldiers will come after the hero from, once in battle
 const PRESS = 8;             // tiles from a hero that those waiting their turn circle at
 const TURN_REACH = 3;        // tiles past that ring they'll put their name down for a turn
 const STRIKE_FROM = 3;       // extra tiles out from a move's reach that it starts its attack
@@ -97,16 +98,16 @@ function strike(monsters, e, move) {
 
 function think(monsters, e, t) {
   const hero = monsters.player, def = e.def;
-  // Town wards push them out, as in the main game.
-  if (monsters.inVillage(e.x, e.z)) {
+  // Town wards push them out, as in the main game (not an army's soldiers: they march right in).
+  if (!e.army && monsters.inVillage(e.x, e.z)) {
     const c = monsters.villageCenter();
     e.vel.set(e.x - c.x, e.z - c.z).normalize().multiplyScalar(Math.max(def.speed, 3));
     return;
   }
   const dist = Math.hypot(hero.x - e.x, hero.z - e.z), dx = (hero.x - e.x) / (dist || 1), dz = (hero.z - e.z) / (dist || 1);
   if (e.mode === 'held') return;
-  // From Scourge, the weakest may lose their nerve and run (omega.js).
-  if (e.mode !== 'reeling' && monsters.world.omega?.afraid(e, e.foe, t)) {
+  // Routed (armies.js), or from Scourge the weakest losing their nerve (omega.js): they run.
+  if (e.mode !== 'reeling' && (e.fleeUntil > t || monsters.world.omega?.afraid(e, e.foe, t))) {
     e.vel.set(-dx, -dz).multiplyScalar(Math.max(def.chaseSpeed, 6));
     standDown(e);
     return;
@@ -146,7 +147,8 @@ function think(monsters, e, t) {
     setMode(e, 'recover', RECOVER, t);
     return;
   }
-  if (hero.dead || dist > def.aggro) {
+  // An army's soldiers (armies.js) march on the hero from well beyond their own sight.
+  if (hero.dead || dist > (e.army && e.army.state === 'battle' ? Math.max(def.aggro, ARMY_SIGHT) : def.aggro)) {
     e.mode = 'roam';
     standDown(e);
     e.wander(t);

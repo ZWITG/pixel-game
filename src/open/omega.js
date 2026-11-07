@@ -7,7 +7,7 @@ import { DOCTRINES } from './doctrines.js';
 //   1 Rumour   bounties are posted; towns that fear you charge more
 //   2 Menace   townsfolk flee on sight; hunter squads track you through a nation's land
 //   3 Scourge  warbands with siege engines come out; the weakest foes may break and run; cowed towns pay tribute
-//   4, 5       nation armies and coalitions (v0.39.0)
+//   4, 5       nation armies and coalitions march on you (armies.js)
 // Being feared is power too: Wrath fills faster with every phase. `world.omega`; saved to `lumen.omega`.
 export const PHASES = [
   { name: 'Unknown', from: 0, color: '#9a9aa8' },
@@ -19,7 +19,7 @@ export const PHASES = [
 ];
 export const MOST = 1000;
 // What each deed adds. `scorch` is per burning cell of land, each quarter second (capped).
-export const DEEDS = { soldier: 2, captain: 15, machine: 6, ruler: 40, house: 4, estate: 12, caravan: 3, stronghold: 25, nation: 80, scorch: 0.0005, watcher: 30 };
+export const DEEDS = { soldier: 2, captain: 15, machine: 6, ruler: 40, house: 4, estate: 12, caravan: 3, stronghold: 25, nation: 80, scorch: 0.0005, watcher: 30, army: 40 };
 const SAVE_KEY = 'lumen.omega';
 const QUIET = 300, FADE = 0.2;           // seconds without a deed before it falls back, and how fast
 const FELL = 10;                          // what a hero falling takes off it

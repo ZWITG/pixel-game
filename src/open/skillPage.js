@@ -138,6 +138,17 @@ export default class WorldHud {
     toggle(box, 'calm', posture < 0.02 && !broken);
   }
 
+  // The nearest army in the field: its name, strength and morale (or null to hide it).
+  setArmy(a) {
+    const el = this.$('army');
+    if (!el) return;
+    put(el, 'hidden', !a, (v) => { el.hidden = v; });
+    if (!a) return;
+    put(el, 'name', `${a.name} · ${a.strength} strong${a.far > 150 ? ` · ${a.far} tiles off` : ''}`, (v) => { el.firstChild.textContent = v; });
+    put(el, 'c', a.color, (v) => el.style.setProperty('--c', v));
+    width(el.lastChild.firstChild, a.morale);
+  }
+
   // The Omega sigil: the phase's name, and a ring that fills toward the next.
   setOmega(om) {
     const el = this.$('omega');

@@ -31,6 +31,7 @@ const SHAPES = {
   village: 'M12 3 2 12h3v9h5v-6h4v6h5v-9h3z',
   bandit: 'M12 4 2 20h7l3-6 3 6h7z',
   keep: 'M7 21V9L5 7V3h3v2h2V3h4v2h2V3h3v4l-2 2v12z',
+  army: 'M5 2h2v20H5zM7 3h12l-3 4 3 4H7z',
   lair: 'M12 2a9 9 0 0 0-6 15.700V21h3v-2h2v2h2v-2h2v2h3v-3.300A9 9 0 0 0 12 2zM8.500 14a2.500 2.500 0 1 1 0-5 2.500 2.500 0 0 1 0 5zm7 0a2.500 2.500 0 1 1 0-5 2.500 2.500 0 0 1 0 5z',
   landmark: 'M12 2l3 7 7 .7-5.300 4.700 1.600 7.100L12 17.800l-6.300 3.700 1.600-7.100L2 9.700 9 9z',
   goal: 'M12 2 22 12 12 22 2 12z',
@@ -48,7 +49,7 @@ function marketLine(economy, s) {
 
 const KINDS = {
   crown: ['#ffd98a', 'Seat of a nation'], kingdom: ['#ffe7b0', 'Kingdom'], city: ['#ffe7b0', 'City'], town: ['#ffd9a0', 'Town'], village: ['#ffd9a0', 'Village'], hamlet: ['#e8ddc8', 'Hamlet or homestead'],
-  fort: ['#ff8f7f', 'Fort'], bandit: ['#ff8f7f', 'Bandit camp'], keep: ['#d8d0c8', 'Ruined keep'], lair: ['#ff4a6a', 'Lair'], landmark: ['#9fe8ff', 'Landmark'], goal: ['#ffffff', 'Place you have found'], cart: ['#ffe7a0', 'Trader on the road'], pin: ['#ffe15a', 'Your pin'],
+  army: ['#ff5a3a', 'An army on the march'], fort: ['#ff8f7f', 'Fort'], bandit: ['#ff8f7f', 'Bandit camp'], keep: ['#d8d0c8', 'Ruined keep'], lair: ['#ff4a6a', 'Lair'], landmark: ['#9fe8ff', 'Landmark'], goal: ['#ffffff', 'Place you have found'], cart: ['#ffe7a0', 'Trader on the road'], pin: ['#ffe15a', 'Your pin'],
 };
 // The icon and size for each tier of a settlement, from homestead to kingdom.
 const TIER_ICONS = [['hamlet', 0.72], ['hamlet', 0.84], ['village', 1], ['town', 1.1], ['city', 1.26], ['kingdom', 1.5]];
@@ -427,6 +428,7 @@ export default class GameMenu {
       if (r.fallen) out.push({ x: n.x, z: n.z, name: n.seat, icon: lair ? 'lair' : 'crown', color: '#8a8690', size: 1.2, info: `${n.seat}, conquered` });
       else out.push({ x: n.x, z: n.z, name: n.seat, icon: 'crown', color: n.color, size: 1.5, open: r.open, info: `${n.ruler}, ${n.seat}: ${r.open ? 'exposed' : `${r.done} of ${r.need} strongholds broken`}` });
     }
+    out.push(...(this.world.armies?.marks() ?? []));
     if (this.owner.pin) out.push({ ...this.owner.pin, name: 'Your pin', icon: 'pin' });
     return out;
   }

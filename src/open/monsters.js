@@ -148,6 +148,7 @@ export default class Monsters {
     this.work.skills.add('fighting', (COMBAT.xp.kill[roleName(e)] ?? 2) * (1 + e.tier * COMBAT.xp.tier) * (e.elder ? 2 : 1));
     this.work.actor?.wrath?.gain(COMBAT.wrath.kill);
     this.work.actor?.powers?.kitDef?.killed?.(this.work.actor.powers, e); // a Gravecaller's kills leave Husks
+    this.world.armies?.killed(e);
     // What the world makes of it (omega.js).
     if (this.world.players.includes(this.work.actor)) {
       const om = this.world.omega;

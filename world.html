@@ -74,6 +74,11 @@
       .omega { position: fixed; left: 16px; top: 70px; display: flex; align-items: center; gap: 6px; pointer-events: none; color: var(--c, #9a9aa8); font: 700 12px 'Zen Maru Gothic', sans-serif; letter-spacing: 0.08em; text-transform: uppercase; text-shadow: 0 1px 0 #141a28; }
       .omega b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; color: #f3ead8; background: radial-gradient(#141a28 55%, transparent 57%), conic-gradient(var(--c, #9a9aa8) var(--k, 0%), #141a2899 0); }
       #p2-omega { left: auto; right: 12px; }
+      .army { position: fixed; left: 50%; top: 82px; width: 320px; transform: translateX(-50%); text-align: center; pointer-events: none; color: var(--c, #ff5a3a); font: 700 13px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; }
+      .army div { height: 5px; margin-top: 3px; background: #141a28cc; box-shadow: 0 0 0 1px #f3ead833; }
+      .army u { display: block; height: 100%; width: 100%; background: var(--c, #ff5a3a); }
+      body.two #p2-army { top: calc(50% + 82px); }
+      body.title .army, body.in-menu .army { display: none; }
       body.two #p2-omega { left: 12px; right: auto; top: calc(50% + 64px); }
       body.title .omega, body.in-menu .omega { display: none; }
       #goal, #p2-goal { position: fixed; left: 16px; top: 96px; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
@@ -375,6 +380,8 @@
     <div id="p2-goal" class="p2"></div>
     <div id="hp"><div id="hp-fill"></div></div>
     <div id="fight" class="fight"></div>
+    <div id="army" class="army" hidden><span></span><div><u></u></div></div>
+    <div id="p2-army" class="army p2" hidden><span></span><div><u></u></div></div>
     <div id="omega" class="omega" title="Omega Level: how the world sees you"><b></b><span></span></div>
     <div id="p2-omega" class="omega p2"><b></b><span></span></div>
     <div id="p2-fight" class="fight p2"></div>

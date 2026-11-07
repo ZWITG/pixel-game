@@ -878,6 +878,7 @@ export default class Melee {
       this.player.world.roadside?.struck(x, z, reach, force, this.player);
       this.player.world.fairs?.struck(x, z, reach, force, this.player);
       this.player.world.events?.struck(x, z, reach, force, this.player);
+      this.player.world.armies?.struck(x, z, reach, force);
       this.player.world.animals?.struck(x, z, reach, force, this.player);
       this.player.world.voxels?.blast(x, this.player.state.y + 0.8, z, this.work.cut(force, this.player, reach), this.player);
       this.dug = this.player.world.digs?.blast(x, this.player.state.y + this.player.state.air + 1.4, z, this.work.cut(force, this.player, reach), this.player, crater) ?? false;

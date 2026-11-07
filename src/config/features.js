@@ -48,5 +48,6 @@ export const FEATURES = {
   spiritArts: true,     // open world: L1 + Square Spirit Shot, L1 + Triangle (hold) Spirit Wave beam (spiritArts.js)
   omega: true,          // open world: the Omega Level, how the world sees you, and what it does about it (omega.js)
   siege: true,          // open world: war machines with their own shots, warnings, crews and leading aim (siege.js)
+  armies: true,         // open world: nation armies and coalitions at Calamity and Omega: march, squads, morale, Commander, supply, truce (armies.js)
   impactFrames: true,   // open world: two-tone ink frames on smashes and Perfect parries (also a Settings switch)
 };
