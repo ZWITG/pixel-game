@@ -67,7 +67,15 @@ export class Flames {
       look.setXYZW(n, f.size * grow, f.seed, Math.min(1, (1 - k) * 2.2), FLAME_TINT[f.kind][1]);
       n++;
     }
-    at.needsUpdate = look.needsUpdate = true;
+    // Only the live flames go to the GPU, and nothing while there are none.
+    if (n || this.shown) {
+      for (const [attr, size] of [[at, 3], [look, 4]]) {
+        attr.clearUpdateRanges();
+        if (n) attr.addUpdateRange(0, n * size);
+        attr.needsUpdate = true;
+      }
+    }
+    this.shown = n > 0;
     this.mesh.geometry.instanceCount = n;
   }
 }

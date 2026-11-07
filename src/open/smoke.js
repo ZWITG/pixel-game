@@ -134,7 +134,15 @@ export default class Smoke {
       tint.setXYZ(n, p.r, p.g, p.b);
       n++;
     }
-    at.needsUpdate = look.needsUpdate = tint.needsUpdate = true;
+    // Only the live puffs go to the GPU, and nothing while there are none.
+    if (n || this.shown) {
+      for (const [attr, size] of [[at, 3], [look, 4], [tint, 3]]) {
+        attr.clearUpdateRanges();
+        if (n) attr.addUpdateRange(0, n * size);
+        attr.needsUpdate = true;
+      }
+    }
+    this.shown = n > 0;
     this.mesh.geometry.instanceCount = n;
     // Light and fog as the land has them now.
     const u = this.uniforms, fog = this.mesh.parent?.fog;

@@ -5,6 +5,18 @@ import PackPage from './packPage.js';
 
 const $ = (id) => document.getElementById(id);
 
+// Sets a style or class only when it differs from what was last set, so an unchanged HUD costs nothing.
+const seen = new WeakMap();
+function put(el, key, value, apply) {
+  let m = seen.get(el);
+  if (!m) seen.set(el, (m = {}));
+  if (m[key] === value) return;
+  m[key] = value;
+  apply(value);
+}
+const width = (el, k) => put(el, 'w', `${Math.round(k * 1000) / 10}%`, (v) => { el.style.width = v; });
+const toggle = (el, name, on) => put(el, `c:${name}`, !!on, (v) => el.classList.toggle(name, v));
+
 // World HUD: short messages, the breath bar, and the skill map.
 export default class WorldHud {
   constructor(prefix) {
@@ -76,10 +88,10 @@ export default class WorldHud {
       this.$('foe-name').textContent = name;
     }
     if (!name) return;
-    this.$('foe-fill').style.width = `${amount * 100}%`;
+    width(this.$('foe-fill'), amount);
     const post = this.$('foe-post');
-    post.firstChild.style.width = `${(broken ? 1 : posture) * 100}%`;
-    post.classList.toggle('broken', broken);
+    width(post.firstChild, broken ? 1 : posture);
+    toggle(post, 'broken', broken);
   }
 
   // Spirit pips, and the hero's own Structure (hidden while it's empty).
@@ -88,33 +100,42 @@ export default class WorldHud {
   setFight(spirit, posture, broken, wrath = 0, surge = 0, device = 'pad', meter = null) {
     const box = this.$('fight');
     if (!this.pips) {
-      box.innerHTML = `<div class="pips">${'<i><b></b></i>'.repeat(5)}</div><div class="post"><u></u></div><div class="wrath"><u></u><span></span></div><div class="meter"><u></u><span></span></div>`;
+      box.innerHTML = `<div class="pips">${'<i><b></b></i>'.repeat(5)}</div><div class="post"><u></u></div><div class="wrath"><u></u><span></span></div><div class="meter"><u></u><i></i><i></i><span></span></div>`;
       this.pips = [...box.querySelectorAll('.pips i')];
       this.postFill = box.querySelector('.post u');
       this.wrathBar = box.querySelector('.wrath');
       this.meterBar = box.querySelector('.meter');
     }
-    this.meterBar.hidden = !meter;
+    put(this.meterBar, 'hidden', !meter, (v) => { this.meterBar.hidden = v; });
     if (meter) {
-      this.meterBar.firstChild.style.width = `${meter.value * 100}%`;
-      this.meterBar.style.setProperty('--c', meter.color);
-      this.meterBar.classList.toggle('hot', !!meter.hot);
+      width(this.meterBar.firstChild, meter.value);
+      put(this.meterBar, 'c', meter.color, (v) => this.meterBar.style.setProperty('--c', v));
+      toggle(this.meterBar, 'hot', meter.hot);
       if (this.meterSay !== meter.label) this.meterBar.lastChild.textContent = this.meterSay = meter.label;
+      // Marks where the gauge changes (the Emberlord's white-gold and blue).
+      const ticks = this.meterBar.querySelectorAll('i');
+      ticks.forEach((el, i) => {
+        const mark = meter.marks?.[i];
+        put(el, 'mark', mark ?? null, (v) => {
+          el.hidden = v === null;
+          if (v !== null) el.style.left = `${v * 100}%`;
+        });
+      });
     }
     const full = wrath >= 1 && !surge;
-    this.wrathBar.firstChild.style.width = `${(surge || wrath) * 100}%`;
-    this.wrathBar.classList.toggle('full', full);
-    this.wrathBar.classList.toggle('surge', surge > 0);
-    const say = full ? (device === 'pad' ? 'L1 + R1' : 'Y') : '';
+    width(this.wrathBar.firstChild, surge || wrath);
+    toggle(this.wrathBar, 'full', full);
+    toggle(this.wrathBar, 'surge', surge > 0);
+    const say = full ? `Wrath: ${device === 'pad' ? 'L1 + R1' : 'Y'}` : surge ? 'Surge' : 'Wrath';
     if (this.wrathSay !== say) this.wrathBar.lastChild.textContent = this.wrathSay = say;
     this.pips.forEach((pip, i) => {
-      const k = Math.max(0, Math.min(1, spirit - i));
-      pip.firstChild.style.transform = `scaleX(${k})`;
-      pip.classList.toggle('full', k >= 1);
+      const k = Math.round(Math.max(0, Math.min(1, spirit - i)) * 100) / 100;
+      put(pip.firstChild, 'k', k, (v) => { pip.firstChild.style.transform = `scaleX(${v})`; });
+      toggle(pip, 'full', k >= 1);
     });
-    this.postFill.style.width = `${(broken ? 1 : posture) * 100}%`;
-    box.classList.toggle('broken', broken);
-    box.classList.toggle('calm', posture < 0.02 && !broken);
+    width(this.postFill, broken ? 1 : posture);
+    toggle(box, 'broken', broken);
+    toggle(box, 'calm', posture < 0.02 && !broken);
   }
 
   // Edge arrows for attackers out of sight: `a` is radians clockwise from straight ahead.
@@ -124,12 +145,16 @@ export default class WorldHud {
     while (this.arrows.length < list.length) this.arrows.push(box.appendChild(document.createElement('i')));
     this.arrows.forEach((el, i) => {
       const t = list[i];
-      el.hidden = !t;
+      put(el, 'hidden', !t, (v) => { el.hidden = v; });
       if (!t) return;
-      el.style.left = `${50 + Math.sin(t.a) * 44}%`;
-      el.style.top = `${50 - Math.cos(t.a) * 40}%`;
-      el.style.setProperty('--a', `${t.a}rad`);
-      el.classList.toggle('tell', t.tell);
+      // Turned in steps of about a degree: finer than the eye can tell, and far fewer writes.
+      const a = Math.round(t.a * 60) / 60;
+      put(el, 'a', a, (v) => {
+        el.style.left = `${50 + Math.sin(v) * 44}%`;
+        el.style.top = `${50 - Math.cos(v) * 40}%`;
+        el.style.setProperty('--a', `${v}rad`);
+      });
+      toggle(el, 'tell', t.tell);
     });
   }
 

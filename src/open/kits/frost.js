@@ -28,7 +28,7 @@ function freeze(set, pid, e, chill, rank = 0) {
 }
 
 // Ice weapons in the hand: one mesh each, made once and hung on the hand bone of the current hero.
-const iceMat = new THREE.MeshLambertMaterial({ color: '#d8f4ff', emissive: '#4ac0f0', emissiveIntensity: 0.8, flatShading: true, transparent: true, opacity: 0.92 });
+export const iceMat = new THREE.MeshLambertMaterial({ color: '#d8f4ff', emissive: '#4ac0f0', emissiveIntensity: 0.8, flatShading: true, transparent: true, opacity: 0.92 });
 function weaponMesh(kind) {
   const g = new THREE.Group();
   if (kind === 'blade') {

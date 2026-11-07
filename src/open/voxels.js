@@ -1,4 +1,11 @@
 import * as THREE from 'three';
+
+// Marks the first `count` numbers of an attribute to be sent to the GPU this frame, not the whole of it.
+function sendRange(attr, count) {
+  attr.clearUpdateRanges();
+  if (count) attr.addUpdateRange(0, count);
+  attr.needsUpdate = true;
+}
 import { height } from './terrain.js';
 import { houseVoxels } from './blueprints.js';
 import { nationAt } from './nations.js';
@@ -741,8 +748,12 @@ export default class Voxels {
       n++;
     }
     this.bits.count = n;
-    this.bits.instanceMatrix.needsUpdate = true;
-    if (this.bits.instanceColor) this.bits.instanceColor.needsUpdate = true;
+    // Only what's flying goes to the GPU, and nothing at all once the last bit has landed.
+    if (n || this.bitsLive) {
+      sendRange(this.bits.instanceMatrix, n * 16);
+      if (this.bits.instanceColor) sendRange(this.bits.instanceColor, n * 3);
+    }
+    this.bitsLive = n > 0;
   }
 
   // ---- a hero among them ----

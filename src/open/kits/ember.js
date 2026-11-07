@@ -9,8 +9,9 @@ import { stagger } from '../foes.js';
 // Hooks: afflicted (brands), landed (heat), power (heat makes powers stronger), meter (the HUD bar),
 // tick (cooling, overheating, the body's colour), finisher (Pyre Break).
 const MOST = 100, WHITE_AT = 40, BLUE_AT = 80, COOL_FROM = 85;
-const COOL = 5, COOL_AFTER = 3;          // heat lost a second, seconds after the last blow
-const PER_BLOW = 1.5, BURN = 0.012;      // heat from a landed blow; health a second burnt away overheated
+const COOL = 5, COOL_AFTER = 4;          // heat lost a second, seconds after the last blow
+const PER_BLOW = 3, BURN = 0.012;        // heat from a landed blow; health a second burnt away overheated
+const OVERHEAT_SECS = 8, VENT_TO = 50;   // an Overheat lasts this long, then the body vents down to this
 const BRANDS = 5, BRAND_SECS = 12;
 const ORANGE = '#ff7a2a', GOLD = '#ffd27a', BLUE = '#6ab8ff';
 const v = new THREE.Vector3(), w = new THREE.Vector3();
@@ -81,7 +82,8 @@ export const EMBER = {
   },
 
   meter(set) {
-    return { value: heatOf(set) / MOST, color: hue(set), hot: !!set.overheat, label: set.overheat ? 'Overheat' : 'Heat' };
+    const left = Math.max(0, Math.ceil((set.overheatUntil ?? 0) - time(set)));
+    return { value: heatOf(set) / MOST, color: hue(set), hot: !!set.overheat, marks: [WHITE_AT / MOST, BLUE_AT / MOST], label: set.overheat ? `Overheat ${left}s` : `Heat ${Math.round(heatOf(set))}` };
   },
 
   afflicted(set, e, def) {
@@ -278,7 +280,16 @@ export const EMBER = {
     if (t - (set.heatAt ?? -9) > COOL_AFTER) set.heat = Math.max(0, heatOf(set) - COOL * dt);
     if (heatOf(set) >= MOST && !set.overheat) {
       set.overheat = true;
+      set.overheatUntil = t + OVERHEAT_SECS;
       p.hud.message('Overheat! Every power at its strongest, and you burn.', true);
+    }
+    // It burns itself out: after a few seconds the body vents, flames bursting off it.
+    if (set.overheat && t > set.overheatUntil) {
+      set.overheat = false;
+      set.heat = Math.min(heatOf(set), VENT_TO);
+      const s = p.state;
+      set.fx.impact('fire', s.x, ground(set, s.x, s.z), s.z, 4);
+      p.hud.message('You vent the heat.');
     }
     if (set.overheat && heatOf(set) < COOL_FROM) set.overheat = false;
     if (set.overheat) {

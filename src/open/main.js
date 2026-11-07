@@ -53,6 +53,7 @@ const QUERY = new URLSearchParams(location.search);
 // What the picture gives up, in turn, to hold the frame rate: smoothing first, then resolution.
 const LEVELS = [{ scale: 1, aa: 4 }, { scale: 1, aa: 0 }, { scale: 0.85, aa: 0 }, { scale: 0.72, aa: 0 }, { scale: 0.6, aa: 0 }, { scale: 0.5, aa: 0 }];
 const SLOW = 0.021, FAST = 0.0178;        // seconds per frame that lower or raise the resolution
+const WARM_AFTER = [2500, 9000];        // ms after loading that hidden effects' shaders are built
 const SLOW_MO = 0.35;                    // how fast the world runs in a slow-motion moment
 const PAUSED_FRAME = 0.1;                 // a frame this long is a hidden tab or a stall, not slowness
 const SCALE_WAIT = 2.5;                   // seconds between changes, since each one costs a hitch
@@ -804,6 +805,33 @@ document.body.classList.toggle('no-compass', !settings.compass);
 addEventListener('pagehide', saveSpot);
 setTime(world.menu ? 'dusk' : 'morning');
 window.__world = { menu, players, world, split, views, join, leave, monsters, height, PUNCHES, work, marks, melee: p1.melee, bag: p1.bag, rooms: p1.rooms, body: p1.body, controls: p1.controls, skills: p1.skills, swim: p1.swim, hud: p1.hud, camera, step, goto, SHOTS, setTime, state, renderer, chunks };
+// Every effect that starts hidden (beams, domes, trails, sparks, crystals, flames...) still needs its
+// shader. renderer.compile only builds what's visible, so show everything for that one call, in the
+// background a moment after loading, and the first ultimate or beam won't stall while the GPU compiles.
+const warmShaders = () => {
+  const hidden = [];
+  scene.traverse((o) => {
+    // Lights stay as they are: shaders are built for the lights that are on, so switching them would
+    // build every shader for the wrong lights.
+    if (o.visible || o.isLight) return;
+    hidden.push(o);
+    o.visible = true;
+  });
+  // Built for where the scene is really drawn (the picture pipeline's target, linear colour), or
+  // they'd be built for the screen and never used.
+  const was = renderer.getRenderTarget();
+  renderer.setRenderTarget(views[0].post.main);
+  try {
+    if (renderer.compileAsync) renderer.compileAsync(scene, camera).catch(() => {});
+    else renderer.compile(scene, camera);
+  } finally {
+    renderer.setRenderTarget(was);
+    for (const o of hidden) o.visible = false;
+  }
+};
+// Twice: once soon after loading, and again once play has settled (a few are only built right then).
+// Shaders already built are skipped, so the second pass costs almost nothing.
+for (const ms of WARM_AFTER) setTimeout(warmShaders, ms);
 let last = performance.now();
 // The next frame is booked first: an error in one frame is logged, and play carries on.
 const loop = (now) => {

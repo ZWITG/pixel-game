@@ -58,10 +58,11 @@ export default class Rooms {
     this.group = new THREE.Group();
     this.group.position.y = ROOM_Y;
     this.group.add(build());
-    // Always in the scene, so entering a house never recompiles every material.
-    const fire = new THREE.PointLight('#ffd8b0', 28, 26, 1.4);
-    fire.position.set(0, 3.2, -3);
-    this.group.add(fire);
+    // Always lit and in the scene (not inside the hidden room, where it wouldn't count as a light),
+    // parked far below until a house is entered, so entering never rebuilds every shader.
+    this.fire = new THREE.PointLight('#ffd8b0', 28, 26, 1.4);
+    this.fire.position.set(0, -500, 0);
+    scene.add(this.fire);
     this.group.visible = false;
     scene.add(this.group);
   }
@@ -71,6 +72,7 @@ export default class Rooms {
     this.group.position.x = house.x;
     this.group.position.z = house.z;
     this.group.visible = true;
+    this.fire.position.set(house.x, ROOM_Y + 3.2, house.z - 3);
     state.x = house.x;
     state.z = house.z + D / 2 - 5.5; // a few steps in, so the camera has room behind the hero
     state.yaw = 0;
@@ -87,6 +89,7 @@ export default class Rooms {
     state.dir = [ox, oz];
     this.house = null;
     this.group.visible = false;
+    this.fire.position.set(0, -500, 0);
   }
 
   spot(state) {

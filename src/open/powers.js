@@ -6,7 +6,7 @@ import { COMBAT } from './combat.js';
 import { TITAN } from './kits/titan.js';
 import { STORM } from './kits/storm.js';
 import { EMBER } from './kits/ember.js';
-import { FROST } from './kits/frost.js';
+import { FROST, iceMat } from './kits/frost.js';
 
 // Conquerors whose kits have their own power kinds and hooks (kits/*.js).
 const KITS = { titan: TITAN, storm: STORM, ember: EMBER, frost: FROST };
@@ -89,6 +89,14 @@ export class PowerFx {
     const black = new THREE.MeshBasicMaterial({ color: '#000000', fog: false });
     this.shells = { earth: pool(SHELLS, () => new THREE.Mesh(lump, stone)), ice: pool(SHELLS, () => new THREE.Mesh(shard, ice)), void: pool(SHELLS, () => new THREE.Mesh(ball, black)), fire: pool(SHELLS, () => new THREE.Mesh(lump, new THREE.MeshBasicMaterial({ color: '#ffb040', fog: false }))) };
     this.holes = pool(HOLES, () => new THREE.Mesh(ball, black));
+    // Materials kits make on demand (the Frostwarden's ice weapons): a hidden stand-in each, so the
+    // shader warm-up in main.js builds them before they're first needed.
+    for (const m of [iceMat]) {
+      const o = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), m);
+      o.visible = false;
+      o.castShadow = true;
+      scene.add(o);
+    }
     this.live = [this.glows, this.pillars, this.discs, this.bolts, this.crystals, this.rocks, this.holes];
   }
 

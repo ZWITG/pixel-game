@@ -190,6 +190,7 @@ export default class Vfx {
       this.nextSpark = (this.nextSpark + 1) % SPARKS;
       const a = Math.random() * 6.283, e = (Math.random() - 0.3) * 1.4, v = speed * (0.35 + Math.random() * 0.65);
       this.color.set(list[i % list.length]);
+      this.sparksLive = true;
       Object.assign(s, { life: life * (0.6 + Math.random() * 0.6), x, y, z, vx: Math.cos(a) * Math.cos(e) * v, vy: (Math.sin(e) + up) * v, vz: Math.sin(a) * Math.cos(e) * v, r: this.color.r, g: this.color.g, b: this.color.b, fall });
       s.max = s.life;
     }
@@ -257,6 +258,9 @@ export default class Vfx {
         s.mesh.visible = false;
       }
     }
+    // With no spark alive (and the last ones already cleared) there's nothing to move or send.
+    if (!this.sparksLive) return;
+    let alive = false;
     const pos = this.sparkPos, col = this.sparkCol, drag = Math.exp(-dt * SPARK_DRAG);
     for (let i = 0; i < SPARKS; i++) {
       const s = this.sparks[i];
@@ -268,6 +272,7 @@ export default class Vfx {
         continue;
       }
       s.life -= dt;
+      alive = true;
       s.vx *= drag;
       s.vz *= drag;
       s.vy = s.vy * drag - SPARK_FALL * s.fall * dt;
@@ -284,5 +289,6 @@ export default class Vfx {
     }
     this.sparkPoints.geometry.attributes.position.needsUpdate = true;
     this.sparkPoints.geometry.attributes.color.needsUpdate = true;
+    this.sparksLive = alive; // one more pass after the last dies, to clear it
   }
 }
