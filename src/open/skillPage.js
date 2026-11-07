@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import SkillMap from './skillMap.js';
 import { height } from './terrain.js';
 import PackPage from './packPage.js';
+import { svg } from './conquerors.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -16,10 +17,13 @@ function put(el, key, value, apply) {
 }
 const width = (el, k) => put(el, 'w', `${Math.round(k * 1000) / 10}%`, (v) => { el.style.width = v; });
 const toggle = (el, name, on) => put(el, `c:${name}`, !!on, (v) => el.classList.toggle(name, v));
+const NUMERALS = ['0', 'I', 'II', 'III', 'IV', 'V'];
+const LOW = 0.25;             // share of health under which the HUD warns
 
 // World HUD: short messages, the breath bar, and the skill map.
 export default class WorldHud {
   constructor(prefix) {
+    this.prefix = prefix;
     this.$ = (id) => $(prefix + id);
     this.mapOpen = false;
     this.packOpen = false;
@@ -149,15 +153,28 @@ export default class WorldHud {
     width(el.lastChild.firstChild, a.morale);
   }
 
-  // The Omega sigil: the phase's name, and a ring that fills toward the next.
+  // The hero's banner: the Omega phase as a numeral and its name, a bar filling toward the next.
   setOmega(om) {
     const el = this.$('omega');
     if (!el) return;
     const info = om.info;
-    put(el, 'name', info.name, (v) => { el.lastChild.textContent = v; });
+    put(el, 'name', info.name, (v) => { el.querySelector('span').textContent = v; });
     put(el, 'c', info.color, (v) => el.style.setProperty('--c', v));
-    put(el, 'k', Math.round(om.progress * 100), (v) => el.style.setProperty('--k', `${v}%`));
-    put(el, 'p', om.phase, (v) => { el.firstChild.textContent = v; });
+    put(el, 'k', Math.round(om.progress * 100), (v) => { el.querySelector('s').style.width = `${v}%`; });
+    put(el, 'p', om.phase, (v) => { el.querySelector('b').textContent = NUMERALS[v] ?? v; });
+  }
+
+  // Whose banner it is: the Conqueror's name, colour and emblem (or none yet).
+  setHero(def) {
+    const banner = this.$('omega'), lv = this.$('lv');
+    put(banner, 'hero', def?.name ?? '', () => {
+      banner.querySelector('em').innerHTML = def ? svg(def.emblem, 30) : '';
+      const c = def?.color ?? '#9a2a2a';
+      banner.style.setProperty('--hero', c);
+      lv.style.setProperty('--hero', c);
+      this.heroName = def?.name ?? '';
+      this.drawLevel();
+    });
   }
 
   // Edge arrows for attackers out of sight: `a` is radians clockwise from straight ahead.
@@ -182,6 +199,10 @@ export default class WorldHud {
 
   setHealth(amount) {
     this.$('hp-fill').style.width = `${Math.max(0, amount) * 100}%`;
+    // Low on health: the bar beats and the screen's edges run red.
+    const low = amount > 0 && amount < LOW;
+    toggle(this.$('hp'), 'low', low);
+    if (!this.prefix) toggle(document.body, 'low-hp', low);
   }
 
   // What monsters call for their damage numbers; `y` is above the ground there.
@@ -202,7 +223,12 @@ export default class WorldHud {
   }
 
   setLevel(level) {
-    this.$('lv').textContent = `Lv ${level}`;
+    this.level = level;
+    this.drawLevel();
+  }
+
+  drawLevel() {
+    this.$('lv').innerHTML = `${this.heroName ? `<b>${this.heroName}</b>` : ''}<span>Lv ${this.level ?? 1}</span>`;
   }
 
   setGoal(text, color) {

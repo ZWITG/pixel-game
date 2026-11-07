@@ -342,6 +342,187 @@
       #menu-hints:empty { display: none; }
       body.in-menu #skills, body.in-menu #pack, body.in-menu #p2-pack { top: 72px; bottom: 0; border-top: 0; }
       body.in-menu #help, body.in-menu #pad-status, body.in-menu .compass, body.in-menu #hp, body.in-menu #lv, body.in-menu #goal { visibility: hidden; }
+      /* ===== War banner: the look of every HUD piece and menu (v0.41). Iron plates with brass trim and rivets,
+         hanging cloth banners, a heraldic serif for names and numbers. Later rules here win over the older ones above. ===== */
+      @font-face { font-family: 'Cinzel'; font-weight: 600; font-display: swap; src: url(/fonts/cinzel-latin-600-normal.woff2) format('woff2'); }
+      @font-face { font-family: 'Cinzel'; font-weight: 800; font-display: swap; src: url(/fonts/cinzel-latin-800-normal.woff2) format('woff2'); }
+      :root {
+        --ink: #120f14; --iron: #2a2420; --iron-hi: #3a322b; --edge: #8a7a62; --brass: #c8a050; --brass-hi: #f0d488;
+        --cloth: #7a1a20; --parch: #ecdcbc; --parch-dim: #b8a684; --blood: #d23c3a; --spirit: #4ab8e0;
+        --serif: 'Cinzel', 'Zen Maru Gothic', serif; --sans: 'Zen Maru Gothic', sans-serif;
+        --rivets: radial-gradient(circle, #c8b088 1.4px, #3a2a1a 1.9px, transparent 2.3px);
+        --plate: linear-gradient(#2f2924f2, #1b1715f2);
+        --frame: inset 0 0 0 1px var(--edge), inset 0 0 0 2px #0009, 0 0 0 1px #000, 0 4px 12px #000a;
+      }
+      /* A plate: iron, a bronze edge, a rivet in each corner. */
+      .compass, #foe, #p2-foe, #act:not(:empty), #p2-act:not(:empty), #menu-hints, #menu-place, #menu-side, .market-box {
+        background: var(--rivets) left 3px top 3px / 8px 8px no-repeat, var(--rivets) right 3px top 3px / 8px 8px no-repeat,
+          var(--rivets) left 3px bottom 3px / 8px 8px no-repeat, var(--rivets) right 3px bottom 3px / 8px 8px no-repeat, var(--plate);
+        box-shadow: var(--frame);
+      }
+
+      /* ---- the hero's banner, hanging from the top-left: emblem, Omega numeral, phase, progress ---- */
+      .omega { left: 14px; top: 0; width: 60px; height: 112px; display: block; gap: 0; letter-spacing: 0; text-transform: none; color: var(--parch); }
+      .omega::before, .omega::after { content: ''; position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 86%, 0 100%); }
+      .omega::before { background: linear-gradient(90deg, #8a6a2a, var(--brass-hi) 50%, #8a6a2a); filter: drop-shadow(0 4px 6px #000); }
+      .omega::after { inset: 0 3px 3px; background: repeating-linear-gradient(0deg, #ffffff07 0 2px, transparent 2px 4px), linear-gradient(90deg, #0006, transparent 30%, transparent 70%, #0006), color-mix(in srgb, var(--hero, #9a2a2a) 52%, #1a080a); }
+      .omega > * { position: relative; z-index: 1; }
+      .omega em { display: flex; justify-content: center; margin-top: 12px; height: 30px; color: var(--brass-hi); filter: drop-shadow(0 1px 0 #000) drop-shadow(0 0 6px #0008); }
+      .omega b { display: block; width: auto; height: auto; margin-top: 4px; background: none; text-align: center; font: 800 21px var(--serif); color: var(--c, var(--parch)); text-shadow: 0 2px 0 #000, 0 0 10px #000; }
+      .omega span { display: block; text-align: center; font: 600 7.5px var(--serif); letter-spacing: 0.1em; text-transform: uppercase; color: var(--parch); text-shadow: 0 1px 0 #000; }
+      .omega u { display: block; width: 36px; height: 3px; margin: 5px auto 0; background: #0009; box-shadow: 0 0 0 1px #0006; }
+      .omega s { display: block; height: 100%; width: 0; background: var(--c, var(--brass)); text-decoration: none; }
+      #p2-omega { left: 14px; right: auto; top: 50%; }
+      body.two #p2-omega { left: 14px; top: 50%; }
+
+      /* ---- name and level, health, Spirit, Wrath, the Conqueror's gauge, Structure ---- */
+      #lv, #p2-lv { left: 86px; top: 9px; display: flex; align-items: baseline; gap: 10px; font: 600 15px var(--serif); color: var(--parch); text-shadow: 0 1px 0 #000, 0 0 8px #000c; }
+      #lv b, #p2-lv b { font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--parch); }
+      #lv span, #p2-lv span { font-size: 13px; color: var(--brass-hi); }
+      #hp, #p2-hp { left: 86px; top: 32px; width: 260px; height: 17px; padding: 3px; border-radius: 0; background: #0d0a09; box-shadow: var(--frame); clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+      #hp::after, #p2-hp::after { content: ''; position: absolute; inset: 3px; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), #0000005a calc(10% - 1px) 10%); pointer-events: none; }
+      #hp-fill, #p2-hp-fill { border-radius: 0; background: linear-gradient(#ff7a68, var(--blood) 45%, #8a1420); box-shadow: inset 0 1px 0 #ffffff55; }
+      #p2-hp-fill { background: linear-gradient(#8af0d8, #2fa890 45%, #16604f); }
+      #hp.low #hp-fill, #p2-hp.low #p2-hp-fill { animation: beat 0.9s ease-in-out infinite; }
+      @keyframes beat { 50% { filter: brightness(1.7); } }
+      #hurt-veil { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.5s; background: radial-gradient(ellipse at center, transparent 55%, #7a0a10b0 100%); }
+      body.low-hp #hurt-veil { opacity: 1; animation: veil 0.9s ease-in-out infinite; }
+      @keyframes veil { 50% { opacity: 0.55; } }
+      body.title #hurt-veil, body.in-menu #hurt-veil, body.in-menu #foe, body.in-menu #p2-foe, body.title #foe { display: none; }
+      .fight, #p2-fight { left: 86px; top: 56px; width: 252px; gap: 6px 10px; }
+      .fight .pips { gap: 5px; }
+      .fight .pips i { width: 22px; height: 9px; background: #0d0a09; box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 1px #000; transform: skewX(-32deg); }
+      .fight .pips b { background: linear-gradient(#d8f6ff, var(--spirit) 60%, #1a6a8a); }
+      .fight .pips i.full { box-shadow: inset 0 0 0 1px #d8f6ff, 0 0 0 1px #000, 0 0 8px #4ab8e099; }
+      .fight .post { width: 96px; height: 6px; background: #0d0a09; box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 1px #000; }
+      .fight .post u { background: linear-gradient(90deg, var(--brass), #ff6a3a); }
+      .fight .wrath { height: 6px; background: #0d0a09; box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 1px #000; }
+      .fight .wrath u { background: linear-gradient(90deg, #6a1020, var(--blood), #ff8a4a); }
+      .fight .wrath span, .fight .meter span { font: 600 10px var(--serif); letter-spacing: 0.08em; text-transform: uppercase; top: -3px; }
+      .fight .wrath:not(.full):not(.surge) span { color: var(--parch-dim); }
+      .fight .meter { height: 9px; border-radius: 0; background: #0d0a09; box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 1px #000; }
+      .fight .meter u { border-radius: 0; }
+      .fight .meter i { background: var(--brass-hi); }
+      #goal, #p2-goal { left: 16px; top: 124px; max-width: 360px; font: 600 14px var(--serif); text-shadow: 0 1px 0 #000, 0 0 8px #000; }
+      #goal:not(:empty)::before { content: '◆ '; color: var(--brass); }
+      body.two #p2-lv { top: calc(50% + 9px); left: 86px; }
+      body.two #p2-hp { top: calc(50% + 32px); left: 86px; right: auto; }
+      body.two #p2-fight { top: calc(50% + 56px); left: 86px; }
+      body.two #p2-goal { top: calc(50% + 124px); left: 16px; }
+
+      /* Narrow screens: a slimmer cluster and compass, so the two never meet. */
+      @media (max-width: 1100px) {
+        #hp, #p2-hp { width: 196px; } .fight, #p2-fight { width: 190px; } .fight .post { width: 70px; }
+        .compass { width: clamp(180px, calc(100vw - 600px), 520px); }
+        #toast, #p2-toast { padding: 6px 40px; top: 31%; }
+        #foe, #p2-foe { top: 112px; width: 300px; } .army { top: 166px; width: 300px; }
+      }
+      /* ---- compass: an iron rule with a brass pointer ---- */
+      .compass { top: 10px; height: 42px; width: clamp(220px, calc(100vw - 780px), 520px); border: 0; color: var(--parch); font: 600 12px var(--serif); text-shadow: 0 1px 0 #000; }
+      .compass .wind { font: 800 15px var(--serif); color: var(--brass-hi); }
+      .compass .town { font: 600 11px var(--sans); color: var(--parch-dim); }
+      .compass::after { content: ''; position: absolute; left: 50%; top: 0; border: 6px solid transparent; border-top-color: var(--brass-hi); transform: translateX(-50%); }
+
+      /* ---- the foe, an army, place names, news ---- */
+      #foe, #p2-foe { top: 60px; width: 360px; padding: 7px 14px 9px; box-sizing: border-box; font: 600 13px var(--serif); letter-spacing: 0.1em; text-transform: uppercase; color: var(--parch); }
+      #foe-bar, #p2-foe-bar { height: 10px; margin-top: 5px; padding: 2px; background: #0d0a09; box-shadow: inset 0 0 0 1px var(--edge); }
+      #foe-fill, #p2-foe-fill { background: linear-gradient(#ff7a68, var(--blood) 45%, #8a1420); }
+      .foe-post { width: 100%; height: 4px; margin-top: 4px; background: #0d0a09; }
+      .foe-post u { background: linear-gradient(90deg, var(--brass), var(--brass-hi)); }
+      body.two #p2-foe { top: calc(50% + 14px); }
+      .army { top: 116px; width: 340px; padding: 8px 18px 16px; box-sizing: border-box; font: 600 12px var(--serif); letter-spacing: 0.08em; text-transform: uppercase; color: var(--parch); }
+      .army::before { content: ''; position: absolute; inset: 0; z-index: -1; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); background: repeating-linear-gradient(0deg, #ffffff07 0 2px, transparent 2px 4px), color-mix(in srgb, var(--c, #ff5a3a) 45%, #12080a); box-shadow: inset 0 0 0 2px var(--brass); }
+      .army div { height: 6px; margin-top: 4px; background: #0d0a09; box-shadow: inset 0 0 0 1px var(--edge); }
+      .army u { background: var(--parch); }
+      .place { font: 800 42px var(--serif); letter-spacing: 0.12em; color: var(--parch); text-shadow: 0 3px 0 #000, 0 0 24px #000c; }
+      .place small { font: 600 15px var(--serif); letter-spacing: 0.2em; text-transform: uppercase; color: var(--brass-hi); }
+      .place::after { content: ''; display: block; width: 340px; height: 1px; margin: 10px auto 0; background: linear-gradient(90deg, transparent, var(--brass), transparent); }
+      #toast, #p2-toast { top: 25%; width: max-content; max-width: min(88vw, 780px); box-sizing: border-box; padding: 8px 64px; border-width: 1px 0; border-style: solid; border-image: linear-gradient(90deg, transparent, var(--brass), transparent) 1; background: linear-gradient(90deg, transparent, #120f14d8 18%, #120f14d8 82%, transparent); font: 600 16px var(--serif); color: var(--parch); text-shadow: 0 2px 0 #000; }
+      #toast.big, #p2-toast.big { font: 800 20px var(--serif); letter-spacing: 0.04em; color: var(--brass-hi); }
+      #gains div, #p2-gains div { margin-bottom: 4px; font: 800 15px var(--serif); letter-spacing: 0.04em; text-shadow: 0 2px 0 #000, 0 0 8px #000; }
+      #act, #p2-act { bottom: 84px; padding: 6px 18px; font: 600 15px var(--serif); color: var(--parch); }
+      .float { font: 800 19px var(--serif); text-shadow: 0 2px 0 #000, 0 0 4px #000, 0 0 2px #000; }
+      #conquest b { font: 800 clamp(30px, 6vw, 64px) var(--serif); letter-spacing: 0.08em; }
+      #conquest span { font: 600 18px var(--serif); }
+
+      /* ---- the rest: hints, pad status, threats, breath ---- */
+      #help { left: 0; right: 0; bottom: 0; padding: 18px 16px 9px; font: 500 13px var(--sans); color: var(--parch); background: linear-gradient(transparent, #0c0a0cb0); }
+      #pad-status { top: 64px; right: 14px; max-width: 300px; text-align: right; font: 600 11px var(--serif); letter-spacing: 0.04em; color: var(--parch-dim); text-shadow: 0 1px 0 #000, 0 0 6px #000; }
+      .key { color: var(--parch); background: var(--iron-hi); box-shadow: inset 0 0 0 1px var(--edge); border-radius: 3px; }
+      .btn { color: var(--ink); background: var(--parch); box-shadow: inset 0 -2px 0 #0003; }
+      .threats i { border-bottom-color: #ecdcbccc; }
+      .threats i.tell { border-bottom-color: #ff3a3a; }
+      #breath, #p2-breath { height: 9px; padding: 2px; background: #0d0a09; box-shadow: var(--frame); }
+      #breath-fill, #p2-breath-fill { background: linear-gradient(#d8f6ff, var(--spirit)); }
+
+      /* ---- the power cross: four iron diamonds ---- */
+      .powers { right: 26px; bottom: 58px; width: 150px; height: 150px; }
+      .pow { width: 48px; height: 48px; overflow: hidden; border-radius: 3px; transform: rotate(45deg); background: var(--plate); box-shadow: inset 0 0 0 1px var(--edge), inset 0 0 0 3px #0008, 0 0 0 1px #000, 0 4px 10px #000a; }
+      .pow i, .pow b { transform: rotate(-45deg); }
+      .pow b { right: auto; left: 50%; bottom: -1px; transform: rotate(-45deg) scale(0.75); }
+      .pow u { background: #050407d0; }
+      .pow:not(.empty) { box-shadow: inset 0 0 0 1px var(--brass), inset 0 0 0 3px #0008, 0 0 0 1px #000, 0 4px 10px #000a; }
+      .pow.empty { opacity: 0.35; }
+      .pow.s0 { left: 51px; top: 0; } .pow.s1 { right: 0; top: 51px; } .pow.s2 { left: 51px; bottom: 0; top: auto; } .pow.s3 { left: 0; top: 51px; }
+      .powers.page2 .pow { box-shadow: inset 0 0 0 1px var(--brass-hi), inset 0 0 0 3px #0008, 0 0 0 1px #000, 0 0 12px #c8a05088; }
+
+      /* ---- the menu: an iron beam with banner tabs; pages of iron and crimson cloth ---- */
+      #menu { font-family: var(--sans); }
+      #menu-bar { height: 72px; background: var(--rivets) left 0 bottom 4px / 26px 8px repeat-x, linear-gradient(#2c2622, #191513); box-shadow: 0 2px 0 var(--brass), 0 3px 0 #000, 0 10px 30px #000c; }
+      #menu-tabs { gap: 6px; align-self: flex-start; }
+      #menu-tabs button { isolation: isolate; width: 84px; height: 66px; padding: 9px 0 0; gap: 3px; border-radius: 0; color: var(--parch-dim); font: 600 10.5px var(--serif); letter-spacing: 0.06em; text-transform: uppercase; transition: color 0.12s, height 0.15s; }
+      #menu-tabs button::before, #menu-tabs button::after { content: ''; position: absolute; inset: 0; z-index: -1; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%); }
+      #menu-tabs button::before { background: #4a3e32; }
+      #menu-tabs button::after { inset: 0 2px 2px; left: 2px; right: 2px; bottom: 2px; height: auto; border-radius: 0; box-shadow: none; background: repeating-linear-gradient(0deg, #ffffff05 0 2px, transparent 2px 4px), #221c19; }
+      #menu-tabs button:hover { color: var(--parch); }
+      #menu-tabs button.at { height: 86px; color: var(--parch); background: none; transform: none; }
+      #menu-tabs button.at::before { background: linear-gradient(90deg, #8a6a2a, var(--brass-hi) 50%, #8a6a2a); filter: drop-shadow(0 6px 8px #000); }
+      #menu-tabs button.at::after { inset: 0 2px 2px; height: auto; border-radius: 0; box-shadow: none; background: repeating-linear-gradient(0deg, #ffffff07 0 2px, transparent 2px 4px), linear-gradient(90deg, #0005, transparent 30%, transparent 70%, #0005), var(--cloth); }
+      #menu-tabs button.at svg { filter: drop-shadow(0 0 6px #f0d48899); color: var(--brass-hi); }
+      #menu-prev, #menu-next { align-self: center; }
+      #menu-page, #menu-map { background: radial-gradient(ellipse at 50% 0%, #3a1a1a55 0%, transparent 60%), repeating-linear-gradient(45deg, #ffffff03 0 2px, transparent 2px 10px), linear-gradient(#17121a, #0c0a0e); }
+      #menu-page h2, .nations-page h2, .market-box h2 { font: 800 22px var(--serif); letter-spacing: 0.06em; color: var(--brass-hi); text-shadow: 0 2px 0 #000; }
+      #menu-page h3, .nations-page h3, #menu-side h3, .watch-notes h3 { font: 600 14px var(--serif); letter-spacing: 0.12em; text-transform: uppercase; color: var(--brass); }
+      #menu-page button { border-radius: 2px; background: linear-gradient(90deg, #2c2622, #1e1a17); box-shadow: inset 0 0 0 1px #8a7a6244; color: var(--parch-dim); }
+      #menu-page button b, #menu-page > button { font-family: var(--serif); font-weight: 600; }
+      #menu-page button em { font-family: var(--serif); color: var(--brass-hi); }
+      #menu-page button small { font-family: var(--sans); font-weight: 500; }
+      #menu-page .watch-page h2 { font: 800 22px var(--serif); letter-spacing: 0.06em; color: var(--brass-hi); text-shadow: 0 2px 0 #000; }
+      #menu-page button.at { color: var(--parch); background: linear-gradient(90deg, var(--cloth), #3a1418 70%, #2c2622); box-shadow: inset 0 0 0 1px var(--brass), inset 4px 0 0 var(--brass-hi); }
+      .menu-rows div, .nation, .gift, .power-info, .watch-notes > div { border-radius: 2px; background: linear-gradient(#2a2420e6, #1c1816e6); box-shadow: inset 0 0 0 1px #8a7a6244; }
+      .watch-notes > div { padding: 12px 16px; }
+      .nation { box-shadow: inset 0 0 0 1px #8a7a6244, inset 4px 0 0 var(--c); }
+      .nation b { font: 600 16px var(--serif); letter-spacing: 0.04em; }
+      .nation-bar, .power-bar, .watch-notes .favour i { border-radius: 0; background: #0d0a09; box-shadow: inset 0 0 0 1px #8a7a6266; }
+      .powers-head b { font: 800 22px var(--serif); letter-spacing: 0.06em; }
+      #menu-page .power-grid button { border-radius: 2px; }
+      #menu-page .power-grid button b { font: 600 12px var(--serif); }
+      #menu-page .power-grid button.at { background: linear-gradient(#3a1418, #2c2622); box-shadow: inset 0 0 0 1px var(--c), 0 0 14px -4px var(--c); }
+      .power-info b, .gift b { font-family: var(--serif); }
+      .cross div { border-radius: 3px; background: linear-gradient(#2c2622, #1b1715); box-shadow: inset 0 0 0 1px var(--edge), 0 0 0 1px #000; }
+      .cross div.choosing { background: #7a1a2088; box-shadow: inset 0 0 0 2px var(--brass-hi); }
+      #menu-hints { border-radius: 0; padding: 6px 14px; color: var(--parch); }
+      #menu-side { box-shadow: inset 1px 0 0 var(--brass); }
+      #menu-place { border-radius: 0; padding: 6px 18px; font: 600 15px var(--serif); letter-spacing: 0.06em; }
+      .chronicle u { font-family: var(--serif); color: var(--brass); }
+
+      /* ---- the trade screen ---- */
+      .market { background: #07060acc; }
+      .market-box { border-radius: 0; padding: 22px 26px; color: var(--parch); }
+      .market-box p { color: var(--parch-dim); }
+      .market-box .row { border-radius: 0; }
+      .market-box .row.at { background: linear-gradient(90deg, var(--cloth), #3a1418 60%, transparent); box-shadow: inset 3px 0 0 var(--brass-hi); }
+
+      /* ---- the title screen ---- */
+      .start-logo { font-family: var(--serif); font-weight: 800; letter-spacing: 0.14em; }
+      .start-tag { font: 600 15px var(--serif); letter-spacing: 0.22em; text-transform: uppercase; color: var(--brass); }
+      #start-list h2 { font: 800 22px var(--serif); letter-spacing: 0.06em; color: var(--brass-hi); }
+      #start-list button { border-radius: 0; font-family: var(--serif); font-weight: 600; font-size: 19px; letter-spacing: 0.04em; }
+      #start-list button b { font-weight: 600; }
+      #start-list button small { font-family: var(--sans); }
+      #start-list button.at { background: linear-gradient(90deg, #7a1a20d8, #7a1a2000); box-shadow: inset 3px 0 0 var(--brass-hi); }
+      #start-list button.at::before { background: var(--brass-hi); box-shadow: 0 0 10px var(--brass); }
+      .pick-side h1, .pick-side h2 { font-family: var(--serif); font-weight: 800; letter-spacing: 0.05em; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -392,8 +573,9 @@
     <div id="fight" class="fight"></div>
     <div id="army" class="army" hidden><span></span><div><u></u></div></div>
     <div id="p2-army" class="army p2" hidden><span></span><div><u></u></div></div>
-    <div id="omega" class="omega" title="Omega Level: how the world sees you"><b></b><span></span></div>
-    <div id="p2-omega" class="omega p2"><b></b><span></span></div>
+    <div id="omega" class="omega" title="Omega Level: how the world sees you"><em></em><b></b><span></span><u><s></s></u></div>
+    <div id="p2-omega" class="omega p2"><em></em><b></b><span></span><u><s></s></u></div>
+    <div id="hurt-veil"></div>
     <div id="p2-fight" class="fight p2"></div>
     <div id="pad-status"></div>
     <div id="help"></div>

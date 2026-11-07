@@ -702,6 +702,7 @@ function step(dt) {
     world.armies?.update(dt);
     world.watchers?.update(dt);
     if (world.omega) for (const p of players) p.hud.setOmega(world.omega);
+    for (const p of players) p.hud.setHero(p.powers.def);
     world.animals?.update(dt);
     world.fireLights?.update(dt, [...(world.voxels?.fires ?? []), ...world.scars.fires()], players[0].state);
     world.people.update(dt);

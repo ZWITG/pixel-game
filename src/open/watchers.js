@@ -583,7 +583,7 @@ export default class Watchers {
   report() {
     const h = this.habits, lines = [];
     const pc = (v) => `${Math.round(v * 100)}%`;
-    if (sum(h.smashAt) >= 4) lines.push(`You smash after ${top(h.smashAt)[0]} hits (${pc(topShare(h.smashAt))})`);
+    if (sum(h.smashAt) >= 4) lines.push(`You smash after ${top(h.smashAt)[0]} hit${top(h.smashAt)[0] === '1' ? '' : 's'} (${pc(topShare(h.smashAt))})`);
     if (sum(h.dodge) >= 4) lines.push(`You roll ${{ in: 'in toward a foe', back: 'away', left: 'to the left', right: 'to the right' }[top(h.dodge)[0]]} (${pc(topShare(h.dodge))})`);
     if (sum(h.parry) >= 4) lines.push(`Parries: ${pc(share(h.parry, 'perfect'))} Perfect, ${pc(share(h.parry, 'early'))} too early`);
     if (sum(h.range) >= 4) lines.push(`You like to fight ${top(h.range)[0]} (${pc(topShare(h.range))})`);

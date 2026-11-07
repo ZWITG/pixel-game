@@ -1,3 +1,4 @@
+Cinzel: Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)
 Copyright 2021 The Zen Maru Gothic Authors (https://github.com/googlefonts/zen-marugothic) ZenMaruGothic-Regular.ttf: Copyright 2021 The Zen Maru Gothic Authors (https://github.com/googlefonts/zen-marugothic) ZenMaruGothic-Medium.ttf: Copyright 2021 The Zen Maru Gothic Authors (https://github.com/googlefonts/zen-marugothic) ZenMaruGothic-Bold.ttf: Copyright 2021 The Zen Maru Gothic Authors (https://github.com/googlefonts/zen-marugothic) ZenMaruGothic-Black.ttf: Copyright 2021 The Zen Maru Gothic Authors (https://github.com/googlefonts/zen-marugothic)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
