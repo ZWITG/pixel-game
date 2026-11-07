@@ -41,7 +41,8 @@ export default class Market {
   }
 
   get rows() {
-    const { place, run } = this.view;
+    const { place, run, menu } = this.view;
+    if (menu) return menu.rows;
     if (place) return Object.keys(GOODS).filter((g) => ITEMS[itemOf(g)]);
     const c = this.player.world.caravans, econ = this.player.world.realm.economy;
     return [
@@ -61,11 +62,12 @@ export default class Market {
     if (just.back) return this.close();
     if (just.up) this.at = (this.at + rows.length - 1) % rows.length;
     if (just.down) this.at = (this.at + 1) % rows.length;
-    if (this.view.run) {
+    if (this.view.run || this.view.menu) {
       if (just.confirm || just.interact) {
-        const row = rows[this.at];
+        const row = rows[this.at], view = this.view;
         row.act();
-        if (row.done || !this.player.world.realm.economy.runs.includes(this.view.run)) return this.close();
+        if (this.view !== view) return undefined; // it opened another screen
+        if (row.done || (view.run && !this.player.world.realm.economy.runs.includes(view.run))) return this.close();
       }
     } else {
       const g = rows[this.at];
@@ -107,8 +109,10 @@ export default class Market {
   }
 
   draw() {
-    const { bag, controls } = this.player, p = (a) => prompt(a, controls.device), { place, run } = this.view;
-    const head = place
+    const { bag, controls } = this.player, p = (a) => prompt(a, controls.device), { place, menu } = this.view, run = this.view.run ?? menu;
+    const head = menu
+      ? `<h2>${menu.title}</h2><p>${menu.sub} · you have <b>${Math.round(bag.gold)} gold</b></p>`
+      : place
       ? `<h2>${place.name} market</h2><p>${TIERS[tierOf(place.pop)].name} of ${Math.round(place.pop)} · prosperity ${Math.round(place.prosperity * 100)}% · you have <b>${Math.round(bag.gold)} gold</b> · carrying ${Math.round(bag.weight)} of ${Math.round(this.player.body.carry)}</p>`
       : `<h2>${run.kind} bound for ${run.to.name}</h2><p>From ${run.from.name}, carrying ${Math.floor(run.qty)} ${GOODS[run.good].name.toLowerCase()} · you have <b>${Math.round(bag.gold)} gold</b></p>`;
     const rows = this.rows.map((row, i) => {

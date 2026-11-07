@@ -270,7 +270,15 @@ export default class Realm {
   war(id) {
     const place = this.weakestNeighbor(id);
     if (!place) return;
-    const s = this.of(id), n = NATIONS.find((a) => a.id === id), attack = s.troops * (0.7 + Math.random() * 0.6), hold = place.owner === 'hero' ? 30 : this.of(place.owner).troops * 0.5 + place.pop * 0.03;
+    // Near a hero, the march is a siege camp before the town, settled when it ends (events.js).
+    if (this.world.events?.siege(id, place, (left) => this.settle(id, place, left))) return;
+    this.settle(id, place, 1);
+  }
+
+  // How a march on a place ends. `left`: the share of the besiegers still standing.
+  settle(id, place, left) {
+    if (!this.of(id) || (place.owner !== 'hero' && !this.of(place.owner))) return;
+    const s = this.of(id), n = NATIONS.find((a) => a.id === id), attack = s.troops * (0.7 + Math.random() * 0.6) * left, hold = place.owner === 'hero' ? 30 : this.of(place.owner).troops * 0.5 + place.pop * 0.03;
     s.troops = Math.max(0, s.troops - hold * 0.3);
     const was = place.owner, name = was === 'hero' ? 'you' : NATIONS.find((a) => a.id === was).name;
     if (attack > hold) {
@@ -365,6 +373,12 @@ export default class Realm {
     const s = this.settlements.find((p) => p.id === id);
     if (!s) return;
     s.pop = Math.max(2, s.pop * 0.9);
+    // Enough burnt homes and its people take to the road.
+    s.burnt = (s.burnt ?? 0) + 1;
+    if (s.burnt >= 3) {
+      s.burnt = 0;
+      this.world.events?.flee(s);
+    }
   }
 
   // A conquered nation's people are the hero's now.

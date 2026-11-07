@@ -128,7 +128,9 @@ export default class Player {
   // Doors, beds and chests, all used with the same button.
   use(spot) {
     const { hud, rooms, state, bag, world } = this;
-    if (spot.caravan) {
+    if (spot.menu) this.market.open({ menu: spot.menu() });
+    else if (spot.act) spot.act();
+    else if (spot.caravan) {
       if (!spot.idle) this.market.open({ run: spot.caravan });
     } else if (spot.market) this.market.open({ place: spot.market });
     else if (spot.person) world.people.talk(this, spot.person);
@@ -163,7 +165,7 @@ export default class Player {
       return false;
     }
     const door = !rooms.house && !swim.inWater && world.work.door(state);
-    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.caravans.spot(this) ?? world.people.spot(this) ?? world.caravans.market(this);
+    const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.events?.spot(this) ?? world.fairs?.spot(this) ?? world.roadside?.spot(this) ?? world.caravans.spot(this) ?? world.people.spot(this) ?? world.caravans.market(this);
     // With Destructive Blow, the button waits to see if it's a tap or a hold (see updateCharge).
     const fights = !rooms.house || rooms.house.hostile;
     if (fights && !swim.inWater) {

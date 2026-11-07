@@ -36,6 +36,8 @@ export const FEATURES = {
   dayNight: true,       // day/night cycle (8 minutes a day): sunsets, stars, lit windows, fireflies
   ambientLife: true,    // butterflies, birds, fish, fireflies, chimney smoke, windmill, wind in grass and trees
   digs: true,           // open world: heavy blows and punches into hillsides dig the ground as voxels (digs.js); needs voxels
+  roadside: true,       // open world: inns, waystations, toll bridges, mills, quarries, lumber camps and mines (roadside.js)
+  fairs: true,          // open world: fairs that come round, and events on the roads: ambushes, bridge works, sieges, refugees (fairs.js, events.js)
   atmosphere: true,     // open world: smoke and dust clouds, fire through timber, fire light, glass shards (smoke.js)
   voxelWorld: true,     // open world: the land, trees, rocks and grass are cubes (half a tile); off = the smooth land
   voxels: true,         // open world: raze works and kingdom buildings are breakable voxels (voxels.js); off = the painted models fall whole

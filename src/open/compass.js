@@ -10,6 +10,14 @@ const WINDS = [['N', 0], ['E', -Math.PI / 2], ['S', Math.PI], ['W', Math.PI / 2]
 const MAX_TOWNS = 4;
 const LABEL_GAP = 0.5;     // radians kept between two labels
 const SHOWN = [...Object.values(PLACES), ...TOWNS];
+// Places that come and go (inns, fairs, events): anything with a name, x, z and r.
+export function showPlace(p) {
+  if (!SHOWN.includes(p)) SHOWN.push(p);
+}
+export function hidePlace(p) {
+  const i = SHOWN.indexOf(p);
+  if (i >= 0) SHOWN.splice(i, 1);
+}
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 

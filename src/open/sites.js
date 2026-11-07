@@ -2,7 +2,7 @@ import { fortMesh } from './doctrines.js';
 import { raises, raiseWorks, razeWorks, strike, settleWorks, restoreWorks, standing, workDuties, explode, fury, dishearten, voxelWorld, cut } from './raze.js';
 import * as THREE from 'three';
 import { VoxelBuilder, vmat } from '../render/voxel.js';
-import { height, biome, riverDistance, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
+import { height, biome, riverDistance, roadDistance, PLACES, SPAWN, WORLD, TOWNS } from './terrain.js';
 import { ITEMS } from './items.js';
 
 // Places worth finding. Every category has its own goal and its own kind of reward, and a
@@ -27,6 +27,9 @@ export const CATEGORIES = {
   city: { name: 'City', color: '#e8c050', count: 0, goal: 'boss', built: true, guards: 5, text: 'Overthrow the ruler of this city', reward: { items: { pearl: 3, iron: 12 }, practice: { fighting: 200 } } },
   lair: { name: 'Lair', color: '#ff3a6a', count: 0, goal: 'boss', built: true, text: 'Bring down what rules here', reward: { items: { pearl: 3, iron: 12, tusk: 4 }, perk: { force: 0.1, health: 15 }, practice: { fighting: 200 } } },
   cache: { name: 'Lost Cache', color: '#ffb547', count: 12, goal: 'open', verb: 'Open', text: 'Open the old chest', land: (y) => y > 3 && y < 260, reward: { items: { salve: 1, iron: 2, wood: 4 } } },
+  tower: { name: 'Ruined Watchtower', color: '#d8c8a8', count: 9, goal: 'hold', secs: 2, verb: 'Climb and look out', text: 'Climb up and look out over the land', steep: 9, land: (y) => y > 40 && y < 320, reward: { reveal: 3, practice: { climbing: 30 } } },
+  cove: { name: 'Smuggler Cove', color: '#6fb0c8', count: 6, goal: 'raze', mobs: ['chief', 'bandit', 'bandit', 'bandit'], size: 4, text: 'Drive the smugglers out', land: (y, x, z) => y > 0.8 && y < 5 && height(x + 24, z) < -3, reward: { gold: 60, items: { iron: 3, pearl: 1 } } },
+  remains: { name: 'Caravan Wreck', color: '#c9a654', count: 8, goal: 'open', verb: 'Search the wreck', text: 'Search what the bandits left', land: (y, x, z) => y > 3 && y < 200 && roadDistance(x, z) < 14, reward: { gold: 35, items: { wood: 4, iron: 2 } } },
 };
 
 const SAVE_KEY = 'lumen.sites';
@@ -80,6 +83,26 @@ function prop(key, color) {
   } else if (key === 'hermit') {
     b.box(0, 0.5, 0, 1.6, 1, 1.4, '#c9b89e', 0.08).box(0, 1.15, 0, 1.2, 0.35, 1.1, '#8a7a5e', 0.08).box(0, 1.4, 0, 0.7, 0.25, 0.7, '#8a7a5e', 0.08).box(0, 0.35, 0.72, 0.4, 0.7, 0.03, '#3a2c30');
     pile(5, 1.6, wood);
+  } else if (key === 'tower') {
+    // A broken stone tower: thick at the foot, its top fallen away on one side.
+    for (let i = 0; i < 9; i++) {
+      const w = 2.2 - i * 0.08;
+      for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        if (i > 5 && dx + dz > 0) continue;
+        b.box(dx * w * 0.5, 0.25 + i * 0.5, dz * w * 0.5, dx ? 0.35 : w, 0.5, dz ? 0.35 : w, i % 3 ? stone : '#a89aa4', 0.07);
+      }
+    }
+    b.box(0, 4.6, 0, 1.6, 0.2, 1.6, wood).box(0.6, 5.2, 0, 0.06, 1.2, 0.06, wood).box(0.85, 5.6, 0, 0.5, 0.3, 0.03, color);
+    pile(6, 2.2, stone);
+  } else if (key === 'cove') {
+    b.box(0, 0.25, 0, 2.4, 0.5, 1, '#6a4428', 0.06).box(0, 0.6, 0, 2.6, 0.2, 1.1, '#4a3020').box(0.9, 1.2, 0, 0.08, 1.2, 0.08, wood).box(0.9, 1.5, 0.25, 0.5, 0.6, 0.03, '#efe6d6');
+    for (const [x, z] of [[-1.6, 1.2], [-1, 1.6], [-1.3, 1.4]]) b.box(x, 0.3, z, 0.6, 0.6, 0.6, '#8a5a30', 0.06);
+    b.box(1.4, 0.2, 1.5, 0.4, 0.4, 0.4, color);
+  } else if (key === 'remains') {
+    // An overturned wagon and its spilled load.
+    b.box(0, 0.45, 0, 1.6, 0.3, 2.6, '#4a3020', 0.08).box(0.85, 0.5, -0.8, 0.12, 0.9, 0.9, '#2a2220').box(-0.9, 0.2, 0.9, 0.9, 0.12, 0.9, '#2a2220');
+    b.box(-0.2, 0.9, 0.3, 1.5, 0.6, 1.4, '#cfc4b0', 0.05);
+    pile(5, 1.8, color);
   } else if (key === 'cave') {
     // A rock arch around a dark mouth.
     b.box(0, 1.1, -0.3, 2.8, 2.2, 1.4, '#5a5260', 0.1).box(0, 0.8, 0.42, 1.4, 1.6, 0.05, '#0c0a12', 0).box(-1.4, 0.7, 0.2, 0.6, 1.4, 0.8, stone, 0.1).box(1.4, 0.9, 0.2, 0.6, 1.8, 0.8, stone, 0.1).box(0, 2.3, 0.1, 2.2, 0.5, 1, stone, 0.1);
@@ -157,7 +180,7 @@ export default class Sites {
       const near = first && t < 300, a = rand() * 6.28, d = FIRST_FROM + rand() * (FIRST_TO - FIRST_FROM);
       const x = near ? SPAWN.x + Math.cos(a) * d : 300 + rand() * (WORLD - 600), z = near ? SPAWN.z + Math.sin(a) * d : 300 + rand() * (WORLD - 600);
       const y = height(x, z);
-      if (!cat.land(y) || Math.hypot(x - PLACES.hollow.x, z - PLACES.hollow.z) < SAFE) continue;
+      if (!cat.land(y, x, z) || Math.hypot(x - PLACES.hollow.x, z - PLACES.hollow.z) < SAFE) continue;
       if (y > 0 && Math.max(Math.abs(height(x + 8, z) - y), Math.abs(height(x, z + 8) - y)) > (cat.steep ?? 5)) continue; // not on a cliff face
       if (Math.hypot(x - PLACES.spire.x, z - PLACES.spire.z) < 260 || biome(x, z)[0] === undefined) continue;
       if (TOWNS.some((T) => Math.hypot(x - T.x, z - T.z) < T.r + 60) || (y > 0 && riverDistance(x, z) < 14)) continue;
@@ -286,7 +309,21 @@ export default class Sites {
   }
 
   reward(p, s) {
-    const { items = {}, practice = {}, perk = {} } = s.cat.reward, { bag, hud } = p, said = [];
+    const { items = {}, practice = {}, perk = {}, gold = 0, reveal = 0 } = s.cat.reward, { bag, hud } = p, said = [];
+    if (gold) {
+      bag.gold += gold;
+      said.push(`${gold} gold`);
+    }
+    if (reveal) {
+      // From the top: the nearest places still to find, and a pin on the first.
+      const names = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+      const seen = this.list.filter((o) => !o.done && o !== s && !o.cat.built).sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z)).slice(0, reveal);
+      for (const o of seen) {
+        const a = Math.atan2(o.x - s.x, -(o.z - s.z));
+        said.push(`a ${o.cat.name} ${Math.round(Math.hypot(o.x - s.x, o.z - s.z) / 10) * 10} m ${names[(Math.round(a / (Math.PI / 4)) + 8) % 8]}`);
+      }
+      if (seen[0]) p.pin = { x: seen[0].x, z: seen[0].z };
+    }
     for (const [id, n] of Object.entries(items)) {
       bag.items[id] = (bag.items[id] ?? 0) + n; // rewards are earned, so they never go to waste
       said.push(`${ITEMS[id].name} ${n}`);

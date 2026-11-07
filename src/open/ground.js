@@ -1,5 +1,6 @@
 import { height, smoothHeight, biome, region, roadDistance, forest, dentAt, PLACES, TOWNS, SPAWN } from './terrain.js';
 import { streetDistance, plazaAt } from './cityPlan.js';
+import { roadsidePlaces } from './roadsidePlan.js';
 
 // Working out what the land looks like: plain numbers, no three.js, so a worker can do it away
 // from the frame. Everything comes from the position, so it's the same each visit.
@@ -17,7 +18,8 @@ const AUTUMN_TONES = [[0.55, 0.32, 0.12], [0.47, 0.25, 0.11]];
 const PINE_TONES = [[0.15, 0.29, 0.15], [0.2, 0.34, 0.15]];
 const ROCK_TINTS = [[0.69, 0.64, 0.67], [0.6, 0.64, 0.6], [0.66, 0.59, 0.55]], ORE_TINT = [0.75, 0.54, 0.39];
 // Trees stay out of these, so landmarks stand in the open.
-const CLEARINGS = [{ ...SPAWN, r: 70 }, PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }, ...TOWNS];
+const CLEARINGS = [{ ...SPAWN, r: 70 }, PLACES.hollow, PLACES.ribs, { x: PLACES.spirit.x, z: PLACES.spirit.z, r: 300 }, ...TOWNS,
+  ...roadsidePlaces().map((p) => ({ x: p.x, z: p.z, r: p.kind === 'inn' ? 42 : p.kind === 'windmill' ? 18 : 28 }))]; // inns, mills and camps have yards
 // No grass through the paving of cities and village squares.
 // Streets of every town are painted like roads (cityPlan.js), and its squares are paved.
 const paved = (x, z) => plazaAt(x, z);

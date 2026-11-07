@@ -117,6 +117,7 @@ export default class Digs {
 
   // Once its voxels are drawn: cut the smooth ground and grass away over it, and clear its trees.
   open(p) {
+    if (!p.vox || !this.list.includes(p)) return; // dropped before its voxels were ready
     p.ready = true;
     const waiting = p.pending ?? [];
     p.pending = null;
