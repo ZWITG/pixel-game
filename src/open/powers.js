@@ -5,9 +5,10 @@ import { prompt } from '../ui/glyphs.js';
 import { COMBAT } from './combat.js';
 import { TITAN } from './kits/titan.js';
 import { STORM } from './kits/storm.js';
+import { EMBER } from './kits/ember.js';
 
 // Conquerors whose kits have their own power kinds and hooks (kits/*.js).
-const KITS = { titan: TITAN, storm: STORM };
+const KITS = { titan: TITAN, storm: STORM, ember: EMBER };
 import { Flames, makeBolt, shapeBolt } from './elementFx.js';
 
 // What a power does when it's used, by `kind`, and the light it makes. Each hero has a PowerSet;
@@ -29,7 +30,7 @@ const STRIKE_WAIT = 0.45;
 const SHADE_REACH = 15, SHADE_EVERY = 0.8;
 const TRAIL_EVERY = 3;       // tiles between patches of a fiery trail
 const SOLID_STEP = 1.5;      // tiles between checks along a dash
-const CAST_POSE = { bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam', pillar: 'slam', slab: 'throw', surf: 'dash', mail: 'gather', garden: 'slam', sand: 'slam', rift: 'slam', mountain: 'gather', ironbend: 'peak', magma: 'slam', gather: 'peak', thunder: 'peak', step: 'dash', spear: 'throw', railgun: 'gather', current: 'gather', cyclone: 'peak', magnet: 'peak', plasma: 'punch' };
+const CAST_POSE = { bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam', pillar: 'slam', slab: 'throw', surf: 'dash', mail: 'gather', garden: 'slam', sand: 'slam', rift: 'slam', mountain: 'gather', ironbend: 'peak', magma: 'slam', gather: 'peak', thunder: 'peak', step: 'dash', spear: 'throw', railgun: 'gather', current: 'gather', cyclone: 'peak', magnet: 'peak', plasma: 'punch', fist: 'punch', ignite: 'peak', jet: 'dash', flare: 'slam', serpent: 'punch', inferno: 'peak', blue: 'punch', meteor: 'peak', sunlance: 'punch', supernova: 'slam' };
 const STATUS_COLORS = { burn: ['#ff9a3a', '#ff5a2a', '#ffd070'], freeze: ['#dff4ff', '#8fe0ff'], shock: ['#fff4b0', '#ffe25a'] };
 const GLOWS = 160, PILLARS = 20, DISCS = 12, BOLTS = 18, CRYSTALS = 60, ROCKS = 60, SHELLS = 16, HOLES = 6;
 const SKY = 46;              // tiles up that falling things start
@@ -124,8 +125,9 @@ export class PowerFx {
     return d;
   }
 
+  // Plain fire (kind 0) takes the colour of an Emberlord's Heat: `fireKind` 0 orange, 3 white-gold, 2 blue.
   flame(x, y, z, size, life, kind) {
-    this.flames.add(x, y, z, size, life, kind);
+    this.flames.add(x, y, z, size, life, kind === 0 ? this.fireKind ?? 0 : kind);
   }
 
   lightning(a, b, color, width = 0.16, life = 0.18) {
@@ -434,7 +436,7 @@ export default class PowerSet {
     if (rooms.house && !rooms.house.dark) return hud.message('Not in here.');
     const def = this.def.powers[pid], rank = this.rank(pid), { kind } = def;
     // A Titan on natural ground hits harder (Grounded).
-    const aim = this.aim(), force = player.body.might * def.power * rankScale(rank) * (player.melee.grounded ? COMBAT.grounded.power : 1) || 0;
+    const aim = this.aim(), force = player.body.might * def.power * rankScale(rank) * (player.melee.grounded ? COMBAT.grounded.power : 1) * (this.kitDef?.power?.(this, def) ?? 1) || 0;
     const job = { pid, def, rank, force, color: this.def.color };
     state.dir = [aim.dx, aim.dz];
     this.player.world.work.actor = player;

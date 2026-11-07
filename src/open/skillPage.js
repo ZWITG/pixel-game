@@ -84,13 +84,22 @@ export default class WorldHud {
 
   // Spirit pips, and the hero's own Structure (hidden while it's empty).
   // Wrath under them: full, it names the buttons; in a Surge it shows the time left.
-  setFight(spirit, posture, broken, wrath = 0, surge = 0, device = 'pad') {
+  // `meter`: a Conqueror's own gauge (the Emberlord's Heat) as { value, color, hot, label }, or null.
+  setFight(spirit, posture, broken, wrath = 0, surge = 0, device = 'pad', meter = null) {
     const box = this.$('fight');
     if (!this.pips) {
-      box.innerHTML = `<div class="pips">${'<i><b></b></i>'.repeat(5)}</div><div class="post"><u></u></div><div class="wrath"><u></u><span></span></div>`;
+      box.innerHTML = `<div class="pips">${'<i><b></b></i>'.repeat(5)}</div><div class="post"><u></u></div><div class="wrath"><u></u><span></span></div><div class="meter"><u></u><span></span></div>`;
       this.pips = [...box.querySelectorAll('.pips i')];
       this.postFill = box.querySelector('.post u');
       this.wrathBar = box.querySelector('.wrath');
+      this.meterBar = box.querySelector('.meter');
+    }
+    this.meterBar.hidden = !meter;
+    if (meter) {
+      this.meterBar.firstChild.style.width = `${meter.value * 100}%`;
+      this.meterBar.style.setProperty('--c', meter.color);
+      this.meterBar.classList.toggle('hot', !!meter.hot);
+      if (this.meterSay !== meter.label) this.meterBar.lastChild.textContent = this.meterSay = meter.label;
     }
     const full = wrath >= 1 && !surge;
     this.wrathBar.firstChild.style.width = `${(surge || wrath) * 100}%`;

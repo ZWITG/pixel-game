@@ -148,7 +148,13 @@ const ULTIMATES = {
   ember: {
     name: 'Second Sun', secs: 3.1, color: '#ff7a2a', tint: '#ffe0a0', mood: 0.35, reach: 35,
     start(u) {
-      const { state } = u.p;
+      const { state, powers } = u.p, t = u.time;
+      // It feeds on the Emberlord's Heat and on every Brand in reach, and grows with Mastery.
+      let brands = 0;
+      for (const e of u.foes(this.reach)) if (e.brandedUntil > t) brands += e.brands ?? 0;
+      u.grow = Math.min(2, (1 + (powers.heat ?? 0) / 100 * 0.6 + brands * 0.05) * (1 + powers.mastery * 0.01));
+      powers.heat = 0;
+      powers.overheat = false;
       u.sun = u.world.fx.glow(state.x, state.y + 14, state.z, 2, '#ffd27a', -1, 1);
       u.sun.life = 99;
       u.core = u.world.fx.shell('fire', 1);
@@ -160,7 +166,7 @@ const ULTIMATES = {
       if (t < 1.9) {
         melee.hover = 0.3;
         state.air = Math.min(12, state.air + 0.25);
-        const size = 1 + Math.min(1, t / 1.8) * 8, y = state.y + state.air + 6 + size;
+        const size = 1 + Math.min(1, t / 1.8) * 8 * Math.min(1.8, u.grow ?? 1), y = state.y + state.air + 6 + size;
         u.at = new THREE.Vector3(state.x, y, state.z);
         u.size = size;
         u.pose('peak');
@@ -187,7 +193,7 @@ const ULTIMATES = {
     beats: [
       [2.4, (u) => {
         const to = u.target ?? u.aim(), y = u.ground(to.x, to.z);
-        u.strike(to.x, to.z, POWER, 35, 12, 'fly');
+        u.strike(to.x, to.z, POWER * (u.grow ?? 1), 35 * Math.min(1.8, u.grow ?? 1), 12, 'fly');
         u.p.powers.scar({ rank: 4 }, to.x, to.z, 30, 6);
         u.world.fx.impact('fire', to.x, y, to.z, 16);
         u.world.vfx.shock(to.x, y, to.z, 40, '#fff0c0', 0.7);

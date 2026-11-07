@@ -32,9 +32,9 @@ export const BRANCHES = {
   ember: {
     drop: ['swimming'],
     list: [
-      B('pyre', 'Pyre', '#ff5a2a', 'Fire that brands and spreads.', ['fireball', 'wave', 'rain'], ['punching', 'fighting', 'ember.pyromancy']),
-      B('sun', 'Sun', '#ffd27a', 'Heat that builds into a sun of your own.', ['meteor', 'supernova', 'cloak'], ['jumping', 'mining']),
-      B('cinder', 'Cinder', '#ff8a4a', 'Fire as movement: trails, jets and walls.', ['stride', 'wall'], ['running', 'climbing', 'woodcutting']),
+      B('pyre', 'Pyre', '#ff5a2a', 'Fire that brands, and the Brands set off: Flame Fist, Ignite, the Pyre Serpent.', ['fireball', 'wave', 'cloak'], ['punching', 'fighting', 'ember.pyromancy']),
+      B('sun', 'Sun', '#ffd27a', 'Heat that builds into a sun of your own: Meteor, Sunlance, Blue Inferno, Supernova.', ['meteor', 'sunlance', 'blue', 'supernova'], ['jumping', 'mining']),
+      B('cinder', 'Cinder', '#ff8a4a', 'Fire as movement and walls: Jet Burst, Flare Wall, Inferno Pillar.', ['stride', 'wall', 'rain'], ['running', 'climbing', 'woodcutting']),
     ],
   },
   frost: {

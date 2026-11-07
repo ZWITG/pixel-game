@@ -71,13 +71,17 @@
       @keyframes gain { 0% { opacity: 0; transform: translateY(10px); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
       #act, #p2-act { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); color: #f3ead8; font: 700 18px 'Zen Maru Gothic', sans-serif; text-shadow: 0 2px 0 #141a28; white-space: nowrap; pointer-events: none; }
       #lv, #p2-lv { position: fixed; left: 246px; top: 12px; color: #f3ead8; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
-      #goal, #p2-goal { position: fixed; left: 16px; top: 60px; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
+      #goal, #p2-goal { position: fixed; left: 16px; top: 70px; font: 700 15px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; pointer-events: none; }
       /* The fight: Spirit pips and the hero's Structure under the health bar; Structure under a foe's. */
       .fight { position: fixed; left: 16px; top: 31px; width: 236px; display: flex; flex-wrap: wrap; gap: 5px 9px; align-items: center; pointer-events: none; }
       .fight .wrath { position: relative; flex-basis: 100%; height: 5px; background: #141a28cc; box-shadow: 0 0 0 1px #f3ead833; }
       .fight .wrath u { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ff8a2a, #ffe27a); }
       .fight .wrath.full u { background: linear-gradient(90deg, #ffe27a, #ffffff, #ffe27a); box-shadow: 0 0 10px #ffd24a; animation: tell 0.4s infinite alternate; }
       .fight .wrath.surge u { background: linear-gradient(90deg, #ffffff, var(--c, #ffe27a)); box-shadow: 0 0 10px var(--c, #ffd24a); }
+      .fight .meter { position: relative; flex-basis: 100%; height: 5px; background: #141a28cc; box-shadow: 0 0 0 1px #f3ead833; }
+      .fight .meter u { display: block; height: 100%; width: 0; background: var(--c, #ff7a2a); box-shadow: 0 0 8px var(--c, #ff7a2a); transition: width 0.15s, background 0.3s; }
+      .fight .meter.hot u { animation: tell 0.15s infinite alternate; }
+      .fight .meter span { position: absolute; left: calc(100% + 6px); top: -6px; white-space: nowrap; color: var(--c, #ff7a2a); font: 700 11px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; }
       .fight .wrath span { position: absolute; left: calc(100% + 6px); top: -6px; white-space: nowrap; color: #ffe27a; font: 700 11px 'Zen Maru Gothic', sans-serif; text-shadow: 0 1px 0 #141a28; }
       .fight .pips { display: flex; gap: 4px; }
       .fight .pips i { position: relative; width: 17px; height: 8px; overflow: hidden; background: #141a28cc; box-shadow: 0 0 0 1px #f3ead855; transform: skewX(-22deg); }

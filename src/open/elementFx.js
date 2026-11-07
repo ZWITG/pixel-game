@@ -4,7 +4,7 @@ import { shared } from './materials.js';
 // How each element looks. Fire is real moving flame, lightning is a jagged bolt with branches,
 // ice is hard crystal, stone is stone, and the void is a hole in the picture.
 const MAX_FLAMES = 320;
-const FLAME_TINT = [[1, 0], [0, 1]]; // kind 0 fire, kind 1 void
+const FLAME_TINT = [[1, 0], [0, 1], [0, 2], [0, 3]]; // kind 0 fire, 1 void, 2 blue fire, 3 white-gold fire
 
 // Every flame in the game is one instance here, turned to face the camera in the shader.
 export class Flames {
@@ -41,7 +41,10 @@ export class Flames {
           float hot=smoothstep(.4,1.05,body);
           vec3 fire=mix(vec3(.8,.09,.01),mix(vec3(1.3,.42,.04),vec3(1.7,1.2,.5),hot),hot);
           vec3 dark=mix(vec3(.1,.01,.26),vec3(.6,.16,1.4),hot);
-          gl_FragColor=vec4(mix(fire,dark,vL.z)*a,a);
+          vec3 blue=mix(vec3(.04,.18,.9),mix(vec3(.3,.75,1.7),vec3(1.2,1.5,1.9),hot),hot);
+          vec3 gold=mix(vec3(.9,.38,.05),mix(vec3(1.6,1.1,.4),vec3(1.9,1.8,1.4),hot),hot);
+          vec3 c=vL.z<.5?fire:vL.z<1.5?dark:vL.z<2.5?blue:gold;
+          gl_FragColor=vec4(c*a,a);
         }`,
     }));
     this.mesh.frustumCulled = false;

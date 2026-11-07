@@ -1001,7 +1001,7 @@ export default class Melee {
     const foe = this.lock ?? (this.barFor > 0 ? this.barOn : null);
     this.hud.setFoe(foe && !foe.dying ? foe.def.name : '', foe ? Math.max(0, foe.hp) / (foe.maxHp || 1) : 0, foe?.postureMax ? (foe.posture ?? 0) / foe.postureMax : 0, foe?.brokenUntil > this.monsters.time);
     const w = this.player.wrath;
-    this.hud.setFight(this.spirit, this.posture, this.broken > 0, w?.wrath ?? 0, w?.surge > 0 ? w.surge / COMBAT.surge.secs : 0, this.player.controls.device);
+    this.hud.setFight(this.spirit, this.posture, this.broken > 0, w?.wrath ?? 0, w?.surge > 0 ? w.surge / COMBAT.surge.secs : 0, this.player.controls.device, this.player.powers.kitDef?.meter?.(this.player.powers) ?? null);
     this.threats(state);
   }
 
