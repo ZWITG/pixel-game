@@ -52,7 +52,10 @@ const ULTIMATES = {
     start(u) {
       const { state } = u.p;
       // The serpent's road: down out of the clouds, through every foe in reach, then back up.
-      const foes = u.foes(this.reach).sort((a, b) => Math.atan2(a.x - state.x, a.z - state.z) - Math.atan2(b.x - state.x, b.z - state.z)).slice(0, 14);
+      // Bigger under the Stormcaller's own clouds, or after gathering them in the last minute, and with Mastery.
+      const p = u.p, gathered = p.powers.gathered !== undefined && u.time - p.powers.gathered < 60;
+      u.boost = (gathered ? 1.5 : 1) * (1 + p.powers.mastery * 0.01);
+      const foes = u.foes(this.reach * u.boost).sort((a, b) => Math.atan2(a.x - state.x, a.z - state.z) - Math.atan2(b.x - state.x, b.z - state.z)).slice(0, Math.round(14 * u.boost));
       const ground = u.ground(state.x, state.z);
       u.path = [new THREE.Vector3(state.x, ground + 50, state.z), ...foes.map((e) => new THREE.Vector3(e.x, e.group.position.y + 2, e.z))];
       if (u.path.length < 4) for (let i = 0; i < 6; i++) {
@@ -90,7 +93,7 @@ const ULTIMATES = {
       for (const e of u.foes(7, u.head)) {
         if (u.struck.has(e)) continue;
         u.struck.add(e);
-        u.strike(e.x, e.z, POWER * 0.5, 6, 0, 'launch');
+        u.strike(e.x, e.z, POWER * 0.5 * u.boost, 6, 0, 'launch');
         fx.impact('storm', e.x, u.ground(e.x, e.z), e.z, 4);
       }
       u.world.vfx.burst(u.head.x, u.head.y, u.head.z, ['#fff48a', '#ffffff', '#a8c8ff'], 3, 14, { fall: 0.2 });
@@ -98,7 +101,7 @@ const ULTIMATES = {
     beats: [
       [2.9, (u) => {
         const { x, z } = u.aim();
-        u.strike(x, z, POWER, 25, 4, 'knockdown');
+        u.strike(x, z, POWER * u.boost, 25 * u.boost, 4, 'knockdown');
         u.world.fx.impact('storm', x, u.ground(x, z), z, 12);
         u.world.vfx.shock(x, u.ground(x, z), z, 28, '#fff6c0', 0.5);
         u.boom(0.7);

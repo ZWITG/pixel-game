@@ -16,9 +16,9 @@ export const BRANCHES = {
   storm: {
     drop: ['climbing'],
     list: [
-      B('thunder', 'Thunder', '#ffe25a', 'Bolts, strikes and charge that leaps between foes.', ['arc', 'thunder', 'chain', 'field'], ['punching', 'fighting', 'storm.conductance']),
-      B('sky', 'Sky', '#9fd0ff', 'Wind, flight and the storm overhead.', ['gust', 'tempest'], ['jumping', 'flight', 'swimming']),
-      B('tempest', 'Tempest', '#c8a8ff', 'Becoming lightning: speed and the charged body.', ['surge', 'cloak'], ['running', 'mining', 'woodcutting']),
+      B('thunder', 'Thunder', '#ffe25a', 'Bolts, spears and beams, and the Charge that leaps between foes.', ['arc', 'thunder', 'chain', 'field'], ['punching', 'fighting', 'storm.conductance']),
+      B('sky', 'Sky', '#9fd0ff', 'The storm overhead: clouds, cyclones, flight, the Stormwyrm.', ['gust', 'tempest'], ['jumping', 'flight', 'swimming']),
+      B('tempest', 'Tempest', '#c8a8ff', 'Becoming lightning: the flash-step, the living current, magnetism and plasma.', ['surge', 'cloak', 'magnet', 'plasma'], ['running', 'mining', 'woodcutting']),
     ],
   },
   void: {

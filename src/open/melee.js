@@ -229,11 +229,22 @@ export default class Melee {
     }
     if (this.held) return this.pileDrive(state);
     if (this.broken > 0) return;
-    const air = this.inAir, target = this.pick(state), t = this.monsters.time;
+    const air = this.inAir, t = this.monsters.time;
+    let target = this.pick(state);
     if (this.idle >= COMBAT.chainWindow && !air) this.restart();
     const close = target?.def && Math.hypot(target.x - state.x, target.z - state.z) - target.radius < COMBAT.homing;
     const name = !air && close && target.brokenUntil > t ? 'execute' : smashFor(this.hits, air);
     const def = COMBAT.smash[name];
+    // The chain's last hit kicked the foe away: the Finisher goes after it and lands there.
+    const flown = this.chase?.e;
+    if (name === 'finisher' && flown && !flown.dying && this.monsters.list.includes(flown)) {
+      const d = Math.hypot(flown.x - state.x, flown.z - state.z) || 1, off = flown.radius + 1.4;
+      flown.vel.set(0, 0);
+      flown.flungUntil = 0;
+      this.blink(state, flown.x - ((flown.x - state.x) / d) * off, flown.z - ((flown.z - state.z) / d) * off, flown);
+      target = flown;
+      this.chase = null;
+    }
     let power = def.power;
     if (this.used.has(name)) {
       power *= COMBAT.repeat;
@@ -388,7 +399,9 @@ export default class Melee {
     const say = (text, color) => hud.float(text, state.x, state.y + 3.4, state.z, color);
     const { vanish, parry, hero, counter } = COMBAT;
     // Circle a breath before it lands, with Spirit to spend: gone, and behind them.
-    if (from && this.clock - this.rollAt < vanish.window && this.broken <= 0 && this.spend(COMBAT.cost.vanish)) {
+    // Living Current (the Stormcaller) blinks out of a blow on its own, for 2 Spirit.
+    const auto = from && this.spirit >= 2 && this.player.powers.kitDef?.autoVanish?.(this.player.powers);
+    if (from && (this.clock - this.rollAt < vanish.window || auto) && this.broken <= 0 && this.spend(auto && this.clock - this.rollAt >= vanish.window ? 2 : COMBAT.cost.vanish)) {
       const d = Math.hypot(from.x - state.x, from.z - state.z) || 1, back = vanish.behind + (from.radius ?? 1);
       this.blink(state, from.x + ((from.x - state.x) / d) * back, from.z + ((from.z - state.z) / d) * back, from);
       say('Vanish!', this.aura);
