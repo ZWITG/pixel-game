@@ -384,7 +384,7 @@ export default class Player {
       const sprint = state.sprinting = controls.held.has('ShiftLeft') || controls.padHeld.R2;
       // Walking sideways slowly brings the camera round behind the hero.
       if (!world.together && !rooms.house && this.looked > LOOK_RESPECT) aim.yaw -= m.x * TURN_WITH_MOVE * dt;
-      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = state.riding ? world.animals.speed(this, sprint, dt) * amount : (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale * this.nature.stride()) * amount * (melee.charging || melee.guarding ? CHARGE_SLOW : melee.held ? HOLD_SLOW : 1);
+      const s = Math.sin(aim.yaw), c = Math.cos(aim.yaw), speed = state.riding ? world.animals.speed(this, sprint, dt) * amount : (state.flying ? FLY_SPEED[skills.level('flight')] * (sprint ? 1.4 : 1) * body.moveScale : state.pace > 0 ? this.superSpeed : swim.inWater ? swim.speed(sprint) : (sprint ? SPRINT : RUN) * body.moveScale * this.nature.stride()) * amount * (melee.charging || melee.guarding ? CHARGE_SLOW : melee.held ? HOLD_SLOW : 1) * (this.slowUntil > world.monsters.time ? 0.5 : 1);
       const wx = c * m.x + s * m.y, wz = -s * m.x + c * m.y;
       if (state.pace > 0) {
         // A hard turn at speed costs you: momentum has to go somewhere.

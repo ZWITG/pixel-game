@@ -54,7 +54,8 @@ export default class Market {
   }
 
   price(g, selling) {
-    return Math.max(1, Math.round(this.view.place.price[g] * (selling ? 1 - MARGIN : 1 + MARGIN)));
+    // Towns that fear the hero charge more (the Omega Level).
+    return Math.max(1, Math.round(this.view.place.price[g] * (selling ? 1 - MARGIN : (1 + MARGIN) * (this.player.world.omega?.priceFactor() ?? 1))));
   }
 
   handle(just) {

@@ -13,6 +13,7 @@ import { ITEMS } from './items.js';
 // villagers they're learned by watching, not by being told, and like Oblivion's lesson says, the
 // rules stay few. They walk the town's streets (cityPlan.js), not through its houses.
 const FOLK_NEAR = 160;      // tiles past a town's edge that people come into being
+const FLEE = 9;               // tiles a second a frightened townsperson runs
 const CROWD = { village: 12, city: 48 };
 const SEEN = 200;           // tiles (as the crow walks the grid) at which a townsperson is drawn
 const TALK = 3.6, GREET = 8;
@@ -264,6 +265,22 @@ export class People {
         f.act = null;
       }
       const m = f.model, grp = m.group;
+      // From Menace on, they run from a hero they recognise; afterwards they find their way again.
+      if (!f.inside && this.world.omega?.scary(f.x, f.z)) {
+        const p = players.reduce((a, b) => (Math.hypot(b.state.x - f.x, b.state.z - f.z) < Math.hypot(a.state.x - f.x, a.state.z - f.z) ? b : a));
+        const dx = f.x - p.state.x, dz = f.z - p.state.z, d = Math.hypot(dx, dz) || 1;
+        f.x += (dx / d) * FLEE * dt;
+        f.z += (dz / d) * FLEE * dt;
+        f.goal = null;
+        f.path = null;
+        f.phase += dt * 14;
+        if (grp.visible) {
+          grp.position.set(f.x, height(f.x, f.z), f.z);
+          grp.rotation.y = Math.atan2(dx, dz);
+          walkPose(m, f.phase, 1.6);
+        }
+        continue;
+      }
       const seen = !f.inside && players.some((p) => Math.abs(p.state.x - f.x) + Math.abs(p.state.z - f.z) < SEEN);
       grp.visible = seen;
       if (f.path?.length) {

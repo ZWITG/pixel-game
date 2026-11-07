@@ -354,6 +354,7 @@ export default class Caravans {
   grudge(id, amount) {
     const n = this.world.realm.nations[id];
     if (n) n.grudge = (n.grudge ?? 0) + amount;
+    this.world.omega?.deed('caravan', amount);
   }
 }
 

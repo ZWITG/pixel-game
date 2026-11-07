@@ -105,6 +105,12 @@ function think(monsters, e, t) {
   }
   const dist = Math.hypot(hero.x - e.x, hero.z - e.z), dx = (hero.x - e.x) / (dist || 1), dz = (hero.z - e.z) / (dist || 1);
   if (e.mode === 'held') return;
+  // From Scourge, the weakest may lose their nerve and run (omega.js).
+  if (e.mode !== 'reeling' && monsters.world.omega?.afraid(e, e.foe, t)) {
+    e.vel.set(-dx, -dz).multiplyScalar(Math.max(def.chaseSpeed, 6));
+    standDown(e);
+    return;
+  }
   if (e.mode === 'reeling' || e.mode === 'recover') {
     e.vel.set(0, 0);
     if (t >= e.until) {

@@ -269,6 +269,7 @@ export default class Wrath {
 
   gain(amount) {
     if (this.surge > 0 || this.ult || !this.p.powers.def) return;
+    amount *= this.world.omega?.wrathFactor() ?? 1; // feared, the hero's Wrath runs higher
     const was = this.full;
     this.wrath = Math.min(1, this.wrath + amount);
     if (!was && this.full) this.p.hud.message('Wrath is full! L1 + R1: ultimate. Hold them: Surge.', true);

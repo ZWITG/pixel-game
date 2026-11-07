@@ -129,6 +129,8 @@ export default class Monsters {
   }
 
   fireOrb(e, dx, dz) {
+    // War machines each have their own shot (siege.js).
+    if (e.def.machine && this.world.siege) return this.world.siege.fire(e);
     const orb = makeOrb();
     orb.scale.setScalar(SIZE);
     orb.position.set(e.x, e.group.position.y + 2, e.z);
@@ -146,6 +148,14 @@ export default class Monsters {
     this.work.skills.add('fighting', (COMBAT.xp.kill[roleName(e)] ?? 2) * (1 + e.tier * COMBAT.xp.tier) * (e.elder ? 2 : 1));
     this.work.actor?.wrath?.gain(COMBAT.wrath.kill);
     this.work.actor?.powers?.kitDef?.killed?.(this.work.actor.powers, e); // a Gravecaller's kills leave Husks
+    // What the world makes of it (omega.js).
+    if (this.world.players.includes(this.work.actor)) {
+      const om = this.world.omega;
+      if (e.boss) om?.deed('ruler');
+      else if (e.def.machine) om?.deed('machine');
+      else if (e.captain) om?.deed('captain');
+      else if (e.nation) om?.deed('soldier');
+    }
     const drops = {};
     for (const { item, chance } of e.def.drops) if (Math.random() < chance * (1 + e.tier * 0.4)) drops[item] = 1 + Math.floor(e.tier / 2);
     this.work.give(drops);
@@ -189,7 +199,8 @@ export default class Monsters {
   }
 
   // `cave`: lives in that cave instead of on the land.
-  add(type, x, z, danger, elder, cave = null) {
+  // `noCrew`: a machine's own crew, so it doesn't call up a crew of its own.
+  add(type, x, z, danger, elder, cave = null, noCrew = false) {
     const e = new Enemy(this, x, z, fit(ENEMIES[type], danger, elder));
     e.kind = type;
     e.elder = elder;
@@ -208,6 +219,8 @@ export default class Monsters {
     e.tough = this.toughness(x, z, hero);
     setTier(e, e.def.boss ? 0 : Math.min(TIERS.length - 1, tierFor(hero.body.level) + (elder ? 1 : 0)), hero);
     this.list.push(e);
+    // A war machine stands with its crew; without them it can't shoot (siege.js).
+    if (e.def.machine && !cave && !noCrew && this.world.siege) this.world.siege.crew(e);
     return e;
   }
 

@@ -115,6 +115,7 @@ export default class Nations {
 
   conquer(s, p) {
     this.fallen.add(s.n.id);
+    this.world.omega?.deed('nation');
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify([...this.fallen]));
     } catch { /* it lasts for this visit */ }

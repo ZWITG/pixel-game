@@ -262,6 +262,8 @@ export default class Sites {
   }
 
   finish(s, p) {
+    // Breaking a stronghold is a deed the whole country hears of.
+    if (s.cat.fort || ['camp', 'den', 'bandit', 'keep'].includes(s.key)) this.world.omega?.deed('stronghold');
     s.done = true;
     s.timer = 0;
     this.hideBeam(s);

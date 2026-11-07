@@ -140,7 +140,8 @@ export default class Realm {
     const st = this.world.nations.get(id), hurt = st.holds.length ? this.world.nations.broken(st) / st.holds.length : 0;
     const here = this.world.players.some((p) => nationAt(p.state.x, p.state.z)?.id === id && !p.rooms.house);
     // Robbed caravans and squeezed merchants count too, fading as the days pass.
-    return clamp(hurt * 0.75 + (here ? 0.4 : 0) + Math.min(GRUDGE_MOST, (this.of(id).grudge ?? 0) * GRUDGE_EACH));
+    // The hero's Omega Level weighs on every nation, wherever the hero is.
+    return clamp(hurt * 0.75 + (here ? 0.4 : 0) + Math.min(GRUDGE_MOST, (this.of(id).grudge ?? 0) * GRUDGE_EACH) + (this.world.omega?.phase ?? 0) * 0.06);
   }
 
   // Armies grow with the hero, on a curve that levels off rather than running away.
@@ -360,6 +361,7 @@ export default class Realm {
 
   // Whoever beats a hero moves up in the world, and says so.
   heroFell(hero) {
+    this.world.omega?.fell();
     const e = this.world.monsters.list.find((m) => m.captain && Math.hypot(m.x - hero.state.x, m.z - hero.state.z) < 90);
     if (!e) return;
     const cap = e.captain, n = NATIONS.find((a) => a.id === e.nation);
@@ -371,6 +373,7 @@ export default class Realm {
 
   // A hero's fire and fists cost a town its people.
   houseLost(id) {
+    this.world.omega?.deed('house');
     const s = this.settlements.find((p) => p.id === id);
     if (!s) return;
     s.pop = Math.max(2, s.pop * 0.9);

@@ -298,6 +298,7 @@ export default class Estates {
 
   // What each building's fall costs the place and the nation that holds it.
   fall(s, e, p) {
+    this.realm.world.omega?.deed('estate');
     s.ruined ??= {};
     s.ruined[e.kind] = -REBUILD.wait / REBUILD.days; // the nation mourns a day before it builds
     const n = this.realm.nations[s.owner], nation = NATIONS.find((a) => a.id === s.owner), econ = this.realm.economy;

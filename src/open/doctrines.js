@@ -42,6 +42,7 @@ export function machineMesh(kind) {
   const look = {
     ballista: ['#7a5230', '#b8a98e', '#e8c050'], thornTurret: ['#3a4a2a', '#5fae62', '#2a3a1e'], frostCannon: ['#6a9cb8', '#dff4ff', '#8fe0ff'],
     flameCannon: ['#2a1a14', '#6a3a22', '#ff7a2a'], plagueEngine: ['#2c3424', '#6a7a3a', '#a8d84a'], boneEngine: ['#c8b89c', '#e8dcc0', '#8a7a5e'],
+    trebuchet: ['#6a4a2a', '#8a6a44', '#9a9080'],
   }[kind];
   const [frame, arm, tip] = look, b = new VoxelBuilder();
   b.box(0, 0.4, 0, 3.4, 0.5, 4.4, frame, 0.06);

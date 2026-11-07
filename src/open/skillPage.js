@@ -138,6 +138,17 @@ export default class WorldHud {
     toggle(box, 'calm', posture < 0.02 && !broken);
   }
 
+  // The Omega sigil: the phase's name, and a ring that fills toward the next.
+  setOmega(om) {
+    const el = this.$('omega');
+    if (!el) return;
+    const info = om.info;
+    put(el, 'name', info.name, (v) => { el.lastChild.textContent = v; });
+    put(el, 'c', info.color, (v) => el.style.setProperty('--c', v));
+    put(el, 'k', Math.round(om.progress * 100), (v) => el.style.setProperty('--k', `${v}%`));
+    put(el, 'p', om.phase, (v) => { el.firstChild.textContent = v; });
+  }
+
   // Edge arrows for attackers out of sight: `a` is radians clockwise from straight ahead.
   setThreats(list) {
     const box = this.$('threats');
