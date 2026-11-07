@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { FEATURES } from '../config/features.js';
+
+const CUBES = FEATURES.voxelWorld;
 
 // Surfaces with no texture files: every color is worked out in the shader from the world
 // position, so the 8 km world never repeats.
@@ -88,14 +91,14 @@ export function terrainMaterial({ far = false } = {}) {
     s.uniforms.uNoise = shared.uNoise;
     s.uniforms.uScars = shared.uScars;
     s.uniforms.uScarAt = shared.uScarAt;
-    s.vertexShader = `attribute vec3 aBiome; attribute float aRoad; attribute vec2 aLand;
-      varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL;\n${s.vertexShader}`.replace(
+    s.vertexShader = `attribute vec3 aBiome; attribute float aRoad; attribute vec2 aLand; attribute vec2 aCube;
+      varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL; varying vec2 vC;\n${s.vertexShader}`.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
        ${far ? 'transformed.y-=3.;' : ''} // the far land sits just under the near land, where they overlap
-       vP=(modelMatrix*vec4(transformed,1.)).xyz; vN=normal; vB=aBiome; vR=aRoad; vL=aLand;`,
+       vP=(modelMatrix*vec4(transformed,1.)).xyz; vN=normal; vB=aBiome; vR=aRoad; vL=aLand; vC=aCube;`,
     );
-    s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL; uniform vec3 uHole,uHole2; uniform float uTime;
+    s.fragmentShader = `varying vec3 vP; varying vec3 vN; varying vec3 vB; varying float vR; varying vec2 vL; varying vec2 vC; uniform vec3 uHole,uHole2; uniform float uTime;
       ${DIG_GLSL}
       ${HASH}
       ${SCAR_GLSL}
@@ -109,8 +112,9 @@ export function terrainMaterial({ far = false } = {}) {
       float detail=1.-smoothstep(90.,420.,dist);
       vec2 g=at.xz+vec2(at.y*.6,-at.y*.4); // a slope keeps its grain instead of stretching
       float big=fb(g*.0045), mid=fb(g*.03), fine=vn(g*.31)*detail+.5*(1.-detail), speck=vn(g*2.3)*detail+.5*(1.-detail);
-      float slope=1.-normalize(vN).y;
+      ${CUBES ? 'float wall=1.-step(.5,abs(vN.y)), below=vC.x-vP.y, slope=vC.y; // cubes: the steepness of the land under them' : 'float wall=0., below=0., slope=1.-normalize(vN).y;'}
       float rocky=smoothstep(.2,.36,slope+(mid-.5)*.18);
+      rocky=max(rocky,wall*smoothstep(4.5,6.,below+(mid-.5)*2.));
       float mixy=(mid-.5)*.5+(fine-.5)*.25;
       // the three ground types melt into each other along a noisy edge
       vec3 w=max(vB+vec3(mixy,big-.5,-mixy)*.7,vec3(.001)); w=w*w*w; w/=w.x+w.y+w.z;
@@ -122,6 +126,12 @@ export function terrainMaterial({ far = false } = {}) {
       float edgeNoise=(mid-.5)*.5+(fine-.5)*.18;
       col=mix(col,mix(vec3(.54,.27,.15),vec3(.75,.5,.28),mid),smoothstep(.45,.55,vL.x+edgeNoise)); // badlands: red dust and pale salt
       col=mix(col,mix(vec3(.1,.14,.1),vec3(.22,.26,.13),mid),smoothstep(.45,.55,vL.y+edgeNoise));  // swamp: black peat and sour moss
+      // A cube's side: a lip of the ground's top, then soil, clay, and rock further down.
+      if(wall>.5){
+        vec3 soil=mix(vec3(.3,.2,.12),vec3(.42,.29,.18),mid)*(.9+fine*.2);
+        vec3 clay=mix(vec3(.46,.29,.18),vec3(.56,.37,.22),mid);
+        col=mix(col*.86,mix(soil,clay,smoothstep(2.,3.,below+(fine-.5))),smoothstep(.1,.18,below+(speck-.5)*.08));
+      }
       col*=.86+fine*.2+(speck-.5)*.12;
       // pale shore, darker where the water laps it, then seabed
       float sand=1.-smoothstep(.6,1.7+mid*1.6,vP.y);
@@ -137,7 +147,7 @@ export function terrainMaterial({ far = false } = {}) {
       float snow=smoothstep(300.,380.,vP.y+(mid-.5)*80.)*(1.-rocky*.7);
       col=mix(col,vec3(.86,.9,.97)*(.95+fine*.08),snow);
       // the roads: packed earth, cobbled where you can see the stones
-      float road=smoothstep(4.6,3.2,vR+(mid-.5)*2.2);
+      float road=smoothstep(4.6,3.2,vR+(mid-.5)*2.2)*(1.-wall);
       if(road>0.){
         // Packed earth, rutted by wheels, then laid stone down the crown of the road.
         vec3 way=mix(vec3(.37,.28,.19),vec3(.54,.43,.3),mid)*(.84+fine*.3);
@@ -171,6 +181,14 @@ export function terrainMaterial({ far = false } = {}) {
         totalEmissiveRadiance+=vec3(1.8,.5,.08)*smoothstep(.1,.7,sc.a)*(.35+speck*1.2);
         totalEmissiveRadiance+=vec3(1.1,.26,.04)*smoothstep(.45,.8,sc.r)*smoothstep(.72,.8,vn(vP.xz*.9))*.5;
       }
+      ${CUBES ? `// each cube a touch its own shade, with a fine dark seam where cubes meet
+      {
+        vec3 n=abs(vN), cp=vP/.5;
+        vec2 q=n.y>.5?cp.xz:(n.x>.5?cp.zy:cp.xy), f=min(fract(q),1.-fract(q));
+        float seam=1.-smoothstep(.02,.07,min(f.x,f.y));
+        vec3 id=floor(n.y>.5?vec3(cp.x,(vC.x-.01)/.5,cp.z):cp-vN*.02);
+        col*=(.95+h21(id.xz+id.y*7.13)*.1)*(1.-seam*.14*detail);
+      }` : ''}
       // cloud shade drifting over the land
       float shade=smoothstep(.42,.68,fb(vP.xz*.0016+vec2(uTime*.006,uTime*.003)));
       col*=1.-shade*.26*(1.-snow*.4);
@@ -180,7 +198,7 @@ export function terrainMaterial({ far = false } = {}) {
       /* glsl */`#include <normal_fragment_maps>
       {
         // small bumps catch the light, close up
-        float reach=1.-smoothstep(25.,90.,length(vP-cameraPosition));
+        float reach=(1.-smoothstep(25.,90.,length(vP-cameraPosition)))*step(.5,vN.y); // sides of cubes stay flat
         if(reach>0.){
           vec2 p=vP.xz; float e=.25, h0=groundBump(p);
           vec3 d=vec3(groundBump(p+vec2(e,0.))-h0,0.,groundBump(p+vec2(0.,e))-h0)*.9*reach;
@@ -189,7 +207,7 @@ export function terrainMaterial({ far = false } = {}) {
       }`,
     );
   };
-  mat.customProgramCacheKey = () => `terrain${far}`;
+  mat.customProgramCacheKey = () => `terrain${far}${CUBES}`;
   return mat;
 }
 

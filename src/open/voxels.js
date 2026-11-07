@@ -86,8 +86,9 @@ class Volume {
   }
 
   // Takes out everything a blow of this radius breaks: weaker materials over a wider sphere.
-  // `only`: a test on the material, for fire that eats only what burns. Returns what came out.
-  carve(x, y, z, r, only) {
+  // `only`: a test on the material, for fire that eats only what burns. `low`: nothing below this
+  // (local) height is cut. Returns what came out.
+  carve(x, y, z, r, only, low = -Infinity) {
     const out = [], reach = r / Math.sqrt(MATERIALS[1].strength);
     const [ci, cj, ck] = this.cell(x, y, z), span = Math.ceil(reach / this.s) + 1;
     for (let k = Math.max(0, ck - span); k <= Math.min(this.nz - 1, ck + span); k++) {
@@ -96,6 +97,7 @@ class Volume {
           const at = this.at(i, j, k), m = this.mat[at];
           if (!m || (only && !only(MATERIALS[m]))) continue;
           const [px, py, pz] = this.centre(i, j, k), d = Math.hypot(px - x, py - y, pz - z);
+          if (py < low) continue;
           // A rough edge: some voxels at the rim survive, so holes look torn, not stamped.
           if (d > r / Math.sqrt(MATERIALS[m].strength) * (0.85 + ((i * 7 + j * 13 + k * 5) % 10) * 0.03)) continue;
           out.push([px, py, pz, this.col[at], m]);
@@ -359,13 +361,13 @@ export default class Voxels {
 
   // ---- breaking them ----
   // A blow on a structure: cut, then let fall whatever has lost its support. `r` in tiles.
-  hit(owner, x, y, z, r, hero, only) {
+  hit(owner, x, y, z, r, hero, only, low) {
     const entry = owner.vox;
     if (!entry?.ready) return 0;
     entry.group.updateMatrixWorld(true);
     // Its own vector: spray() below reuses this.v.
     const local = entry.group.worldToLocal(new THREE.Vector3(x, y, z));
-    const out = entry.vol.carve(local.x, local.y, local.z, r, only);
+    const out = entry.vol.carve(local.x, local.y, local.z, r, only, low === undefined ? -Infinity : low - entry.group.position.y);
     if (!out.length) return 0;
     this.onCarve?.(entry, out, hero);
     this.spray(entry, out, x, y, z);

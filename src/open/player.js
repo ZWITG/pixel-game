@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import Controls from '../systems/controls.js';
 import { prompt } from '../ui/glyphs.js';
 import { FEATURES } from '../config/features.js';
-import { height, SPAWN } from './terrain.js';
+import { height, smoothHeight, SPAWN } from './terrain.js';
 import HeroModel, { LOOKS } from './hero3d.js';
 import Compass from './compass.js';
 import { reachPin, SATCHEL_TAB } from './gameMenu.js';
@@ -21,6 +21,7 @@ import Rooms from './rooms.js';
 import Cave, { CaveLevel } from './cave.js';
 
 // One hero: their own input, body, skills, bag, HUD and sprite. The world they stand in is shared.
+const STEP_GLIDE = 1.1;         // tiles: a rise or drop this small is a step the body glides over
 const RUN = 6, SPRINT = 16;
 const GRAVITY = 22;
 const CLIMB_START = 0.45; // slopes steeper than this count as climbing practice
@@ -345,7 +346,8 @@ export default class Player {
         }
       }
       const nx = state.x + wx * speed * dt, nz = state.z + wz * speed * dt;
-      const footing = (x, z) => world.scars.floor(x, z, height(x, z)); // frozen water holds the hero up
+      // Frozen water holds the hero up. Steepness is the land under the cubes, or every step is a wall.
+      const footing = (x, z) => world.scars.floor(x, z, smoothHeight(x, z));
       const rise = rooms.house ? 0 : footing(nx, nz) - footing(state.x, state.z), dist = Math.hypot(nx - state.x, nz - state.z);
       const wet = !rooms.house && footing(nx, nz) < DEEP;
       state.onWater = !!state.super && state.pace > WATER_PACE && skills.level('superspeed') >= WATER_RUN && (wet || state.y < DEEP);
@@ -403,6 +405,10 @@ export default class Player {
     if (melee.charging) hud.setBreath(melee.charge);
     else if (state.super && SUPER_TIME[skills.level('superspeed')] !== Infinity) hud.setBreath(Math.max(0, this.rush) / SUPER_TIME[skills.level('superspeed')]);
     if (state.flying && FLY_TIME[skills.level('flight')] !== Infinity) hud.setBreath(Math.max(0, this.wind) / FLY_TIME[skills.level('flight')]);
+    // Up or down a cube step: the body glides over it instead of jumping.
+    const step = y - state.y;
+    if (!state.air && !rooms.house && step !== 0 && Math.abs(step) <= STEP_GLIDE) this.stepOff = (this.stepOff ?? 0) - step;
+    this.stepOff = (this.stepOff ?? 0) * Math.exp(-dt * 16);
     state.y = y;
     this.hero.mesh.scale.setScalar(body.heroScale);
     this.landed = Math.max(0, this.landed - dt);
@@ -559,7 +565,7 @@ export default class Player {
   pose(camera, time) {
     const { state, swim, melee, hero } = this;
     // Swimmers sit low in the water; a non-swimmer bobs and thrashes.
-    const heroY = swim.inWater ? -1.2 * this.body.heroScale + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air + melee.lift;
+    const heroY = swim.inWater ? -1.2 * this.body.heroScale + Math.sin(time * (swim.flailing ? 9 : 3)) * (swim.flailing ? 0.16 : 0.07) : (state.super && state.onWater ? Math.max(state.y, 0) : Math.max(state.y, SURFACE)) + state.air + melee.lift + (this.stepOff ?? 0);
     const pose = melee.pose, [name, lean, options] = this.motion(pose, time);
     hero.update(state.x, heroY, state.z, state.dir, name, lean, time, options);
     hero.punch(pose, pose?.chain === 1 ? 1 : 0);

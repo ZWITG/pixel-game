@@ -1,4 +1,4 @@
-import { height, biome, region, roadDistance, forest, dentAt, PLACES, TOWNS, SPAWN } from './terrain.js';
+import { height, smoothHeight, biome, region, roadDistance, forest, dentAt, PLACES, TOWNS, SPAWN } from './terrain.js';
 import { streetDistance, plazaAt } from './cityPlan.js';
 
 // Working out what the land looks like: plain numbers, no three.js, so a worker can do it away
@@ -89,6 +89,119 @@ export function gridData(x0, z0, size, step, skirt) {
     edge((e) => [n, e], true);
   }
   return { pos, nor, bio, road, land, idx, deep, wet, faces };
+}
+
+// One square of land as cubes: columns `cell` tiles wide standing to the cube tops of
+// height(), their tops merged in blocks of `merge` columns (which also keeps road and biome
+// colours as fine as the smooth land had them), walls where a column stands over its neighbour,
+// and a hidden curtain round the edge where chunks of different cube sizes meet. Water is a flat
+// sheet of its own over the chunk, knowing how deep it is.
+const CURTAIN = 6;
+// `rise`: the far land steps in taller cubes, so its flats merge into few faces.
+export function blockData(x0, z0, size, cell, skirt, merge = 4, rise = 0) {
+  const n = Math.round(size / cell), w = n + 2, tops = new Float32Array(w * w);
+  for (let j = 0; j < w; j++) for (let i = 0; i < w; i++) {
+    const h = height(x0 + (i - 0.5) * cell, z0 + (j - 0.5) * cell);
+    tops[j * w + i] = rise ? Math.round(h / rise) * rise + rise / 2 : h;
+  }
+  const T = (i, j) => tops[(j + 1) * w + i + 1];
+  // Colours, roads and steepness on a coarser lattice, blended in between.
+  const A = cell * merge, m = Math.ceil(n / merge) + 1, lat = new Float32Array(m * m * 7);
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+    const x = x0 + i * A, z = z0 + j * A, b = biome(x, z), r = region(x, z), e = Math.max(1, Math.min(A, 4));
+    const dx = smoothHeight(x + e, z) - smoothHeight(x - e, z), dz = smoothHeight(x, z + e) - smoothHeight(x, z - e);
+    lat.set([b[0], b[1], b[2], r[0], r[1], A <= 8 ? Math.min(ROAD_FAR, way(x, z)) : ROAD_FAR, 1 - (2 * e) / Math.hypot(dx, 2 * e, dz)], (j * m + i) * 7);
+  }
+  const pos = [], nor = [], bio = [], road = [], land = [], cube = [], idx = [];
+  const vert = (x, y, z, N, top) => {
+    const u = Math.min(m - 1.001, Math.max(0, (x - x0) / A)), v = Math.min(m - 1.001, Math.max(0, (z - z0) / A));
+    const i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j, o = (j * m + i) * 7, s = m * 7;
+    const at = (k) => (lat[o + k] * (1 - fu) + lat[o + 7 + k] * fu) * (1 - fv) + (lat[o + s + k] * (1 - fu) + lat[o + s + 7 + k] * fu) * fv;
+    pos.push(x, y, z);
+    nor.push(N[0], N[1], N[2]);
+    bio.push(at(0), at(1), at(2));
+    land.push(at(3), at(4));
+    road.push(at(5));
+    cube.push(top, at(6));
+  };
+  const face = (P, N, top) => {
+    const b = pos.length / 3;
+    for (const p of P) vert(p[0], p[1], p[2], N, top);
+    const ax = P[1][0] - P[0][0], ay = P[1][1] - P[0][1], az = P[1][2] - P[0][2], bx = P[2][0] - P[0][0], by = P[2][1] - P[0][1], bz = P[2][2] - P[0][2];
+    const facing = (ay * bz - az * by) * N[0] + (az * bx - ax * bz) * N[1] + (ax * by - ay * bx) * N[2];
+    if (facing >= 0) idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    else idx.push(b, b + 2, b + 1, b, b + 3, b + 2);
+  };
+  // Tops, merged into the biggest flat rectangles within each block.
+  const done = new Uint8Array(n * n);
+  for (let bj = 0; bj < n; bj += merge) for (let bi = 0; bi < n; bi += merge) {
+    const ie = Math.min(n, bi + merge), je = Math.min(n, bj + merge);
+    for (let j = bj; j < je; j++) for (let i = bi; i < ie; i++) {
+      if (done[j * n + i]) continue;
+      const t = T(i, j);
+      let i2 = i + 1, j2 = j + 1;
+      while (i2 < ie && !done[j * n + i2] && T(i2, j) === t) i2++;
+      grow: while (j2 < je) {
+        for (let k = i; k < i2; k++) if (done[j2 * n + k] || T(k, j2) !== t) break grow;
+        j2++;
+      }
+      for (let jj = j; jj < j2; jj++) for (let ii = i; ii < i2; ii++) done[jj * n + ii] = 1;
+      const xa = x0 + i * cell, xb = x0 + i2 * cell, za = z0 + j * cell, zb = z0 + j2 * cell;
+      face([[xa, t, za], [xa, t, zb], [xb, t, zb], [xb, t, za]], [0, 1, 0], t);
+    }
+  }
+  // Walls, merged along each row where the same two heights meet.
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const alongZ = dx !== 0;
+    for (let a = 0; a < n; a++) {
+      let start = -1, rt = 0, rb = 0;
+      for (let b = 0; b <= n; b++) {
+        let t = NaN, bot = NaN;
+        if (b < n) {
+          const i = alongZ ? a : b, j = alongZ ? b : a, ni = i + dx, nj = j + dz;
+          t = T(i, j);
+          const nb = T(ni, nj), edge = ni < 0 || nj < 0 || ni >= n || nj >= n;
+          bot = edge && skirt ? Math.min(nb, t) - CURTAIN - cell : nb;
+          if (!(bot < t)) t = NaN;
+        }
+        if (start >= 0 && (t !== rt || bot !== rb)) {
+          if (alongZ) {
+            const x = x0 + (a + (dx > 0 ? 1 : 0)) * cell, za = z0 + start * cell, zb = z0 + b * cell;
+            face([[x, rb, za], [x, rb, zb], [x, rt, zb], [x, rt, za]], [dx, 0, 0], rt);
+          } else {
+            const z = z0 + (a + (dz > 0 ? 1 : 0)) * cell, xa = x0 + start * cell, xb = x0 + b * cell;
+            face([[xa, rb, z], [xb, rb, z], [xb, rt, z], [xa, rt, z]], [0, 0, dz], rt);
+          }
+          start = -1;
+        }
+        if (t === t && start < 0) {
+          start = b;
+          rt = t;
+          rb = bot;
+        }
+      }
+    }
+  }
+  // The water: a flat sheet on the colour lattice, deep where the cubes are low.
+  const wpos = new Float32Array(m * m * 3), deep = new Float32Array(m * m), widx = new Uint32Array((m - 1) * (m - 1) * 6);
+  let wet = false;
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+    const k = j * m + i, x = x0 + Math.min(size, i * A), z = z0 + Math.min(size, j * A);
+    wpos[k * 3] = x;
+    wpos[k * 3 + 2] = z;
+    deep[k] = -smoothHeight(x, z);
+    if (deep[k] > -1.5) wet = true;
+  }
+  let t = 0;
+  for (let j = 0; j < m - 1; j++) for (let i = 0; i < m - 1; i++) {
+    const a = j * m + i;
+    widx[t++] = a; widx[t++] = a + m; widx[t++] = a + 1;
+    widx[t++] = a + 1; widx[t++] = a + m; widx[t++] = a + m + 1;
+  }
+  return {
+    pos: new Float32Array(pos), nor: new Float32Array(nor), bio: new Float32Array(bio), road: new Float32Array(road), land: new Float32Array(land), cube: new Float32Array(cube),
+    idx: new Uint32Array(idx), wet, water: { pos: wpos, deep, idx: widx },
+  };
 }
 
 // The steepest rise or drop a step away from a point, so nothing is placed on a cliff face.

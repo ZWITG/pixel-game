@@ -103,7 +103,7 @@ export default class Digs {
     // Dig again whatever was dug here before.
     const old = this.saved.find((q) => q.x === cx && q.z === cz);
     if (old) {
-      for (const [ax, ay, az, r] of old.cuts) p.vox.vol.carve(ax - cx, ay, az - cz, r);
+      for (const [ax, ay, az, r, low] of old.cuts) p.vox.vol.carve(ax - cx, ay, az - cz, r, null, low ?? -Infinity);
       for (const [ax, ay, az, r] of old.cuts) {
         const [i, j, k] = p.vox.vol.cell(ax - cx, ay, az - cz);
         for (const at of p.vox.vol.unsupported(p.vox.vol.around(i, j, k, Math.ceil(r / Math.sqrt(MATERIALS[1].strength) / S) + 1))) p.vox.vol.mat[at] = 0;
@@ -183,12 +183,11 @@ export default class Digs {
     }
     const cut = down ? Math.max(r, deep * 0.9) : r;
     // Never through the bottom of the patch, nor below the water: a pit always keeps a floor of rock.
-    const lowest = Math.max(p.vox.vol.oy + KEEP_FLOOR, SEA_FLOOR) + cut;
-    const cy = Math.max(lowest, down ? Math.min(y, ground - r * 0.25) : y);
-    if (this.voxels.hit(p, x, cy, z, cut, hero)) {
+    const low = Math.max(p.vox.vol.oy + KEEP_FLOOR, SEA_FLOOR), cy = down ? Math.min(y, ground - r * 0.25) : y;
+    if (this.voxels.hit(p, x, cy, z, cut, hero, null, low)) {
       this.bare(p, x, z, cut);
       this.holes();
-      p.cuts.push([Math.round(x * 10) / 10, Math.round(cy * 10) / 10, Math.round(z * 10) / 10, Math.round(cut * 10) / 10]);
+      p.cuts.push([Math.round(x * 10) / 10, Math.round(cy * 10) / 10, Math.round(z * 10) / 10, Math.round(cut * 10) / 10, low]);
       if (p.cuts.length > MOST_CUTS) p.cuts.shift();
       this.save(p);
     }

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { height, addDent, dents, dentShape, WORLD } from './terrain.js';
 import { terrainMaterial, waterMaterial, shared } from './materials.js';
 import { makeTreeMeshes, makeGrass, makeRocks } from './foliage.js';
-import { CHUNK, gridData, spotsData, grassData } from './ground.js';
+import { CHUNK, gridData, blockData, spotsData, grassData } from './ground.js';
+import { FEATURES } from '../config/features.js';
 
 // Terrain streams in around the hero: fine chunks close by, coarse ones further out, and one
 // low-detail mesh of the whole world behind them. Workers do the sums, so frames never wait.
@@ -15,7 +16,10 @@ const IN_FLIGHT = 4;       // jobs out with the workers at once, so new orders c
 const ADD_PER_FRAME = 2;   // finished chunks turned into meshes per frame
 const SCATTER_GAP = 180;   // ms between refills of the instanced trees and grass
 const MAX_TREES = 2600, MAX_FAR_TREES = 26000, MAX_BLADES = 70000, MAX_ROCKS = 4000;
-const stepFor = (ring) => (ring <= 1 ? 2 : ring <= 2 ? 4 : 8);
+const CUBES = FEATURES.voxelWorld;
+// Smooth land: vertex spacing by ring. Cubes: the size of the land's cubes by ring.
+const stepFor = CUBES ? (ring) => (ring <= 1 ? 0.5 : ring <= 2 ? 1 : 2) : (ring) => (ring <= 1 ? 2 : ring <= 2 ? 4 : 8);
+const landData = (x0, z0, size, step, skirt) => (CUBES ? blockData(x0, z0, size, step, skirt) : gridData(x0, z0, size, step, skirt));
 
 function meshData(g) {
   const out = new THREE.BufferGeometry();
@@ -24,12 +28,20 @@ function meshData(g) {
   out.setAttribute('aBiome', new THREE.BufferAttribute(g.bio, 3));
   out.setAttribute('aRoad', new THREE.BufferAttribute(g.road, 1));
   out.setAttribute('aLand', new THREE.BufferAttribute(g.land, 2));
+  out.setAttribute('aCube', g.cube ? new THREE.BufferAttribute(g.cube, 2) : new THREE.Float32BufferAttribute(new Float32Array((g.pos.length / 3) * 2), 2));
   out.setIndex(new THREE.BufferAttribute(g.idx, 1));
   return out;
 }
 
 // The water over one chunk knows how deep it is, for clear shallows and foam at the shore.
 function waterData(g) {
+  if (g.water) {
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(g.water.pos, 3));
+    out.setAttribute('aDepth', new THREE.BufferAttribute(g.water.deep, 1));
+    out.setIndex(new THREE.BufferAttribute(g.water.idx, 1));
+    return out;
+  }
   const count = g.deep.length, pos = new Float32Array(count * 3);
   for (let k = 0; k < count; k++) {
     pos[k * 3] = g.pos[k * 3];
@@ -69,7 +81,7 @@ export default class Chunks {
     this.next = 0;
 
     const farMat = terrainMaterial({ far: true });
-    const far = new THREE.Mesh(meshData(gridData(-1024, -1024, WORLD + 2048, 32, false)), farMat);
+    const far = new THREE.Mesh(meshData(CUBES ? blockData(-1024, -1024, WORLD + 2048, 32, false, 2, 4) : gridData(-1024, -1024, WORLD + 2048, 32, false)), farMat);
     far.frustumCulled = false;
     far.receiveShadow = false;
     scene.add(far);
@@ -110,7 +122,15 @@ export default class Chunks {
     let added = 0;
     while (this.inbox.length && added < ADD_PER_FRAME) {
       const m = this.inbox.shift();
-      if (m.type === 'chunk') {
+      if (m.type === 'chunk' && m.redo) {
+        const old = this.live.get(m.k);
+        if (old) {
+          const c = { ...old.userData.cell };
+          this.drop(m.k, old);
+          this.build({ k: m.k, cx: c.x0 / CHUNK, cz: c.z0 / CHUNK, step: c.step }, m.g);
+          added++;
+        }
+      } else if (m.type === 'chunk') {
         this.flying.delete(m.k);
         if (this.wanted?.has(m.k) && !this.live.has(m.k)) {
           this.build(this.wanted.get(m.k), m.g);
@@ -253,7 +273,7 @@ export default class Chunks {
   settle() {
     this.queue = this.queue.filter((c) => {
       if (c.ring > 1) return true;
-      if (!this.live.has(c.k)) this.build(c, gridData(c.cx * CHUNK, c.cz * CHUNK, CHUNK, c.step, true));
+      if (!this.live.has(c.k)) this.build(c, landData(c.cx * CHUNK, c.cz * CHUNK, CHUNK, c.step, true));
       return false;
     });
     for (const { cx, cz, ring } of this.around(GRASS_RING)) {
@@ -339,7 +359,13 @@ export default class Chunks {
   deform(x, z, r, depth, later = false) {
     const old = addDent(x, z, r, depth);
     this.tell({ type: 'dents', list: [[x, z, r, depth]] });
-    for (const mesh of this.live.values()) {
+    for (const [k, mesh] of this.live) {
+      if (CUBES) {
+        // Cubes are built again by the workers and swapped in when ready.
+        const { x0, z0 } = mesh.userData.cell, hit = (cx, cz, cr) => cx + cr > x0 && cx - cr < x0 + CHUNK && cz + cr > z0 && cz - cr < z0 + CHUNK;
+        if (hit(x, z, r) || (old && hit(old[0], old[1], old[2]))) this.redo(k, mesh);
+        continue;
+      }
       this.patch(mesh, x, z, r, depth);
       if (old) this.patch(mesh, old[0], old[1], old[2], -old[3]);
     }
@@ -353,6 +379,11 @@ export default class Chunks {
     this.dirty = true;
     if (!later) this.scatter();
     for (const watch of this.watchers) watch(x, z, r);
+  }
+
+  redo(k, mesh) {
+    const { x0, z0, step } = mesh.userData.cell;
+    this.post({ type: 'chunk', k, cx: x0 / CHUNK, cz: z0 / CHUNK, step, redo: true });
   }
 
   patch(mesh, x, z, r, depth) {

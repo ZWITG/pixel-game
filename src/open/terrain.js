@@ -1,3 +1,4 @@
+import { FEATURES } from '../config/features.js';
 // The open world as pure functions: height and biome at any point. 1 unit = 1 tile (about 1 m).
 // World is 8192 x 8192 tiles (8 km across; for scale, Skyrim is roughly 6 km across).
 export const WORLD = 8192;
@@ -259,8 +260,20 @@ export function dentAt(x, z) {
   return sum;
 }
 
-export function height(x, z) {
+// The land is cubes (FEATURES.voxelWorld): columns half a tile wide, their tops on half-tile
+// steps. `height` is the top of the column a point stands in, so everything placed on the land,
+// heroes, trees, houses and dug patches, sits on the cubes. `smoothHeight` is the land underneath.
+export const CUBE = 0.5;
+const cubed = FEATURES.voxelWorld;
+export function smoothHeight(x, z) {
   return dents.length ? baseHeight(x, z) - dentAt(x, z) : baseHeight(x, z);
+}
+export function height(x, z) {
+  if (!cubed) return smoothHeight(x, z);
+  const h = smoothHeight((Math.floor(x / CUBE) + 0.5) * CUBE, (Math.floor(z / CUBE) + 0.5) * CUBE);
+  const top = Math.round(h / CUBE) * CUBE;
+  // Never level with the water, which would flicker: a shore cube stands a little above or below.
+  return top === 0 ? (h >= 0 ? CUBE / 2 : -CUBE / 2) : top;
 }
 
 // How much of each ground type: [golden meadow, crimson autumn wood, deep pine wood].

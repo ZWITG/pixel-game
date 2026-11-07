@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { addWind } from '../render/wind.js';
 import { shared, SCAR_GLSL, DIG_GLSL } from './materials.js';
+import { FEATURES } from '../config/features.js';
+import { voxelCrown, voxelTrunk, voxelRock, voxelTuft } from './voxelArt.js';
+
+const CUBES = FEATURES.voxelWorld;
 
 // Trees and ground cover made of crossed cards. A card is two triangles, so a crown of soft
 // leaves costs less than a few boxes. Far trees swap to a single picture of the near one.
@@ -250,8 +254,8 @@ function bakeImpostor(renderer, kind, crownGeo, leafMat, trunkGeo, trunkMat) {
   const light = new THREE.DirectionalLight('#ffffff', 2.2);
   light.position.set(0.4, 1, 0.6);
   scene.add(new THREE.HemisphereLight('#ffffff', '#88888a', 1.5), light);
-  const leaf = new THREE.MeshLambertMaterial({ map: leafMat.map, alphaTest: 0.4, side: THREE.DoubleSide, vertexColors: true });
-  const a = new THREE.Mesh(crownGeo, cardLight(leaf)), b = new THREE.Mesh(trunkGeo, trunkMat.clone());
+  const leaf = CUBES ? new THREE.MeshLambertMaterial({ vertexColors: true }) : cardLight(new THREE.MeshLambertMaterial({ map: leafMat.map, alphaTest: 0.4, side: THREE.DoubleSide, vertexColors: true }));
+  const a = new THREE.Mesh(crownGeo, leaf), b = new THREE.Mesh(trunkGeo, trunkMat.clone());
   scene.add(a, b);
   const clear = new THREE.Color(LEAVES[kind].colors[1]), oldColor = new THREE.Color(), oldAlpha = renderer.getClearAlpha();
   renderer.getClearColor(oldColor);
@@ -285,17 +289,19 @@ function impostorGeometry() {
 
 export function makeTreeMeshes(scene, renderer, max, farMax) {
   return Object.keys(LEAVES).map((kind) => {
-    const stump = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.42, 0.5, 0.8, 7).translate(0, 0.4, 0), trunkMaterial(kind, 0.4), STUMPS);
+    const stump = new THREE.InstancedMesh(CUBES ? new THREE.BoxGeometry(1, 0.8, 1).translate(0, 0.4, 0) : new THREE.CylinderGeometry(0.42, 0.5, 0.8, 7).translate(0, 0.4, 0), trunkMaterial(kind, 0.4), STUMPS);
     stump.frustumCulled = false;
     stump.castShadow = true;
     stump.count = 0;
     scene.add(stump);
-    const map = leafTexture(LEAVES[kind]);
-    const leaf = new THREE.MeshLambertMaterial({ map, alphaTest: 0.4, alphaToCoverage: true, side: THREE.DoubleSide, vertexColors: true });
-    const mat = parting(scarred(cardLight(addWind(leaf, { from: 5, amount: 0.014 })), 'transformed = mix(transformed, aCard, smoothstep(.35, .8, vScar.r));'), 3, 8);
-    const geo = crown(kind), bark = trunkMaterial(kind), trunkGeo = trunkGeometry();
+    // Cubes: solid crowns of leaf cubes and trunks of bark cubes, coloured per cube.
+    const map = CUBES ? null : leafTexture(LEAVES[kind]);
+    const leaf = CUBES ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshLambertMaterial({ map, alphaTest: 0.4, alphaToCoverage: true, side: THREE.DoubleSide, vertexColors: true });
+    const burn = 'transformed = mix(transformed, aCard, smoothstep(.35, .8, vScar.r));';
+    const mat = CUBES ? parting(scarred(addWind(leaf, { from: 5, amount: 0.01 }), burn), 3, 8) : parting(scarred(cardLight(addWind(leaf, { from: 5, amount: 0.014 })), burn), 3, 8);
+    const geo = CUBES ? voxelCrown(kind, LEAVES[kind].colors) : crown(kind), bark = CUBES ? new THREE.MeshLambertMaterial({ vertexColors: true }) : trunkMaterial(kind), trunkGeo = CUBES ? voxelTrunk(kind) : trunkGeometry();
     const crownMesh = new THREE.InstancedMesh(geo, mat, max);
-    crownMesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.4, side: THREE.DoubleSide });
+    if (!CUBES) crownMesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.4, side: THREE.DoubleSide });
     const trunkMesh = new THREE.InstancedMesh(trunkGeo, fadeNear(bark.clone(), 2, 5), max);
     for (const m of [crownMesh, trunkMesh]) {
       m.frustumCulled = false;
@@ -330,15 +336,15 @@ export function makeRocks(scene, max) {
     }
   });
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  const geo = new THREE.IcosahedronGeometry(1, 1);
-  const p = geo.attributes.position;
+  const geo = CUBES ? voxelRock() : new THREE.IcosahedronGeometry(1, 1);
+  const p = CUBES ? { count: 0 } : geo.attributes.position;
   // Knock the corners about, keeping shared corners together so the stone stays closed.
   for (let i = 0; i < p.count; i++) {
     const k = 1 + Math.sin(p.getX(i) * 4 + p.getY(i) * 7 + p.getZ(i) * 3) * 0.14 + Math.sin(p.getX(i) * 9 - p.getZ(i) * 8) * 0.06;
     p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k);
   }
-  geo.computeVertexNormals();
-  const mesh = new THREE.InstancedMesh(geo, fadeNear(new THREE.MeshLambertMaterial({ map, flatShading: true }), 1.5, 3), max);
+  if (!CUBES) geo.computeVertexNormals();
+  const mesh = new THREE.InstancedMesh(geo, fadeNear(CUBES ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshLambertMaterial({ map, flatShading: true }), 1.5, 3), max);
   mesh.frustumCulled = false;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -378,13 +384,15 @@ export function makeGrass(scene, max) {
     }
     idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   });
-  const g = new THREE.BufferGeometry();
+  let g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('aCard', new THREE.Float32BufferAttribute(card, 3));
   g.setIndex(idx);
-  const material = new THREE.MeshLambertMaterial({ map, alphaTest: 0.35, alphaToCoverage: true, side: THREE.DoubleSide });
+  // Cubes: a tuft of thin square blades instead of a painted card.
+  if (CUBES) g = voxelTuft();
+  const material = CUBES ? new THREE.MeshLambertMaterial({ vertexColors: true }) : new THREE.MeshLambertMaterial({ map, alphaTest: 0.35, alphaToCoverage: true, side: THREE.DoubleSide });
   addWind(material, { from: 0.1, amount: 0.2 });
   // Grass sinks into the ground with distance, so its edge can't be seen.
   const inner = material.onBeforeCompile;
@@ -396,7 +404,8 @@ export function makeGrass(scene, max) {
       #include <project_vertex>`,
     );
   };
-  const mesh = new THREE.InstancedMesh(g, parting(scarred(cardLight(material), 'transformed.y *= 1.0 - smoothstep(.15, .5, vScar.r) * .94;'), 1.6, 4), max);
+  const flatten = 'transformed.y *= 1.0 - smoothstep(.15, .5, vScar.r) * .94;';
+  const mesh = new THREE.InstancedMesh(g, parting(scarred(CUBES ? material : cardLight(material), flatten), 1.6, 4), max);
   mesh.frustumCulled = false;
   mesh.receiveShadow = true;
   mesh.count = 0;

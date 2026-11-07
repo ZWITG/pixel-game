@@ -126,6 +126,8 @@ export default class Realm {
   // How much of a nation is left: its people and its army, against the strongest it's been.
   strength(id) {
     const s = this.of(id);
+    // Places the hero holds have only their own walls: 30 men, as when they're attacked (war()).
+    if (!s) return clamp(30 / 120);
     return clamp((this.people(id) / 1800) * 0.5 + (s.troops / Math.max(s.peak, 120)) * 0.5);
   }
 
