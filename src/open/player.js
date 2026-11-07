@@ -209,6 +209,8 @@ export default class Player {
     // Square: the rush chain. Triangle: a smash, which once Destructive Blow is open throws on release.
     const reach = !state.air || melee.hover > 0;
     const arts = shift && FEATURES.spiritArts;
+    // A slab in the air takes the punch instead: it bursts.
+    if (FEATURES.punching && just.punch && fights && !arts && this.powers.onPunch()) just.punch = false;
     if (FEATURES.punching && just.punch && fights && reach && !arts) melee.punch(state);
     if (FEATURES.punching && just.heavy && fights && reach && !arts && (!melee.blowReady || melee.hover > 0)) melee.heavy(state);
     if (!spot) {
@@ -338,7 +340,9 @@ export default class Player {
     const used = busy ? false : this.act(just);
     const free = !hud.open && !this.frozen;
     if (free && !melee.active && this.powers.def && !this.wrath.ult) {
-      for (let i = 0; i < 4; i++) if (just[`power${i}`]) this.powers.use(i);
+      // L1 + the D-pad wears the second page of powers.
+      const page = controls.padHeld.L1 || controls.held.has('KeyQ') ? 4 : 0;
+      for (let i = 0; i < 4; i++) if (just[`power${i}`]) this.powers.use(i + page);
     }
     if (!world.paused) {
       this.wrath.update(dt);
@@ -346,7 +350,7 @@ export default class Player {
       this.powers.update(dt);
       this.nature.update(dt);
     }
-    this.bar.update(this.powers, controls.device);
+    this.bar.update(this.powers, controls.device, controls.padHeld.L1 || controls.held.has('KeyQ') ? 1 : 0);
     if (this.powers.def) this.growForm();
     // Cross just after a Launcher flies up after the foe instead of jumping.
     const pursued = just.jump && !used && free && melee.pursue(state);
@@ -369,7 +373,7 @@ export default class Player {
     }
     aim.pitch = THREE.MathUtils.clamp(aim.pitch + look.y, -0.25, 1.2);
 
-    const m = !free || melee.active || melee.rolling > 0 || melee.hover > 0 || melee.pursuing || melee.broken > 0 || this.wrath.ult || this.arts.wave ? { x: 0, y: 0 } : controls.move(false), amount = Math.min(1, Math.hypot(m.x, m.y));
+    const m = !free || melee.active || melee.rolling > 0 || melee.hover > 0 || melee.pursuing || melee.broken > 0 || this.wrath.ult || this.arts.wave || this.powers.busy ? { x: 0, y: 0 } : controls.move(false), amount = Math.min(1, Math.hypot(m.x, m.y));
     if (!world.paused) {
       this.updateSuper(dt, !!(controls.held.has('ShiftLeft') || controls.padHeld.R2), amount > 0.05 && free);
       melee.updateMoves(dt, state);

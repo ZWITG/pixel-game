@@ -294,8 +294,14 @@ export default class Melee {
   }
 
   // A blow from this hero at their current punch, before the combo adds to it.
+  // The Titan, feet on natural ground (not in the air, water or a house).
+  get grounded() {
+    const p = this.player;
+    return p.powers.id === 'titan' && p.state.air < 0.3 && !p.swim.inWater && !p.rooms.house;
+  }
+
   get force() {
-    return PUNCHES[this.stage].power * this.body.damageScale * this.body.massScale * (this.surging ? COMBAT.surge.power : 1);
+    return PUNCHES[this.stage].power * this.body.damageScale * this.body.massScale * (this.surging ? COMBAT.surge.power : 1) * (this.grounded ? COMBAT.grounded.power : 1);
   }
 
   // Rolls toward (x, z) in world terms, or the way the hero is facing.
@@ -401,7 +407,7 @@ export default class Melee {
     const facing = Math.hypot(...state.dir) || 1, dx = x - state.x, dz = z - state.z, d = Math.hypot(dx, dz) || 1;
     const front = (dx * state.dir[0] + dz * state.dir[1]) / (d * facing) > 0;
     if (!this.guarding || !front) return { amount };
-    const since = this.clock - this.guardAt, perfect = since < parry.perfect;
+    const since = this.clock - this.guardAt, perfect = since < parry.perfect + (this.grounded ? COMBAT.grounded.parry : 0);
     // A Perfect parry turns anything; a plain one only what isn't heavy.
     if (perfect || (since < parry.plain && !heavy)) {
       say(perfect ? 'Perfect!' : 'Parry!', perfect ? '#ffffff' : '#ffd24a');
@@ -517,7 +523,10 @@ export default class Melee {
   // Cross after a Launcher: fly up to the foe and carry the fight into the air.
   pursue(state) {
     const p = this.pursuit;
-    if (!p || this.clock > p.until || p.e.dying || !this.monsters.list.includes(p.e) || this.active) return false;
+    // It can cut short the follow-through of the blow that launched, but not a blow still on its way.
+    if (!p || this.clock > p.until || p.e.dying || !this.monsters.list.includes(p.e) || (this.active && !this.active.landed)) return false;
+    this.active = null;
+    this.queued = false;
     this.pursuit = null;
     this.pursuing = { e: p.e, t: 0, x: state.x, z: state.z, air: state.air };
     this.airHits = 0;
@@ -740,7 +749,13 @@ export default class Melee {
       this.hud.float('Execute!', t.x, t.group.position.y + 4, t.z, '#ff5a5a');
       this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.slow.execute);
     }
-    const reach = smash?.reach ?? p.radius * (finisher ? FINISHER_REACH : 1) * spread;
+    // A Conqueror's own Finisher (the Titan's Pillar Uppercut); smashes on a sunken foe hit twice as hard.
+    if (a.name === 'finisher' && t?.def) react = this.player.powers.kitDef?.finisher?.(this, t) ?? react;
+    if (smash && t?.sunkUntil > this.monsters.time) {
+      force *= 2;
+      this.hud.float('Sunk!', t.x, t.group.position.y + 3, t.z, '#c8a060');
+    }
+    const reach = (smash?.reach ?? p.radius * (finisher ? FINISHER_REACH : 1) * spread) * (1 + this.player.powers.bonus('reach'));
     const crater = !this.player.rooms.house && (finisher || this.stage >= 3) && !a.air ? p.crater * spread * (finisher ? FINISHER_REACH : 1) : 0;
     // A sweep or a finisher knocks down all it reaches; anything else throws only its target.
     const all = a.name === 'sweep' || a.name === 'finisher';
@@ -748,6 +763,7 @@ export default class Melee {
     this.skills.add('punching', struck ? 1 : AIR_PRACTICE);
     if (t && !t.def) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);
     if (t?.def) {
+      this.player.powers.landed();
       this.gain(smash ? COMBAT.spirit.smash : COMBAT.spirit.hit);
       this.rage(smash ? COMBAT.wrath.smash : COMBAT.wrath.hit);
       if (a.air) {

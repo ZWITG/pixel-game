@@ -81,7 +81,9 @@ function strike(monsters, e, move) {
   if (s.air > 3) return;
   if (d < (move.area ?? move.reach) + e.radius) {
     e.landed = true;
-    monsters.hurt(hero, e.def.damage * move.power, e.x, e.z, { heavy: move.heavy, from: e });
+    // Disarmed by Ironbend: half as hard, and no blow heavy enough to break a guard.
+    const weak = e.disarmedUntil > monsters.time;
+    monsters.hurt(hero, e.def.damage * move.power * (weak ? 0.5 : 1), e.x, e.z, { heavy: move.heavy && !weak, from: e });
   }
 }
 

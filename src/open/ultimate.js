@@ -14,7 +14,10 @@ const ULTIMATES = {
   titan: {
     name: 'Upheaval', secs: 2.6, color: '#e8964a', tint: '#d8a070', reach: 40,
     start(u) {
-      u.lift = u.foes(this.reach);
+      // It grows with the Titan: wider and harder as Mastery rises.
+      u.reach = Math.min(70, 30 + u.p.powers.mastery * 1.5);
+      u.might = 1 + u.p.powers.mastery * 0.015;
+      u.lift = u.foes(u.reach);
       for (const e of u.lift) Object.assign(e, { rise: 22 + Math.random() * 8, air: Math.max(e.air, 0.01), hang: 0 });
       u.pose('gather');
     },
@@ -25,7 +28,7 @@ const ULTIMATES = {
       u.world.work.shakeAt = state;
       // The land tears up in a widening ring and everything on it is carried skyward.
       if (t < 1.3 && Math.random() < 0.9) {
-        const a = Math.random() * 6.283, d = 6 + t * 26 * Math.random();
+        const a = Math.random() * 6.283, d = 6 + t * u.reach * 0.65 * Math.random();
         const x = state.x + Math.cos(a) * d, z = state.z + Math.sin(a) * d;
         fx.rock(x, u.ground(x, z), z, 0.9 + Math.random() * 1.4, 2.4);
         u.world.smoke?.dust(x, u.ground(x, z) + 0.5, z, '#a89070', 1.5, 4);
@@ -36,10 +39,10 @@ const ULTIMATES = {
       [1.3, (u) => { for (const e of u.lift) if (!e.dying) Object.assign(e, { hang: 0, rise: -70 }); }],
       [1.55, (u) => {
         const { state, melee } = u.p;
-        u.strike(state.x, state.z, POWER, 40, 0, 'knockdown');
-        if (!u.p.rooms.house) melee.tear(state.x, state.z, 16, 24);
+        u.strike(state.x, state.z, POWER * u.might, u.reach, 0, 'knockdown');
+        if (!u.p.rooms.house) melee.tear(state.x, state.z, u.reach * 0.4, 24);
         u.world.quake.throwStones(state.x, u.ground(state.x, state.z), state.z, 28, 24);
-        u.world.vfx.shock(state.x, u.ground(state.x, state.z), state.z, 42, '#ffd2a0', 0.7);
+        u.world.vfx.shock(state.x, u.ground(state.x, state.z), state.z, u.reach + 2, '#ffd2a0', 0.7);
         u.boom(0.9);
       }],
     ],

@@ -3,6 +3,10 @@ import { CONQUERORS, MAX_RANK, svg } from './conquerors.js';
 import { stagger } from './foes.js';
 import { prompt } from '../ui/glyphs.js';
 import { COMBAT } from './combat.js';
+import { TITAN } from './kits/titan.js';
+
+// Conquerors whose kits have their own power kinds and hooks (kits/*.js).
+const KITS = { titan: TITAN };
 import { Flames, makeBolt, shapeBolt } from './elementFx.js';
 
 // What a power does when it's used, by `kind`, and the light it makes. Each hero has a PowerSet;
@@ -24,7 +28,7 @@ const STRIKE_WAIT = 0.45;
 const SHADE_REACH = 15, SHADE_EVERY = 0.8;
 const TRAIL_EVERY = 3;       // tiles between patches of a fiery trail
 const SOLID_STEP = 1.5;      // tiles between checks along a dash
-const CAST_POSE = { bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam' };
+const CAST_POSE = { bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam', pillar: 'slam', slab: 'throw', surf: 'dash', mail: 'gather', garden: 'slam', sand: 'slam', rift: 'slam', mountain: 'gather', ironbend: 'peak', magma: 'slam' };
 const STATUS_COLORS = { burn: ['#ff9a3a', '#ff5a2a', '#ffd070'], freeze: ['#dff4ff', '#8fe0ff'], shock: ['#fff4b0', '#ffe25a'] };
 const GLOWS = 160, PILLARS = 20, DISCS = 12, BOLTS = 18, CRYSTALS = 60, ROCKS = 60, SHELLS = 16, HOLES = 6;
 const SKY = 46;              // tiles up that falling things start
@@ -308,6 +312,7 @@ export default class PowerSet {
     this.shades = [];
     this.walls = [];
     this.dashing = null;
+    this.kit = [];             // lasting effects of a Conqueror's own powers
     this.burns = new Map();
     this.tick = 0;
     this.trailed = 0;
@@ -367,7 +372,30 @@ export default class PowerSet {
     return this.mastery >= this.def.powers[pid].mastery;
   }
 
-  // Puts a power on a D-pad direction; if it's already worn, the two swap places.
+  get kitDef() {
+    return KITS[this.id] ?? null;
+  }
+
+  // While a power like Earth Surf is carrying the hero, the stick steers it instead of walking.
+  get busy() {
+    return this.kit.some((k) => k.busy);
+  }
+
+  // A blow reaching the hero: the kit may take some of it (Stone Mail).
+  absorb(amount) {
+    return this.kitDef?.absorb?.(this, amount) ?? amount;
+  }
+
+  // Square pressed: true if the kit used it (a Slab bursting).
+  onPunch() {
+    return !!this.kitDef?.onPunch?.(this);
+  }
+
+  landed() {
+    this.kitDef?.landed?.(this);
+  }
+
+  // Puts a power on a D-pad direction (4 to 7: the L1 page); if it's already worn, the two swap places.
   wear(pid, slot) {
     const was = this.loadout.indexOf(pid);
     if (was >= 0) this.loadout[was] = this.loadout[slot];
@@ -404,11 +432,14 @@ export default class PowerSet {
     if ((this.waits[pid] ?? 0) > 0 || melee.held) return undefined;
     if (rooms.house && !rooms.house.dark) return hud.message('Not in here.');
     const def = this.def.powers[pid], rank = this.rank(pid), { kind } = def;
-    const aim = this.aim(), force = player.body.might * def.power * rankScale(rank) || 0;
+    // A Titan on natural ground hits harder (Grounded).
+    const aim = this.aim(), force = player.body.might * def.power * rankScale(rank) * (player.melee.grounded ? COMBAT.grounded.power : 1) || 0;
     const job = { pid, def, rank, force, color: this.def.color };
     state.dir = [aim.dx, aim.dz];
     this.player.world.work.actor = player;
-    this[kind](job, aim);
+    const own = this.kitDef?.[kind];
+    if (own) own(this, job, aim);
+    else this[kind](job, aim);
     this.waits[pid] = def.cool * (1 - rank * 0.07);
     this.casting = CAST_TIME;
     this.pose = CAST_POSE[kind] ?? 'punch';
@@ -756,6 +787,8 @@ export default class PowerSet {
       const { state } = this.player, a = Math.random() * 6.28, d = 0.6 + Math.random() * 1.2;
       this.fx.glow(state.x + Math.cos(a) * d, Math.max(state.y, 0) + state.air + Math.random() * 2.4, state.z + Math.sin(a) * d, 0.2, this.def.color, 0.8, 0.15);
     }
+    this.kit = this.kit.filter((k) => k.update(dt) !== false);
+    this.kitDef?.tick?.(this, dt);
     this.updateDash(dt);
     this.updateBolts(dt);
     this.updateStrikes(dt);
@@ -772,11 +805,13 @@ export class PowerBar {
     this.device = null;
   }
 
-  update(set, device) {
+  // `page` 1 while L1 is held: the cross shows the second page of worn powers.
+  update(set, device, page = 0) {
     this.box.hidden = !set.def;
     if (!set.def) return;
-    this.cells.forEach((c, i) => {
-      const pid = set.loadout[i];
+    this.box.classList.toggle('page2', page === 1);
+    this.cells.forEach((c, k) => {
+      const i = k + page * SLOTS, pid = set.loadout[i] ?? null;
       if (pid !== c.pid) {
         c.pid = pid;
         const def = pid ? set.def.powers[pid] : null;

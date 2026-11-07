@@ -62,6 +62,8 @@ export const COMBAT = {
   wrath: { hit: 0.008, smash: 0.015, execute: 0.06, perfect: 0.04, parry: 0.02, vanish: 0.02, kill: 0.025, hurt: 0.6 },
   // Surge: seconds; Spirit a second; blows this much harder; powers cool this much faster; a sixth hit.
   surge: { secs: 12, spirit: 0.25, power: 1.2, cool: 1.5, hit: 1.9, hitTime: 1.3 },
+  // The Titan's Grounded: on natural ground, blows and powers this much stronger; Perfect parries this much longer.
+  grounded: { power: 1.2, parry: 0.04 },
   // Spirit Arts (spiritArts.js): a shot and a held beam, in blows and Spirit pips.
   arts: {
     shot: { power: 0.5, cost: 1 / 3, every: 0.18, speed: 70, range: 45 },

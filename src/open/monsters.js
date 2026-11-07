@@ -335,6 +335,7 @@ export default class Monsters {
   hurt(p, amount, fromX, fromZ, { heavy: crushing = false, from = null } = {}) {
     const s = p.state;
     if (p.guard > 0 || (p.rooms.house && !p.rooms.house.hostile)) return;
+    amount = p.powers.absorb(amount);
     const answer = p.melee.defend(amount, fromX, fromZ, crushing, from);
     if (answer.avoided) {
       if (answer.parried && from) stagger(from, answer.perfect ? COMBAT.parried.perfect : COMBAT.parried.plain, this.time, true);
@@ -488,7 +489,8 @@ export default class Monsters {
       try {
         e.update(dt);
         // Ice underfoot steals most of every step.
-        const drag = this.world.scars.drag(wasX, wasZ);
+        // Quicksand and rifts hold it too.
+        const drag = this.world.scars.drag(wasX, wasZ) * (e.sunkUntil > this.time ? 0.2 : 1);
         if (drag < 1) {
           e.group.position.x = wasX + (e.group.position.x - wasX) * drag;
           e.group.position.z = wasZ + (e.group.position.z - wasZ) * drag;
@@ -531,7 +533,9 @@ export default class Monsters {
         e.brokenUntil = 0;
         e.posture = e.postureMax * 0.3;
       } else if (e.posture > 0 && !e.brokenUntil && this.time - e.postureAt > COMBAT.postureRest) e.posture = Math.max(0, e.posture - COMBAT.postureBack * dt);
-      e.group.position.y = (e.cave ? CAVE_FLOOR : this.groundY(e.x, e.z, e.group.position.y)) + e.air;
+      // Sunk into sand or a rift: it settles into the ground, and climbs back out when it ends.
+      e.sinkNow = (e.sinkNow ?? 0) + ((e.sunkUntil > this.time ? e.sinkTo ?? 1 : 0) - (e.sinkNow ?? 0)) * Math.min(1, dt * 6);
+      e.group.position.y = (e.cave ? CAVE_FLOOR : this.groundY(e.x, e.z, e.group.position.y)) + e.air - e.sinkNow;
       if (e.heldBy) e.heldBy.melee.carry(e);
       // A thrown monster hits the ground like a bomb.
       if (e.thrown && !e.air && e.thrown.melee) {

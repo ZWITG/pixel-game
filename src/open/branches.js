@@ -8,9 +8,9 @@ export const BRANCHES = {
   titan: {
     drop: ['swimming'],
     list: [
-      B('mountain', 'Mountain', '#d8b07a', 'Armour, footing and sensing through the ground.', ['skin', 'well', 'colossus'], ['climbing', 'fighting']),
-      B('quake', 'Quake', '#ff8a2a', 'Breaking the land: the Blow, rifts, the Upheaval.', ['quake', 'spikes', 'fault'], ['punching', 'blow', 'jumping', 'titan.demolition']),
-      B('forge', 'Forge', '#ff5a3a', 'Stone hurled and run through; iron and magma come later.', ['boulder', 'charge'], ['running', 'mining', 'woodcutting']),
+      B('mountain', 'Mountain', '#d8b07a', 'Armour, footing and sensing through the ground: Stone Mail, Mountain Form, Grounded, Seismic Sense.', ['skin', 'colossus'], ['climbing', 'fighting']),
+      B('quake', 'Quake', '#ff8a2a', 'Breaking the land: columns, spears, sand and rifts, the Blow and the Upheaval.', ['quake', 'spikes', 'well', 'fault'], ['punching', 'blow', 'jumping', 'titan.demolition']),
+      B('forge', 'Forge', '#ff5a3a', 'Stone, iron and fire: slabs hurled and ridden, iron bent, magma raised.', ['boulder', 'charge', 'ironbend', 'magma'], ['running', 'mining', 'woodcutting']),
     ],
   },
   storm: {

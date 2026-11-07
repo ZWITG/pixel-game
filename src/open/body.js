@@ -45,7 +45,7 @@ export default class Body {
   // The hero's level: their whole build, before gear. Monsters evolve against it.
   get level() { return this.skills.heroLevel(); }
   // The hero grows a little as they rise, up to a quarter again by level 60.
-  get heroScale() { return (1 + Math.min(0.25, (this.level - 1) * 0.004)) * (this.conq?.size ?? 1); }
+  get heroScale() { return (1 + Math.min(0.25, (this.level - 1) * 0.004)) * (this.conq?.size ?? 1) * (1 + (this.powers?.bonus('size') ?? 0)); }
   // Heavy enough, and just landing from a jump shakes the ground. Tiles of reach, 0 for none.
   get stompReach() { return Math.max(0, (this.mass - 90) * 0.06); }
   get maxHealth() { return (20 + (this.endurance - 10) * 2.5) * (this.conq?.health ?? 1) + this.bonus('health'); }

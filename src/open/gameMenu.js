@@ -276,15 +276,16 @@ export default class GameMenu {
       return;
     }
     const ids = powerOrder(set.id, c.powers), pid = ids[this.at], def = c.powers[pid], rank = set.rank(pid), open = set.open(pid);
-    const slots = DIRS.map((dir, i) => {
-      const worn = set.loadout[i];
+    const page = this.page ?? 0;
+    const slots = DIRS.map((dir, k) => {
+      const i = k + page * 4, worn = set.loadout[i];
       return `<div data-slot="${i}" class="cross-${dir} ${this.assigning ? 'choosing' : ''}" style="color:${c.color}" title="${worn ? c.powers[worn].name : ''}">${worn ? svg(c.powers[worn].kind, 30) : ''}</div>`;
     }).join('');
     const pips = (id) => Array.from({ length: MAX_RANK + 1 }, (_, i) => `<i class="${i <= set.rank(id) ? 'on' : ''}"></i>`).join('');
     const cards = ids.map((id, i) => {
       const q = c.powers[id], ok = set.open(id), worn = set.loadout.indexOf(id), br = branchOf(set.id, id);
       return `<button data-card="${i}" class="${i === this.at ? 'at' : ''} ${ok ? '' : 'locked'}" style="--c:${br?.color ?? c.color}">
-        ${svg(ok ? q.kind : 'lock', 34)}<b>${q.name}</b>${br ? `<small class="branch">${br.name}</small>` : ''}<span class="pips">${ok ? pips(id) : `Mastery ${q.mastery}`}</span>${worn >= 0 ? `<em>${DIR_NAMES[worn]}</em>` : ''}
+        ${svg(ok ? q.kind : 'lock', 34)}<b>${q.name}</b>${br ? `<small class="branch">${br.name}</small>` : ''}<span class="pips">${ok ? pips(id) : `Mastery ${q.mastery}`}</span>${worn >= 0 ? `<em>${worn >= 4 ? 'L1 ' : ''}${DIR_NAMES[worn % 4]}</em>` : ''}
       </button>`;
     }).join('');
     const skill = this.owner.skills.all().find((s) => s.id === set.skillOf(pid));
@@ -292,7 +293,7 @@ export default class GameMenu {
     this.page.innerHTML = `<div class="powers-page">
       <div class="powers-head" style="color:${c.color}">${svg(c.emblem, 34)}<div><b>${c.name}</b><span>Mastery ${set.mastery}</span></div></div>
       <div class="powers-main">
-        <div class="cross">${slots}</div>
+        <div class="cross-wrap"><div class="cross">${slots}</div><small class="cross-page">${page ? 'L1 + D-pad' : 'D-pad'} · ${prompt('heavy', this.owner.controls.device)} other page</small></div>
         <div class="power-grid">${cards}</div>
       </div>
       <div class="power-info"><b>${def.name}</b>${open ? `<span>Rank ${rank + 1} of ${MAX_RANK + 1}</span>` : `<span>Opens at Mastery ${def.mastery}. You are at ${set.mastery}.</span>`}<p>${def.text}</p>${branchOf(set.id, pid) ? `<p style="color:${branchOf(set.id, pid).color}">${branchOf(set.id, pid).name}: ${branchOf(set.id, pid).text}</p>` : ''}${open ? stats : ''}</div>
@@ -320,7 +321,7 @@ export default class GameMenu {
 
   place(slot) {
     const set = this.owner.powers, pid = powerOrder(set.id, set.def.powers)[this.at];
-    set.wear(pid, slot);
+    set.wear(pid, slot + (this.page ?? 0) * 4);
     this.assigning = false;
     this.drawPage();
     this.drawHints();
@@ -332,6 +333,12 @@ export default class GameMenu {
     if (this.assigning) {
       const dir = DIRS.findIndex((d) => just[d]);
       if (dir >= 0) this.place(dir);
+      return;
+    }
+    // Triangle turns the cross over to the other page of worn powers (L1 + D-pad in play).
+    if (just.heavy) {
+      this.page = this.page ? 0 : 1;
+      this.drawPage();
       return;
     }
     const n = powerOrder(set.id, set.def.powers).length, before = this.at;
