@@ -77,6 +77,11 @@ function pickMove(e, dist) {
 function strike(monsters, e, move) {
   const hero = e.foe;
   if (!hero || e.landed) return;
+  // A Gravecaller's Thralls standing in the way take the blow too, once a strike.
+  if (!e.thrallsHit) {
+    e.thrallsHit = true;
+    for (const p of monsters.players) p.powers?.kitDef?.struckNear?.(p.powers, e, move);
+  }
   // Drawn to a Frost Mirror, its blows go into the ice instead.
   const decoy = hero.powers?.kitDef?.decoy?.(hero.powers);
   if (decoy && Math.hypot(e.x - decoy.x, e.z - decoy.z) < 25) return;
@@ -117,6 +122,7 @@ function think(monsters, e, t) {
       e.landed = false;
       e.vel.set(dx, dz).multiplyScalar(m.lunge);
       setMode(e, 'strike', m.time, t);
+      e.thrallsHit = false;
       if (m.area) monsters.quakeAt(e, m.area);
     }
     return;

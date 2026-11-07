@@ -7,9 +7,10 @@ import { TITAN } from './kits/titan.js';
 import { STORM } from './kits/storm.js';
 import { EMBER } from './kits/ember.js';
 import { FROST, iceMat } from './kits/frost.js';
+import { VOID } from './kits/void.js';
 
 // Conquerors whose kits have their own power kinds and hooks (kits/*.js).
-const KITS = { titan: TITAN, storm: STORM, ember: EMBER, frost: FROST };
+const KITS = { titan: TITAN, storm: STORM, ember: EMBER, frost: FROST, void: VOID };
 import { Flames, makeBolt, shapeBolt } from './elementFx.js';
 
 // What a power does when it's used, by `kind`, and the light it makes. Each hero has a PowerSet;
@@ -31,7 +32,7 @@ const STRIKE_WAIT = 0.45;
 const SHADE_REACH = 15, SHADE_EVERY = 0.8;
 const TRAIL_EVERY = 3;       // tiles between patches of a fiery trail
 const SOLID_STEP = 1.5;      // tiles between checks along a dash
-const CAST_POSE = { bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam', pillar: 'slam', slab: 'throw', surf: 'dash', mail: 'gather', garden: 'slam', sand: 'slam', rift: 'slam', mountain: 'gather', ironbend: 'peak', magma: 'slam', gather: 'peak', thunder: 'peak', step: 'dash', spear: 'throw', railgun: 'gather', current: 'gather', cyclone: 'peak', magnet: 'peak', plasma: 'punch', fist: 'punch', ignite: 'peak', jet: 'dash', flare: 'slam', serpent: 'punch', inferno: 'peak', blue: 'punch', meteor: 'peak', sunlance: 'punch', supernova: 'slam', forge: 'gather', armor: 'gather', hail: 'peak', prison: 'punch', rime: 'slam', mirror: 'gather', glacier: 'slam', sea: 'slam' };
+const CAST_POSE = { bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam', pillar: 'slam', slab: 'throw', surf: 'dash', mail: 'gather', garden: 'slam', sand: 'slam', rift: 'slam', mountain: 'gather', ironbend: 'peak', magma: 'slam', gather: 'peak', thunder: 'peak', step: 'dash', spear: 'throw', railgun: 'gather', current: 'gather', cyclone: 'peak', magnet: 'peak', plasma: 'punch', fist: 'punch', ignite: 'peak', jet: 'dash', flare: 'slam', serpent: 'punch', inferno: 'peak', blue: 'punch', meteor: 'peak', sunlance: 'punch', supernova: 'slam', forge: 'gather', armor: 'gather', hail: 'peak', prison: 'punch', rime: 'slam', mirror: 'gather', glacier: 'slam', sea: 'slam', rise: 'gather', command: 'peak', swap: 'dash', lance: 'punch', tide: 'punch', burst: 'slam', gate: 'gather', amalgam: 'gather', reap: 'peak' };
 const STATUS_COLORS = { burn: ['#ff9a3a', '#ff5a2a', '#ffd070'], freeze: ['#dff4ff', '#8fe0ff'], shock: ['#fff4b0', '#ffe25a'] };
 const GLOWS = 160, PILLARS = 20, DISCS = 12, BOLTS = 18, CRYSTALS = 60, ROCKS = 60, SHELLS = 16, HOLES = 6;
 const SKY = 46;              // tiles up that falling things start

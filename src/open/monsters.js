@@ -145,6 +145,7 @@ export default class Monsters {
     // Evolved monsters teach more and drop more.
     this.work.skills.add('fighting', (COMBAT.xp.kill[roleName(e)] ?? 2) * (1 + e.tier * COMBAT.xp.tier) * (e.elder ? 2 : 1));
     this.work.actor?.wrath?.gain(COMBAT.wrath.kill);
+    this.work.actor?.powers?.kitDef?.killed?.(this.work.actor.powers, e); // a Gravecaller's kills leave Husks
     const drops = {};
     for (const { item, chance } of e.def.drops) if (Math.random() < chance * (1 + e.tier * 0.4)) drops[item] = 1 + Math.floor(e.tier / 2);
     this.work.give(drops);

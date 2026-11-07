@@ -85,7 +85,7 @@ export default class Player {
       else if (skill.power) hud.message(`${skill.name} reached rank ${level + 1}!`, true);
       else if (raw.id === 'jumping' && level === JUMP_MAX && conq?.flight) hud.message('Jumping has evolved into Flight! Jump and hold X to fly.', true, 5000);
       else if (raw.id === 'punching' && level === 5 && conq?.blow) hud.message('Punching has evolved into Destructive Blow! Hold Triangle, then let go.', true, 5000);
-      else if (raw.id === 'running' && level === RUN_MAX && conq?.superspeed) hud.message('Running has evolved into Superspeed! While sprinting, press sprint again.', true, 5000);
+      else if (raw.id === 'running' && level === RUN_MAX && conq?.superspeed) hud.message('Running has evolved into the Shade Run! While sprinting, press sprint again.', true, 5000);
       else if (level === 1) hud.message(`You learned ${skill.name}! See your Spirit Tree.`, true);
       else hud.message(`${skill.name} improved: ${skill.levels[level - 1].title}`, true);
     }, (name, value) => hud.gain(ATTRIBUTES[name], value), `${save}skills`);

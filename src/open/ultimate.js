@@ -115,6 +115,9 @@ const ULTIMATES = {
       u.rift = { x: state.x - (state.dir[0] / len) * 7, z: state.z - (state.dir[1] / len) * 7 };
       u.rift.y = u.ground(u.rift.x, u.rift.z) + 6;
       u.world.fx.hole(u.rift.x, u.rift.y, u.rift.z, 6, this.secs);
+      // Everyone in the Hollow pours out for twenty seconds, and everything killed meanwhile rises too.
+      const n = u.p.powers.kitDef?.openHollow?.(u.p.powers, u.rift.x, u.rift.z, 20) ?? 0;
+      if (n) u.p.hud.message(`The Hollow opens: ${n} pour out.`, true, 2500);
       u.pose('gather');
     },
     tick(u, t, dt) {

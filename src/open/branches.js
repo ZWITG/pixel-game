@@ -24,9 +24,9 @@ export const BRANCHES = {
   void: {
     drop: ['swimming', 'climbing'],
     list: [
-      B('legion', 'Legion', '#b06aff', 'The fallen who answer you, and how many.', ['shades', 'reap'], ['fighting', 'void.harvest']),
-      B('dominion', 'Dominion', '#8a5ad8', 'Command over the dead: draining and binding.', ['drain', 'rift'], ['mining', 'woodcutting']),
-      B('hollow', 'Hollow', '#d08aff', 'Your own void craft: blades of shadow and the Shade Run.', ['step', 'rend', 'lance', 'veil'], ['running', 'superspeed', 'jumping', 'punching']),
+      B('legion', 'Legion', '#b06aff', 'The fallen who answer you, and how many: Rise, the Hollow Gate, Amalgam.', ['rend', 'gate', 'amalgam'], ['fighting', 'void.harvest']),
+      B('dominion', 'Dominion', '#8a5ad8', 'Command over the dead: orders, the Grave Tide, Husk Burst, the Reaping Mark.', ['shades', 'veil', 'rift', 'reap'], ['mining', 'woodcutting']),
+      B('hollow', 'Hollow', '#d08aff', 'Your own void craft: the Soul Lance, Soul Drain, the Shade Swap and the Shade Run.', ['step', 'lance', 'drain'], ['running', 'superspeed', 'jumping', 'punching']),
     ],
   },
   ember: {

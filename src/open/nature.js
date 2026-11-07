@@ -50,6 +50,7 @@ export const NATURES = {
       jumping: ['Blinking', 'Flicker', 'Blink', 'Slip', 'Rift Hopper', 'Nowhere'],
       swimming: ['Drowning', 'Still Lungs', 'Nothing to Breathe', 'Deep Shade', 'Abyss Walker', 'Drowned God'],
       climbing: ['Phasing', 'Cold Grip', 'Phase Grip', 'Stone Ghost', 'Wallwalker', 'Through All'],
+      superspeed: ['Shade Run', 'Quick Shade', 'Shade Glide', 'Shade on Water', 'Shade Storm', 'Gone Before Seen'],
     },
     discipline: { id: 'void.harvest', name: 'Harvest', icon: 'skull', taught: 'Take lives', per: 0.015, text: 'Every kill gives some of its life to you.' },
     twists: [
