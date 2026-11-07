@@ -2,7 +2,8 @@
 // blow (Melee.force) against foes of the hero's own level, the way ROLES is defined, and fails
 // (exit code 1) if anything lands outside its target. Run it before committing combat changes.
 import { COMBAT, smashFor } from '../src/open/combat.js';
-import { ROLES } from '../src/open/evolve.js';
+import { ROLES, tierFor } from '../src/open/evolve.js';
+import { SKILLS, paceAt } from '../src/open/skills.js';
 
 const BLOW = 1.3;                  // evolve.js: a foe's health is role.hits of these
 const PUNCH = 0.34;                // body.punchTime at Strength 10
@@ -66,6 +67,25 @@ const perString = A.spirit;
 check(COMBAT.cost.vanish / perString >= 1 && COMBAT.cost.vanish / perString <= 3, `a Vanish costs ${(COMBAT.cost.vanish / perString).toFixed(1)} strings of hits`);
 check(COMBAT.spirit.perfect >= COMBAT.cost.vanish, 'a Perfect parry pays for a Vanish');
 check(COMBAT.cost.breakout <= COMBAT.spirit.pips / 2, 'a Breakout costs at most half the bar');
+
+// Levelling: how many fighter kills one level takes, now and with the old rules (v0.31.0).
+console.log('\nLevelling (fighter kills per hero level, about 7 blows a kill)');
+const BLOWS = 7, trains = (id, name) => SKILLS[id].trains[name] ?? 0;
+const perKill = (level, old) => {
+  const tier = tierFor(level), punching = BLOWS, fighting = old ? BLOWS + 3 * (1 + tier) : BLOWS * COMBAT.xp.hit + COMBAT.xp.kill.fighter * (1 + tier * COMBAT.xp.tier);
+  const pace = old ? 1 : paceAt(level), d = (name) => (punching * trains('punching', name) + fighting * trains('fighting', name)) * pace;
+  const mass = d('strength') * 1.5 + d('endurance') * 1.2 + fighting * pace * 0.3;
+  return mass / 18 + d('speed') / 10;
+};
+console.log('  level   kills now   kills before');
+const kills = {};
+for (const level of [1, 5, 10, 20, 40, 80, 128]) {
+  kills[level] = 1 / perKill(level, false);
+  console.log(`  ${String(level).padStart(5)}${kills[level].toFixed(1).padStart(12)}${(1 / perKill(level, true)).toFixed(1).padStart(15)}`);
+}
+check(kills[1] >= 4 && kills[1] <= 12, 'the first levels take a handful of fights');
+check(kills[20] >= 25, 'by level 20 a level takes dozens of kills');
+check(kills[80] >= 80, 'by level 80 a level takes a long campaign');
 
 console.log(failed ? `\n${failed} check(s) failed.` : '\nAll checks passed.');
 process.exit(failed ? 1 : 0);

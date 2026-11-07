@@ -44,7 +44,7 @@ export default class Body {
   // spreads shockwaves, softens hits and shrugs off knockback, and the hero visibly grows.
   get massScale() { return this.mass / 60; }
   // The hero's level: their whole build, before gear. Monsters evolve against it.
-  get level() { return 1 + Math.floor((this.skills.attribute('mass') - 60) / 18 + (this.speed - 10) / 10); }
+  get level() { return this.skills.heroLevel(); }
   get heroScale() { return (1 + Math.min(0.6, (this.mass - 60) * 0.004)) * (this.conq?.size ?? 1); }
   // Heavy enough, and just landing from a jump shakes the ground. Tiles of reach, 0 for none.
   get stompReach() { return Math.max(0, (this.mass - 90) * 0.06); }

@@ -152,6 +152,11 @@ for (const [id, skill] of Object.entries(SKILLS)) skill.id = id;
 export const ATTRIBUTE_START = 10;
 // Mass isn't trained directly: it builds on a stronger, tougher body and on time spent fighting.
 const MASS = { start: 60, strength: 1.5, endurance: 1.2, fighting: 0.3 };
+// The body grows ever slower as the hero rises: practice still earns skill levels and power ranks
+// at full rate, but only 1 / (1 + (level - 1) / LEVEL_PACE) of it builds Strength, Speed, Endurance
+// and Mass, which are what the hero's level is made of. Raise LEVEL_PACE to level faster.
+export const LEVEL_PACE = 3;
+export const paceAt = (level) => 1 / (1 + Math.max(0, level - 1) / LEVEL_PACE);
 const SAVE_EVERY = 2000; // ms; practice ticks every frame
 
 export default class Skills {
@@ -162,10 +167,14 @@ export default class Skills {
     this.onLevel = onLevel;
     this.onGain = onGain;
     this.practice = {};
+    this.trained = null;       // the share of practice that went into the body (see LEVEL_PACE)
     this.savedAt = 0;
     try {
       this.practice = JSON.parse(localStorage.getItem(saveKey)) ?? {};
+      this.trained = JSON.parse(localStorage.getItem(`${saveKey}.trained`));
     } catch { /* no saved skills: start fresh */ }
+    // Saves from before v0.31.1 put all practice into the body, so the hero keeps the level they had.
+    this.trained ??= { ...this.practice };
     // Practice saves every couple of seconds; this catches the last of it when the page goes.
     addEventListener('pagehide', () => this.save());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.save(); });
@@ -176,20 +185,26 @@ export default class Skills {
     return SKILLS[id].levels.filter((l) => p >= l.at).length;
   }
 
-  // Attributes are worked out from practice, so they can never drift from what you've done.
+  // Attributes are worked out from trained practice, so they can never drift from what you've done.
   attribute(name) {
     if (name === 'mass') {
       return MASS.start + (this.attribute('strength') - ATTRIBUTE_START) * MASS.strength
-        + (this.attribute('endurance') - ATTRIBUTE_START) * MASS.endurance + (this.practice.fighting ?? 0) * MASS.fighting;
+        + (this.attribute('endurance') - ATTRIBUTE_START) * MASS.endurance + (this.trained.fighting ?? 0) * MASS.fighting;
     }
     let value = ATTRIBUTE_START;
-    for (const [id, skill] of Object.entries(SKILLS)) value += (this.practice[id] ?? 0) * (skill.trains[name] ?? 0);
+    for (const [id, skill] of Object.entries(SKILLS)) value += (this.trained[id] ?? 0) * (skill.trains[name] ?? 0);
     return value;
+  }
+
+  // The hero's level: their whole build, before gear. Monsters evolve against it.
+  heroLevel() {
+    return 1 + Math.floor((this.attribute('mass') - MASS.start) / 18 + (this.attribute('speed') - ATTRIBUTE_START) / 10);
   }
 
   add(id, amount) {
     const skill = SKILLS[id], before = this.level(id);
     const whole = [...Object.keys(skill.trains), 'mass'].map((a) => [a, Math.floor(this.attribute(a))]);
+    this.trained[id] = (this.trained[id] ?? 0) + amount * paceAt(this.heroLevel());
     this.practice[id] = (this.practice[id] ?? 0) + amount;
     const after = this.level(id);
     if (after > before) this.onLevel(skill, after);
@@ -204,6 +219,7 @@ export default class Skills {
     this.savedAt = performance.now();
     try {
       localStorage.setItem(this.saveKey, JSON.stringify(this.practice));
+      localStorage.setItem(`${this.saveKey}.trained`, JSON.stringify(this.trained));
     } catch { /* private window: skills last this session only */ }
   }
 

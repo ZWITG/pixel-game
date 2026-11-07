@@ -143,7 +143,7 @@ export default class Monsters {
     if (hero?.state && this.list.length > 1 && !this.within(hero.state.x, hero.state.z, 45).length) this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.slow.last);
     this.work.actor?.nature.killed();
     // Evolved monsters teach more and drop more.
-    this.work.skills.add('fighting', 3 * (1 + e.tier));
+    this.work.skills.add('fighting', (COMBAT.xp.kill[roleName(e)] ?? 2) * (1 + e.tier * COMBAT.xp.tier) * (e.elder ? 2 : 1));
     const drops = {};
     for (const { item, chance } of e.def.drops) if (Math.random() < chance * (1 + e.tier * 0.4)) drops[item] = 1 + Math.floor(e.tier / 2);
     this.work.give(drops);
@@ -255,7 +255,7 @@ export default class Monsters {
     if (e.heldBy) e.heldBy.melee.drop();
     e.takeHit(Math.round(force * this.work.actor.nature.edge(e) * 10) / 10, x, z);
     e.recoil = 1;
-    this.work.skills.add('fighting', 1);
+    this.work.skills.add('fighting', COMBAT.xp.hit);
     this.wear(e, posture);
     if (e.boss) {
       // Far too big to knock about. It only reels from a parry, or when its Structure breaks.

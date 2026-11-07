@@ -55,6 +55,9 @@ export const COMBAT = {
   stop: { light: 0.04, smash: 0.08, execute: 0.18, perfect: 0.14 },
   slow: { last: 0.7, execute: 0.4, vanish: 0.25 },
   impact: 0.06,         // seconds of an anime impact frame
+  // Fighting practice: a little for each blow that lands (anything a wave reaches counts), more for
+  // a kill, by role, a little more for evolved forms. See LEVEL_PACE in skills.js for the body.
+  xp: { hit: 0.3, kill: { fodder: 1.5, fighter: 2.5, brute: 4, machine: 2, ruler: 25 }, tier: 0.25 },
 };
 
 export const ROLE_POSTURE = (role) => COMBAT.posture[role] ?? COMBAT.posture.fighter;
