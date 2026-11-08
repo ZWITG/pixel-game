@@ -13,6 +13,7 @@ import { machineMesh, DOCTRINES } from './doctrines.js';
 import { arm, stagger, standDown, TURN_TAKERS, GUARDERS } from './foes.js';
 import { rumble } from './rumble.js';
 import Tells from './tells.js';
+import { animateFoe } from './foeAnim.js';
 import { FEATURES } from '../config/features.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
 import { nearSolids } from './solidGrid.js';
@@ -634,6 +635,7 @@ export default class Monsters {
       // Knocked flat, or swaying on its feet while Broken.
       if (e.downUntil > this.time && !e.dying) e.model.root.rotation.x = -1.3 * Math.min(1, (e.downUntil - this.time) * 4);
       e.model.root.rotation.z = e.brokenUntil > this.time && !e.dying ? Math.sin(this.time * 13) * 0.16 : 0;
+      animateFoe(e, this.time);
       if (e.air > 0 || e.rise > 0) {
         // Mid-combo it hangs where it was struck.
         if (e.hang > this.time) e.rise = 0;

@@ -52,6 +52,7 @@ export const FEATURES = {
   armies: true,         // open world: nation armies and coalitions at Calamity and Omega: march, squads, morale, Commander, supply, truce (armies.js)
   impactFrames: true,   // open world: two-tone ink frames on smashes and Perfect parries (also a Settings switch)
   rally: true,          // open world: grey health a blow took, won back by hitting back, blocking or parrying (melee.js)
+  foeAnim: true,        // open world: foes wind up, swing through, recover, reel and slump with their whole body (foeAnim.js)
   heroClips: true,      // open world: keyframed attack animations for the hero: wind-up, strike, follow-through (heroClips.js)
   foeGuard: true,       // open world: human fighters raise a guard against light hits; smash it, get behind it, or parry its counter (monsters.js)
   clashes: true,        // open world: a smash meeting a foe's strike locks you together; mash Square to win (melee.js)
