@@ -139,7 +139,7 @@ function think(monsters, e, t) {
     strike(monsters, e, m);
     if (t < e.until) return;
     e.vel.set(0, 0);
-    if (e.left > 0 && !e.landed) {
+    if (e.left > 0 && !e.landed && !e.foe?.melee?.finishing) {
       e.left--;
       setMode(e, 'tell', m.tell * 0.6, t);
       return;
@@ -160,7 +160,7 @@ function think(monsters, e, t) {
   }
   e.mode = 'hunt';
   const move = !e.turn && dist < PRESS + e.radius + TURN_REACH ? monsters.takeTurn(e) : e.turn;
-  if (move) {
+  if (move && !e.foe?.melee?.finishing) {
     e.turn = true;
     const pick = pickMove(e, dist);
     if (pick) {

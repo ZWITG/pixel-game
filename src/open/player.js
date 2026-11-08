@@ -30,6 +30,7 @@ const GRAVITY = 22;
 const CLIMB_START = 0.45; // slopes steeper than this count as climbing practice
 const TURN_WITH_MOVE = 0.4; // radians per second the camera eases round when walking sideways
 const LOOK_RESPECT = 1.2;    // seconds after the player steers the camera before it eases again
+const FINISH_SIDE = 0.85;     // radians round from behind the hero the camera watches a finisher from
 const DUEL_EDGE = 0.55, DUEL_BEHIND = 2.2, DUEL_TURN = 1.3; // radians off-centre the duel camera starts easing, gives up, and radians a second
 const REGEN_DELAY = 6, REGEN = 2; // seconds out of a fight, then health per second
 const JUMP_MAX = 5;          // the Jumping level that opens Flight
@@ -174,7 +175,7 @@ export default class Player {
     const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.animals?.spot(this) ?? world.events?.spot(this) ?? world.fairs?.spot(this) ?? world.roadside?.spot(this) ?? world.caravans.spot(this) ?? world.people.spot(this) ?? world.caravans.market(this);
     // With Destructive Blow, the button waits to see if it's a tap or a hold (see updateCharge).
     // While an ultimate plays the hero does nothing else.
-    const fights = (!rooms.house || rooms.house.hostile) && !this.wrath.ult;
+    const fights = (!rooms.house || rooms.house.hostile) && !this.wrath.ult && !melee.finishing;
     // L1 held is the Spirit shift: Square and Triangle become Spirit Arts, and R1 waits on the ultimate.
     const shift = !!(this.controls.padHeld.L1 || this.controls.held.has('KeyQ'));
     // On horseback: Circle gets you down. Anywhere: the whistle calls your horse.
@@ -431,8 +432,11 @@ export default class Player {
       state.x += melee.rollDir[0] * ROLL_SPEED * scale * dt;
       state.z += melee.rollDir[1] * ROLL_SPEED * scale * dt;
     }
-    // Locked on, the camera keeps the enemy in view.
-    if (melee.lock && !world.together) {
+    // A paired finisher: the camera swings round to watch it from the side.
+    if (melee.finishing && !world.together) {
+      const e = melee.finishing.e, want = Math.atan2(state.x - e.x, state.z - e.z) + FINISH_SIDE, diff = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
+      state.yaw += diff * Math.min(1, dt * 5);
+    } else if (melee.lock && !world.together) {
       const want = Math.atan2(state.x - melee.lock.x, state.z - melee.lock.z), diff = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
       state.yaw += diff * Math.min(1, dt * 7);
       if (!state.moving && melee.rolling <= 0) state.dir = [melee.lock.x - state.x, melee.lock.z - state.z];

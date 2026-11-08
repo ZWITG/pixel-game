@@ -4,6 +4,7 @@ import { SPAWN_CLEAR } from './work.js';
 import { FEATURES } from '../config/features.js';
 import { COMBAT, smashFor, clampSpirit, parryWear } from './combat.js';
 import { rumble } from './rumble.js';
+import { stagger } from './foes.js';
 
 // Punching. Square throws a five-hit rush chain anywhere, at anything; Triangle branches it into a
 // smash (see combat.js). The punch itself grows in
@@ -51,6 +52,18 @@ const SLAM_FORCE = 2.5;
 const THROW_BLAST = 7;       // tiles
 const DIVE = 46;             // tiles per second straight down
 const LOCK_FAR = 70;
+// Paired finishers (v0.46.0): Triangle on a Broken foe up close plays one of these, in seconds from the seize.
+// `pose` is the hero's, `hit` a beat that lands (a flash and a jolt, no damage), `rise` a leap, `fall` a dive back
+// down, `end` the Execute itself (all its damage and rewards, thrown the way `react` says).
+const FINISHERS = {
+  quick: [{ at: 0, pose: 'windup' }, { at: 0.2, pose: 'kick', end: true, react: 'fly' }],
+  rush: [{ at: 0, pose: 'hold' }, { at: 0.24, pose: 'punch', arm: 0, hit: true }, { at: 0.42, pose: 'punch', arm: 1, hit: true }, { at: 0.62, pose: 'windup' }, { at: 0.74, pose: 'uppercut', end: true, react: 'launch' }],
+  reap: [{ at: 0, pose: 'hold' }, { at: 0.26, pose: 'sweep', hit: true }, { at: 0.5, pose: 'gather' }, { at: 0.7, pose: 'slam', end: true, react: 'bounce' }],
+  giant: [{ at: 0, pose: 'gather' }, { at: 0.2, pose: 'rising', rise: 15 }, { at: 0.55, pose: 'punch', arm: 0, hit: true }, { at: 0.68, pose: 'slam', fall: true }, { at: 0.8, pose: 'slam', end: true, react: 'knockdown' }],
+};
+const FINISH_AFTER = 0.28;   // seconds the last pose holds after the Execute
+const FINISH_GAP = 1.1;      // tiles between the hero and the foe's edge while it plays
+const FINISH_SLIDE = 0.12;   // seconds to close in at the start
 const DUEL_REACH = 16;       // tiles: foes this close and fighting the hero count toward the duel camera
 const BAR_TIME = 3;          // seconds an enemy's health bar stays up after a hit
 const WHITE = new THREE.Color('#ffffff');
@@ -137,6 +150,8 @@ export default class Melee {
     this.parryRow = 0;         // parries in a row (a hit taken or a long gap ends it)
     this.duel = { foe: null, count: 0 }; // read by the duel camera
     this.closeUp = 0;          // seconds the camera leans in after an Execute or a Perfect parry
+    this.finishing = null;     // a paired finisher playing: { e, seq, t, next, ... }
+    this.finishTurn = 0;       // alternates the two mid-size finishers
     this.parryAt = -9;
     this.rallyAt = -9;
     this.counterBy = 1;
@@ -209,6 +224,7 @@ export default class Melee {
 
   // Square: the next light hit of the rush chain, on the ground or in the air.
   punch(state) {
+    if (this.finishing) return undefined;
     if (this.active) {
       this.queued = 'light'; // remembered, so mashing Square keeps the chain going
       return;
@@ -232,6 +248,7 @@ export default class Melee {
 
   // Triangle: a smash, which one depending on how far the chain has come; on a Broken foe, an Execute.
   heavy(state) {
+    if (this.finishing) return;
     if (this.active) {
       this.queued = 'heavy';
       return;
@@ -243,6 +260,7 @@ export default class Melee {
     if (this.idle >= COMBAT.chainWindow && !air) this.restart();
     const close = target?.def && Math.hypot(target.x - state.x, target.z - state.z) - target.radius < COMBAT.homing;
     const name = !air && close && target.brokenUntil > t ? 'execute' : smashFor(this.hits, air);
+    if (name === 'execute' && FEATURES.finishers && !this.player.rooms.house) return this.finish(state, target);
     const def = COMBAT.smash[name];
     // The chain's last hit kicked the foe away: the Finisher goes after it and lands there.
     const flown = this.chase?.e;
@@ -359,8 +377,85 @@ export default class Melee {
     return PUNCHES[this.stage].power * this.body.damageScale * this.body.massScale * (this.surging ? COMBAT.surge.power : 1) * (this.grounded ? COMBAT.grounded.power : 1);
   }
 
+  // A paired finisher on a Broken foe: the hero seizes it and the two play one of FINISHERS together. The foe is
+  // held dazed in place, the hero can't be hurt, other foes hold their attacks (foes.js), and the camera comes in
+  // from the side (player.js, main.js duelFrame). The last beat is the Execute, through land() as before.
+  finish(state, e) {
+    const { monsters } = this, crowd = (this.duel?.count ?? 0) >= 4;
+    const big = (e.radius ?? 1) > 1.3 || !!e.def.boss || !!e.watch;
+    const kind = big ? 'giant' : crowd || (monsters.structure(e) <= 3.5) ? 'quick' : (this.finishTurn++ % 2 ? 'reap' : 'rush');
+    const seq = FINISHERS[kind], total = seq[seq.length - 1].at + FINISH_AFTER;
+    const dx = e.x - state.x, dz = e.z - state.z, d = Math.hypot(dx, dz) || 1;
+    this.finishing = { e, kind, seq, t: 0, next: 0, total, fx: dx / d, fz: dz / d, from: [state.x, state.z], pose: { move: 'windup', arm: 0 } };
+    this.active = null;
+    this.queued = false;
+    this.guarding = false;
+    this.armored = true;
+    this.player.guard = Math.max(this.player.guard, total + 0.3);
+    this.closeUp = total + 0.3;
+    state.dir = [dx / d, dz / d];
+    stagger(e, total + 0.5, monsters.time, true);
+    e.vel.set(0, 0);
+    this.player.world.watchers?.saw(this.player, 'smash', this.hits);
+    this.work.slow = Math.max(this.work.slow ?? 0, 0.12);
+    rumble(this.player, 'jab');
+    return true;
+  }
+
+  updateFinish(dt, state) {
+    const f = this.finishing;
+    if (!f) return;
+    const { e } = f;
+    if (e.dying || !this.monsters.list.includes(e)) {
+      this.endFinish();
+      return;
+    }
+    f.t += dt;
+    // Close in, then stay face to face with it.
+    const k = Math.min(1, f.t / FINISH_SLIDE), off = (e.radius ?? 1) + FINISH_GAP;
+    const tx = e.x - f.fx * off, tz = e.z - f.fz * off;
+    state.x = f.from[0] + (tx - f.from[0]) * k;
+    state.z = f.from[1] + (tz - f.from[1]) * k;
+    state.dir = [f.fx, f.fz];
+    e.vel.set(0, 0);
+    while (f.next < f.seq.length && f.t >= f.seq[f.next].at) this.beat(f, f.seq[f.next++], state);
+    if (f.t >= f.total) this.endFinish();
+  }
+
+  beat(f, b, state) {
+    const { e } = f, y = e.group.position.y + 1.4;
+    f.pose = { move: b.pose, arm: b.arm ?? 0 };
+    if (b.rise) {
+      state.rise = b.rise;
+      state.air = Math.max(state.air, 0.01);
+    }
+    if (b.fall) {
+      state.rise = Math.min(state.rise, -45);
+      this.soft = true; // the Execute is the landing; no stomp on top of it
+    }
+    if (b.hit) {
+      e.flashUntil = this.monsters.time + 0.08;
+      this.work.burst(e.x - f.fx * (e.radius ?? 1), y + Math.max(0, state.air * 0.5), e.z - f.fz * (e.radius ?? 1), ['#ffffff', this.aura, '#ffd24a'], 14, 5);
+      this.work.stop = Math.max(this.work.stop ?? 0, 0.05);
+      this.work.shake = Math.max(this.work.shake, 0.14);
+      rumble(this.player, 'finisher');
+    }
+    if (b.end) {
+      const def = COMBAT.smash.execute;
+      const a = { kind: 'smash', name: 'execute', power: def.power, chain: 4, time: def.time, hitAt: 0, target: e, t: 0, fx: f.fx, fz: f.fz, landed: true, react: b.react };
+      this.land(a, state);
+    }
+  }
+
+  endFinish() {
+    this.finishing = null;
+    this.armored = false;
+    this.idle = 0;
+  }
+
   // Rolls toward (x, z) in world terms, or the way the hero is facing.
   roll(state, x, z) {
+    if (this.finishing) return;
     if (this.rolling > 0 || this.rollWait > 0 || state.air || this.active || this.held || this.charging) return;
     const len = Math.hypot(x, z);
     this.rollDir = len > 0.05 ? [x / len, z / len] : (() => {
@@ -518,7 +613,7 @@ export default class Melee {
   }
 
   setGuard(on) {
-    const up = on && this.guardDown <= 0 && this.broken <= 0 && !this.active && !this.held && this.rolling <= 0 && !this.charging;
+    const up = on && !this.finishing && this.guardDown <= 0 && this.broken <= 0 && !this.active && !this.held && this.rolling <= 0 && !this.charging;
     if (up && !this.guarding) this.guardAt = this.clock;
     this.guarding = up;
   }
@@ -795,6 +890,8 @@ export default class Melee {
 
   // For the sprite: null when not punching.
   get pose() {
+    const f = this.finishing;
+    if (f) return { t: f.pose.move === 'windup' ? 0 : 1, chain: 4, arm: f.pose.arm, move: f.pose.move, stage: this.stage, color: PUNCHES[this.stage].color };
     const a = this.active;
     if (!a) return null;
     const arm = a.chain % 2, move = a.kind === 'smash' ? SMASH_POSE[a.name] : a.last && !a.air ? 'kick' : a.air && a.last ? 'uppercut' : 'punch';
@@ -811,7 +908,7 @@ export default class Melee {
     // The end of a chain, and every smash, throws the punch's full wave; a light hit, its plain one.
     const finisher = a.kind === 'smash' || a.last;
     let force = this.force * (smash ? a.power : a.mult);
-    let posture = smash ? smash.posture : 1, react = smash ? smash.react : a.last && !a.air ? 'fly' : 'flinch';
+    let posture = smash ? smash.posture : 1, react = a.react ?? (smash ? smash.react : a.last && !a.air ? 'fly' : 'flinch');
     const wpn = this.weapon;
     if (wpn && !a.air) {
       force *= wpn.power;
@@ -1125,6 +1222,7 @@ export default class Melee {
       }
     }
     this.idle += dt;
+    this.updateFinish(dt, state);
     const a = this.active;
     if (a) {
       a.t += dt;

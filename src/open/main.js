@@ -537,8 +537,9 @@ function duelFrame(p, dt, inside) {
     if (want > 0) want *= Math.max(0.2, Math.min(1, 1 - ((foe.radius ?? 1) - 1.2) / 3));
     if (want > 0 && (s.air > HOP || p.melee.hover > 0)) want *= 0.35;
   }
-  const lean = p.melee.closeUp > 0 && want > 0 ? DUEL_LEAN : 0;
-  const rate = want > (p.camDuel ?? 0) ? DUEL_IN : want < 0 ? DUEL_OUT_CROWD : DUEL_OUT;
+  if (p.melee.finishing && !inside && !world.together && settings.duelCam !== false) want = Math.max(want, 0.55);
+  const lean = p.melee.closeUp > 0 && want > 0 ? DUEL_LEAN * (p.melee.finishing ? 1.2 : 1) : 0;
+  const rate = want > (p.camDuel ?? 0) ? (p.melee.finishing ? DUEL_IN * 3 : DUEL_IN) : want < 0 ? DUEL_OUT_CROWD : DUEL_OUT;
   p.camDuel = (p.camDuel ?? 0) + (want - (p.camDuel ?? 0)) * Math.min(1, dt * rate);
   p.camLean = (p.camLean ?? 0) + (lean - (p.camLean ?? 0)) * Math.min(1, dt * (lean ? 8 : 2.5));
   const k = p.camDuel, close = Math.max(0, k);
