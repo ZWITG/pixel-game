@@ -175,7 +175,8 @@ export default class Player {
     const spot = rooms.house ? rooms.spot(state) : door ? { label: 'Enter', action: 'enter', house: door } : world.sites.spot(this) ?? world.animals?.spot(this) ?? world.events?.spot(this) ?? world.fairs?.spot(this) ?? world.roadside?.spot(this) ?? world.caravans.spot(this) ?? world.people.spot(this) ?? world.caravans.market(this);
     // With Destructive Blow, the button waits to see if it's a tap or a hold (see updateCharge).
     // While an ultimate plays the hero does nothing else.
-    const fights = (!rooms.house || rooms.house.hostile) && !this.wrath.ult && !melee.finishing;
+    const fights = (!rooms.house || rooms.house.hostile) && !this.wrath.ult && !melee.staged;
+    if (melee.clashing && just.punch) melee.pushClash();
     // L1 held is the Spirit shift: Square and Triangle become Spirit Arts, and R1 waits on the ultimate.
     const shift = !!(this.controls.padHeld.L1 || this.controls.held.has('KeyQ'));
     // On horseback: Circle gets you down. Anywhere: the whistle calls your horse.
@@ -433,8 +434,8 @@ export default class Player {
       state.z += melee.rollDir[1] * ROLL_SPEED * scale * dt;
     }
     // A paired finisher: the camera swings round to watch it from the side.
-    if (melee.finishing && !world.together) {
-      const e = melee.finishing.e, want = Math.atan2(state.x - e.x, state.z - e.z) + FINISH_SIDE, diff = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
+    if (melee.staged && !world.together) {
+      const e = melee.staged.e, want = Math.atan2(state.x - e.x, state.z - e.z) + FINISH_SIDE, diff = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
       state.yaw += diff * Math.min(1, dt * 5);
     } else if (melee.lock && !world.together) {
       const want = Math.atan2(state.x - melee.lock.x, state.z - melee.lock.z), diff = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));

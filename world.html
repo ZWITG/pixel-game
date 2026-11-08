@@ -527,7 +527,16 @@
       #start-list button.at::before { background: var(--brass-hi); box-shadow: 0 0 10px var(--brass); }
       .pick-side h1, .pick-side h2 { font-family: var(--serif); font-weight: 800; letter-spacing: 0.05em; }
       [hidden] { display: none !important; }
-    </style>
+          /* Weapon clash (v0.48.0): the struggle bar, in the War banner style. */
+      #clash { position: fixed; left: 50%; bottom: 13%; width: 320px; transform: translateX(-50%); text-align: center; pointer-events: none; color: var(--cloth, #f3ead8); font: 700 13px var(--serif, serif); letter-spacing: 0.12em; text-transform: uppercase; text-shadow: 0 1px 0 #000; }
+      #clash b { display: block; font-size: 22px; color: var(--brass, #d8b060); margin-bottom: 4px; animation: tell 0.12s infinite alternate; }
+      #clash .bar { height: 14px; padding: 3px; background: #0d0a09; box-shadow: var(--frame, 0 0 0 1px #d8b06088); position: relative; }
+      #clash .bar::after { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--brass, #d8b060); }
+      #clash .bar i { display: block; height: 100%; width: 50%; background: linear-gradient(#fff1cf, #e8b84a 55%, #8f6a24); transition: width 0.06s linear; }
+      #clash.losing .bar i { background: linear-gradient(#ffb0a0, #e8505a 55%, #8a1420); }
+      #clash span { display: block; margin-top: 5px; font-size: 12px; }
+      body.title #clash, body.in-menu #clash { display: none; }
+</style>
   </head>
   <body>
     <div id="splash">
@@ -566,6 +575,7 @@
     <div id="foe" hidden><div id="foe-name"></div><div id="foe-bar"><div id="foe-fill"></div></div><div id="foe-post" class="foe-post"><u></u></div></div>
     <div id="p2-foe" hidden><div id="p2-foe-name"></div><div id="p2-foe-bar"><div id="p2-foe-fill"></div></div><div id="p2-foe-post" class="foe-post"><u></u></div></div>
     <div id="threats" class="threats p1"></div>
+    <div id="clash" hidden><b>Clash</b><div class="bar"><i></i></div><span>Mash □</span></div>
     <div id="p2-threats" class="threats p2"></div>
     <div id="lv"></div>
     <div id="goal"></div>

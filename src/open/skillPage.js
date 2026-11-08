@@ -198,6 +198,17 @@ export default class WorldHud {
     });
   }
 
+  // The clash bar: `k` 0..1 (yours from the left), or null to hide it.
+  setClash(k, device) {
+    const el = this.$('clash');
+    if (!el) return;
+    put(el, 'hidden', k === null, (v) => { el.hidden = v; });
+    if (k === null) return;
+    width(el.querySelector('i'), k);
+    toggle(el, 'losing', k < 0.35);
+    put(el, 'device', device, (v) => { el.querySelector('span').textContent = v === 'pad' ? 'Mash \u25a1' : 'Mash J'; });
+  }
+
   // Rally: the grey stretch after the health that hitting back wins back. Both 0..1 of max health.
   setRally(health, rally) {
     const el = this.$('hp-rally');

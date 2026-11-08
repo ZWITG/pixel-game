@@ -49,6 +49,12 @@ export const COMBAT = {
   // Riposte (v0.47.0): after a Perfect parry, Square within `window` seconds (the world slowed for `slow`)
   // strikes back up close: the Riposte smash (doubled by the counter) plus `base` + `share` of the foe's Structure.
   riposte: { window: 0.65, slow: 0.45, base: 2, share: 0.12 },
+  // Weapon clashes (v0.48.0): a smash meeting a foe's strike locks the two together. The bar starts at `start`;
+  // each Square press adds `press`, the foe pushes back `push[role]` a second; full wins, empty loses, and after
+  // `secs` whoever is ahead wins. Won: `base` + `share` of the foe's Structure, a counter, `spirit` pips. Lost:
+  // `hurt` of the foe's blow and a dented guard. `every`: seconds before the same hero can clash again.
+  clash: { start: 0.5, press: 0.09, secs: 2.2, base: 2, share: 0.6, spirit: 1, hurt: 0.6, every: 4, stun: 1.2,
+    push: { fodder: 0.15, fighter: 0.3, brute: 0.45, machine: 0.3, ruler: 0.55, watcher: 0.5 } },
   // Parries break Structure (v0.43.0): `base` points plus `share` of the foe's whole Structure, and each parry in a
   // row (within `chainSecs` of the last, no hit taken between) adds `chain` more, up to `chainMost` steps.
   parryPosture: { perfect: 3, plain: 2, share: { perfect: 0.15, plain: 0.07 }, chain: 0.35, chainMost: 3, chainSecs: 3 },

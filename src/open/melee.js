@@ -5,6 +5,7 @@ import { FEATURES } from '../config/features.js';
 import { COMBAT, smashFor, clampSpirit, parryWear } from './combat.js';
 import { rumble } from './rumble.js';
 import { stagger } from './foes.js';
+import { roleName } from './evolve.js';
 
 // Punching. Square throws a five-hit rush chain anywhere, at anything; Triangle branches it into a
 // smash (see combat.js). The punch itself grows in
@@ -154,6 +155,8 @@ export default class Melee {
     this.finishing = null;     // a paired finisher playing: { e, seq, t, next, ... }
     this.finishTurn = 0;       // alternates the two mid-size finishers
     this.riposte = null;       // after a Perfect parry: { e, until } while Square strikes back
+    this.clashing = null;      // a weapon clash: { e, t, k (the bar, 0..1), presses, ... }
+    this.clashAt = -99;
     this.parryAt = -9;
     this.rallyAt = -9;
     this.counterBy = 1;
@@ -226,6 +229,7 @@ export default class Melee {
 
   // Square: the next light hit of the rush chain, on the ground or in the air.
   punch(state) {
+    if (this.clashing) return this.pushClash();
     if (this.finishing) return undefined;
     const r = this.riposte;
     if (r) {
@@ -256,7 +260,7 @@ export default class Melee {
 
   // Triangle: a smash, which one depending on how far the chain has come; on a Broken foe, an Execute.
   heavy(state) {
-    if (this.finishing) return;
+    if (this.staged) return;
     if (this.active) {
       this.queued = 'heavy';
       return;
@@ -466,9 +470,118 @@ export default class Melee {
     this.idle = 0;
   }
 
+  // A finisher or a clash: foes hold back, inputs wait, the camera comes in from the side.
+  get staged() {
+    return this.finishing ?? this.clashing;
+  }
+
+  // Can this blow meet that foe's in a clash? A smash, against a foe mid-strike (or a breath from it), face to face.
+  clashable(a, e) {
+    if (!FEATURES.clashes || !e?.def || e.dying || e.def.keepAway || e.def.machine || e.brokenUntil > this.monsters.time) return false;
+    if (a.kind !== 'smash' || a.name === 'execute' || a.name === 'riposte' || a.air || this.player.rooms.house) return false;
+    if (this.clock - this.clashAt < COMBAT.clash.every || this.staged) return false;
+    const striking = e.mode === 'strike' || e.mode === 'charging' || (e.mode === 'tell' && e.until - this.monsters.time < 0.15);
+    return striking && e.foe === this.player && Math.hypot(e.x - this.player.state.x, e.z - this.player.state.z) - (e.radius ?? 1) < COMBAT.homing + 1;
+  }
+
+  startClash(e, state) {
+    const { clash } = COMBAT, dx = e.x - state.x, dz = e.z - state.z, d = Math.hypot(dx, dz) || 1;
+    this.clashing = { e, t: 0, k: clash.start, presses: 0, sparkIn: 0, fx: dx / d, fz: dz / d, push: clash.push[roleName(e)] ?? clash.push.fighter };
+    this.clashAt = this.clock;
+    this.active = null;
+    this.queued = false;
+    this.guarding = false;
+    this.armored = true;
+    this.player.guard = Math.max(this.player.guard, clash.secs + 0.4);
+    this.closeUp = clash.secs + 0.3;
+    stagger(e, clash.secs + 0.3, this.monsters.time, true);
+    e.vel.set(0, 0);
+    e.left = 0;
+    const y = e.group.position.y + 1.5;
+    this.hud.float('Clash!', (state.x + e.x) / 2, y + 2.5, (state.z + e.z) / 2, '#ffd24a');
+    this.work.burst((state.x + e.x) / 2, y, (state.z + e.z) / 2, ['#ffffff', '#ffd24a', this.aura], 30, 9);
+    this.work.stop = Math.max(this.work.stop ?? 0, 0.12);
+    this.work.shake = Math.max(this.work.shake, 0.3);
+    this.work.impact = COMBAT.impact;
+    rumble(this.player, 'guardBroken');
+  }
+
+  // Square during a clash: push the bar your way.
+  pushClash() {
+    const c = this.clashing;
+    if (!c) return;
+    c.k = Math.min(1, c.k + COMBAT.clash.press);
+    c.presses++;
+    rumble(this.player, 'jab', 0.6 + c.k * 0.4);
+    if (c.k >= 1) this.endClash(true, this.player.state);
+  }
+
+  updateClash(dt, state) {
+    const c = this.clashing;
+    if (!c) return;
+    const { e } = c, { clash } = COMBAT;
+    if (e.dying || !this.monsters.list.includes(e)) {
+      this.endClash(null, state);
+      return;
+    }
+    c.t += dt;
+    c.k = Math.max(0, c.k - c.push * dt);
+    // Face to face, leaning in, sparks where they meet.
+    const off = (e.radius ?? 1) + 1;
+    state.x = e.x - c.fx * off;
+    state.z = e.z - c.fz * off;
+    state.dir = [c.fx, c.fz];
+    e.vel.set(0, 0);
+    if ((c.sparkIn -= dt) <= 0) {
+      c.sparkIn = 0.09;
+      const y = e.group.position.y + 1.5;
+      this.work.burst(e.x - c.fx * (e.radius ?? 1) * 1.05, y, e.z - c.fz * (e.radius ?? 1) * 1.05, ['#ffffff', '#ffd24a', c.k > 0.5 ? this.aura : '#ff6a4a'], 6, 4);
+      this.work.shake = Math.max(this.work.shake, 0.06 + Math.abs(c.k - 0.5) * 0.2);
+    }
+    this.hud.setClash?.(c.k, this.player.controls.device);
+    if (c.k >= 1) this.endClash(true, state);
+    else if (c.k <= 0) this.endClash(false, state);
+    else if (c.t >= clash.secs) this.endClash(c.k >= 0.5, state);
+  }
+
+  // `won`: true, false, or null when the foe is gone.
+  endClash(won, state) {
+    const c = this.clashing;
+    this.clashing = null;
+    this.armored = false;
+    this.idle = 0;
+    this.hud.setClash?.(null);
+    if (won === null || !c) return;
+    const { e } = c, { clash } = COMBAT, y = e.group.position.y;
+    this.player.guard = 0;
+    if (won) {
+      this.hud.float('Clash won!', e.x, y + 4.2, e.z, '#ffffff');
+      this.work.actor = this.player;
+      this.monsters.wear(e, clash.base + clash.share * this.monsters.structure(e));
+      if (!(e.brokenUntil > this.monsters.time)) stagger(e, clash.stun, this.monsters.time, true);
+      this.monsters.react(e, 1, 'stagger');
+      this.countering = COMBAT.counter.secs;
+      this.counterBy = COMBAT.counter.perfect;
+      this.gain(clash.spirit);
+      this.rage(COMBAT.wrath.perfect);
+      this.work.burst(e.x, y + 1.6, e.z, ['#ffffff', this.aura, '#ffd24a'], 36, 10);
+      this.work.stop = Math.max(this.work.stop ?? 0, COMBAT.stop.perfect);
+      this.work.impact = COMBAT.impact;
+      this.closeUp = 0.4;
+      rumble(this.player, 'shatter');
+      return;
+    }
+    this.hud.float('Overpowered!', state.x, state.y + 3.4, state.z, '#ff7a6a');
+    state.x -= c.fx * 3;
+    state.z -= c.fz * 3;
+    this.wear(COMBAT.hero.heavy);
+    stagger(e, 0.3, this.monsters.time, true);
+    this.monsters.hurt(this.player, e.def.damage * clash.hurt, e.x, e.z, { from: null });
+  }
+
   // Rolls toward (x, z) in world terms, or the way the hero is facing.
   roll(state, x, z) {
-    if (this.finishing) return;
+    if (this.staged) return;
     if (this.rolling > 0 || this.rollWait > 0 || state.air || this.active || this.held || this.charging) return;
     const len = Math.hypot(x, z);
     this.rollDir = len > 0.05 ? [x / len, z / len] : (() => {
@@ -576,6 +689,12 @@ export default class Melee {
       this.wear(hero.dodge);
       return { avoided: true };
     }
+    // Mid-smash, a foe's blow meets it: a clash, not a hit.
+    const swing = this.active;
+    if (from && swing && !swing.landed && swing.t > swing.time * 0.15 && this.clashable(swing, from)) {
+      this.startClash(from, state);
+      return { avoided: true, clashed: true };
+    }
     const facing = Math.hypot(...state.dir) || 1, dx = x - state.x, dz = z - state.z, d = Math.hypot(dx, dz) || 1;
     const front = (dx * state.dir[0] + dz * state.dir[1]) / (d * facing) > 0;
     if (!this.guarding || !front) return { amount };
@@ -634,7 +753,7 @@ export default class Melee {
   }
 
   setGuard(on) {
-    const up = on && !this.finishing && this.guardDown <= 0 && this.broken <= 0 && !this.active && !this.held && this.rolling <= 0 && !this.charging;
+    const up = on && !this.staged && this.guardDown <= 0 && this.broken <= 0 && !this.active && !this.held && this.rolling <= 0 && !this.charging;
     if (up && !this.guarding) this.guardAt = this.clock;
     this.guarding = up;
   }
@@ -911,6 +1030,8 @@ export default class Melee {
 
   // For the sprite: null when not punching.
   get pose() {
+    const c = this.clashing;
+    if (c) return { t: 1, chain: 4, arm: c.presses % 2, move: 'punch', stage: this.stage, color: PUNCHES[this.stage].color };
     const f = this.finishing;
     if (f) return { t: f.pose.move === 'windup' ? 0 : 1, chain: 4, arm: f.pose.arm, move: f.pose.move, stage: this.stage, color: PUNCHES[this.stage].color };
     const a = this.active;
@@ -925,6 +1046,7 @@ export default class Melee {
   }
 
   land(a, state) {
+    if (this.clashable(a, a.target)) return this.startClash(a.target, state);
     const p = PUNCHES[this.stage], smash = a.kind === 'smash' ? COMBAT.smash[a.name] : null, heavy = this.body.massScale, spread = Math.sqrt(heavy);
     // The end of a chain, and every smash, throws the punch's full wave; a light hit, its plain one.
     const finisher = a.kind === 'smash' || a.last;
@@ -1244,6 +1366,7 @@ export default class Melee {
     }
     this.idle += dt;
     this.updateFinish(dt, state);
+    this.updateClash(dt, state);
     const a = this.active;
     if (a) {
       a.t += dt;
