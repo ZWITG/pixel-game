@@ -610,6 +610,7 @@ export default class Player {
     if (melee.broken > 0) return [FEATURES.heroClips ? 'broken' : 'hurt', -0.1];
     if (this.flinch) return ['hurt', -0.15];
     if (this.powers.casting > 0) return [this.powers.pose, 0.05];
+    if (pose?.move === 'clash') return ['clash', 0.05, { k: pose.k }];
     if (pose?.clip) return ['clip', 0, { arm: pose.arm, clip: pose.clip, t: pose.t }];
     if (pose) return [pose.t < 0.35 ? 'windup' : pose.move, 0, { arm: pose.arm }];
     if (melee.pursuing || melee.hover > 0) return ['rising', 0.1];

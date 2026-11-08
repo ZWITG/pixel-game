@@ -25,7 +25,8 @@ export const PUNCHES = [
 const FINISHER_REACH = 1.3;  // the finisher's wave goes this much further
 const HIT_AT = 0.4;          // how far through the punch the blow lands
 const SMASH_AT = 0.5;
-const LIGHT_CLIPS = ['jab', 'cross', 'hook', 'knee', 'spinKick']; // the rush chain's clips; a Surge's sixth hit is 'palms'        // and through a smash
+const LIGHT_CLIPS = ['jab', 'cross', 'hook', 'knee', 'spinKick'];
+const FINISH_CLIPS = { quick: 'finQuick', rush: 'finRush', reap: 'finReap', giant: 'finGiant', riposte: 'finRiposte' }; // heroClips.js // the rush chain's clips; a Surge's sixth hit is 'palms'        // and through a smash
 const HOMING_MOST = 34;      // tiles per second a blow can close in on its target
 // What the body does for each smash, and for the last hit of a chain.
 const SMASH_POSE = { breaker: 'punch', launcher: 'uppercut', sweep: 'sweep', driver: 'kick', slam: 'slam', finisher: 'punch', spike: 'slam', execute: 'kick', riposte: 'kick' };
@@ -505,6 +506,7 @@ export default class Melee {
     stagger(e, clash.secs + 0.3, this.monsters.time, true);
     e.vel.set(0, 0);
     e.left = 0;
+    e.clashed = true;
     const y = e.group.position.y + 1.5;
     this.hud.float('Clash!', (state.x + e.x) / 2, y + 2.5, (state.z + e.z) / 2, '#ffd24a');
     this.work.burst((state.x + e.x) / 2, y, (state.z + e.z) / 2, ['#ffffff', '#ffd24a', this.aura], 30, 9);
@@ -557,6 +559,7 @@ export default class Melee {
     const c = this.clashing;
     this.clashing = null;
     this.armored = false;
+    if (c) c.e.clashed = false;
     this.idle = 0;
     this.hud.setClash?.(null);
     if (won === null || !c) return;
@@ -1051,8 +1054,9 @@ export default class Melee {
       this.reaction = null;
     }
     const c = this.clashing;
-    if (c) return { t: 1, chain: 4, arm: c.presses % 2, move: 'punch', stage: this.stage, color: PUNCHES[this.stage].color };
+    if (c) return FEATURES.heroClips ? { t: 1, chain: 4, arm: 0, move: 'clash', k: c.k, stage: this.stage, color: PUNCHES[this.stage].color } : { t: 1, chain: 4, arm: c.presses % 2, move: 'punch', stage: this.stage, color: PUNCHES[this.stage].color };
     const f = this.finishing;
+    if (f && FEATURES.heroClips && FINISH_CLIPS[f.kind]) return { t: Math.min(1, f.t / f.total), chain: 4, arm: 0, move: 'clip', clip: FINISH_CLIPS[f.kind], stage: this.stage, color: PUNCHES[this.stage].color };
     if (f) return { t: f.pose.move === 'windup' ? 0 : 1, chain: 4, arm: f.pose.arm, move: f.pose.move, stage: this.stage, color: PUNCHES[this.stage].color };
     const a = this.active;
     if (!a) return null;

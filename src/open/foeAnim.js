@@ -50,7 +50,11 @@ export function animateFoe(e, t) {
 
   if (human) {
     let pose = null, k = 1, lean = 0, head = 0, crouch = 0;
-    if (broken) {
+    if (e.clashed) {
+      // Locked in a clash: the strike held against the hero's, shaking with the strain.
+      const b = STRIKE[e.move] ?? STRIKE.swipe, shake = Math.sin(t * 43) * 0.06;
+      pose = { arm: b.arm + shake, side: b.side, other: b.other - shake, lean: 0.3 + shake };
+    } else if (broken) {
       // Slumped forward, arms hanging, head down.
       pose = { arm: 0.15, side: 0.2, other: 0.2, lean: 0.4 };
       head = 0.5;

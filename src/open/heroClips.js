@@ -190,6 +190,63 @@ Object.assign(CLIPS, {
     { t: 1 },
   ] },
 });
+// Paired finishers and the Riposte (v0.53.0): one clip across the whole sequence, t = seconds in / its length
+// (melee.js FINISHERS beats + FINISH_AFTER), so each key sits on a beat.
+Object.assign(CLIPS, {
+  // quick (0.48 s): kick at 0.2 s.
+  finQuick: { hit: 0.42, limb: 'F0', keys: [
+    { t: 0 },
+    { t: 0.28, lx0: 1.5, lk0: 2.3, lx1: -0.15, lk1: 0.15, waist: -0.08, ax0: 0.9, ax1: 0.7 },
+    { t: 0.42, ease: 'out', lx0: 1.65, lk0: 0, lx1: -0.25, lk1: 0.2, waist: -0.48, chest: -0.2, ax0: -0.6, ax1: 0.9, ae0: 1.2, ae1: 1.6, as0: 0.5 },
+    { t: 0.72, lx0: 1.4, lk0: 0.3, waist: -0.35, ax0: -0.4, ax1: 0.9 },
+    { t: 1 },
+  ] },
+  // rush (1.02 s): seize, punch at 0.24 s, punch at 0.42 s, crouch at 0.62 s, uppercut at 0.74 s.
+  finRush: { hit: 0.725, limb: 'R', keys: [
+    { t: 0 },
+    { t: 0.12, ax0: 1.5, ax1: 1.5, ae0: 0.6, ae1: 0.6, as0: -0.2, as1: -0.2, waist: 0.25, lx0: 0.6, lk0: 0.4, lx1: -0.4, lk1: 0.3 },
+    { t: 0.235, ease: 'out', axR: 1.62, aeR: 0, asR: -0.1, axO: 1.35, aeO: 1.1, twistS: 0.55, waist: 0.3, lx0: 0.65, lk0: 0.35, lx1: -0.5, lk1: 0.2 },
+    { t: 0.32, axR: 1.2, aeR: 1.5, axO: 1.4, aeO: 1, twistS: 0.1, waist: 0.25, lx0: 0.6, lk0: 0.4, lx1: -0.45 },
+    { t: 0.41, ease: 'out', axO: 1.62, aeO: 0, asO: -0.1, axR: 1.35, aeR: 1.1, twistS: -0.6, waist: 0.3, lx0: 0.65, lk0: 0.35, lx1: -0.5, lk1: 0.2 },
+    { t: 0.52, axO: 1.2, aeO: 1.5, axR: 1.3, aeR: 1.2, twistS: -0.1, waist: 0.25 },
+    { t: 0.61, lx0: 1.05, lk0: 1.95, lx1: 0.6, lk1: 1.6, waist: 0.55, axR: -0.5, aeR: 1.9, asR: 0.3, axO: 1.2, aeO: 1, twistS: -0.4 },
+    { t: 0.725, ease: 'out', axR: 3, aeR: 0.45, asR: -0.1, axO: -0.4, aeO: 1.5, twistS: 0.35, waist: -0.2, chest: -0.3, head: 0.25, lx0: 0.25, lk0: 0.1, lx1: -0.4, lk1: 0.6, lift: 0.5 },
+    { t: 0.88, axR: 2.85, aeR: 0.6, twistS: 0.3, waist: -0.15, chest: -0.25, lift: 0.55, lx0: 0.2, lk0: 0.3, lx1: -0.3, lk1: 0.8 },
+    { t: 1 },
+  ] },
+  // reap (0.98 s): seize, sweep at 0.26 s, gather at 0.5 s, slam at 0.7 s.
+  finReap: { hit: 0.714, limb: 'R', keys: [
+    { t: 0 },
+    { t: 0.12, ax0: 1.5, ax1: 1.5, ae0: 0.6, ae1: 0.6, as0: -0.2, as1: -0.2, waist: 0.25, lx0: 0.6, lk0: 0.4, lx1: -0.4, lk1: 0.3 },
+    { t: 0.265, ease: 'out', spinS: 3.4, lx0: 1.3, lk0: 2.1, lx1: 0.25, lk1: 0.1, ls1: 1.3, waist: 0.65, ax0: 0.5, ax1: 0.5, as0: 1, as1: 1, ae0: 0.4, ae1: 0.4 },
+    { t: 0.4, spinS: Math.PI * 2, lx0: 1.2, lk0: 1.9, lx1: 0.4, lk1: 1.2, waist: 0.55 },
+    { t: 0.51, spinS: Math.PI * 2, lift: 0.75, ax0: 2.9, ax1: 2.9, ae0: 0.6, ae1: 0.6, as0: 0.2, as1: 0.2, lx0: 0.5, lk0: 1.3, lx1: 0.3, lk1: 1.5, chest: -0.3 },
+    { t: 0.714, ease: 'in', spinS: Math.PI * 2, lift: 0, lx0: 1.05, lk0: 1.95, lx1: 0.9, lk1: 1.8, waist: 0.85, ax0: 1.1, ax1: 1.1, ae0: 0.1, ae1: 0.1, head: -0.35 },
+    { t: 0.88, spinS: Math.PI * 2, lx0: 1, lk0: 1.9, lx1: 0.85, lk1: 1.75, waist: 0.8, ax0: 1.05, ax1: 1.05, ae0: 0.2, ae1: 0.2 },
+    { t: 1, spinS: Math.PI * 2 },
+  ] },
+  // giant (1.08 s): gather, leap at 0.2 s, punch at 0.55 s, dive at 0.68 s, slam at 0.8 s. The leap itself is real
+  // (melee.js sets state.rise), so these keys only shape the body in the air.
+  finGiant: { hit: 0.74, limb: 'R', keys: [
+    { t: 0, lx0: 0.75, lk0: 1.3, lx1: 0.6, lk1: 1.2, waist: 0.1, chest: -0.2, ax0: -0.7, ax1: -0.7, as0: 0.95, as1: 0.95, ae0: 1.5, ae1: 1.5 },
+    { t: 0.19, ease: 'out', air: 1, lx0: 0.1, lk0: 0.1, lx1: -0.2, lk1: 0.2, ax0: 2.8, ax1: 2.6, ae0: 0.3, ae1: 0.4, as0: 0.2, as1: 0.2, chest: -0.35 },
+    { t: 0.4, air: 1, lx0: 0.9, lk0: 1.8, lx1: 0.6, lk1: 1.9, ax0: 0.8, ax1: 0.8, ae0: 1.9, ae1: 1.9, waist: 0.3 },
+    { t: 0.51, ease: 'out', air: 1, axR: 1.62, aeR: 0, axO: 0.5, aeO: 2, twistS: 0.6, lx0: 0.6, lk0: 1.4, lx1: 0.3, lk1: 1.5, waist: 0.3 },
+    { t: 0.63, air: 1, ax0: 2.9, ax1: 2.9, ae0: 0.5, ae1: 0.5, as0: -0.1, as1: -0.1, chest: -0.4, waist: -0.2, lx0: 0.4, lk0: 1, lx1: 0.2, lk1: 1.2 },
+    { t: 0.74, ease: 'out', air: 0.5, ax0: 0.9, ax1: 0.9, ae0: 0.1, ae1: 0.1, waist: 0.85, chest: 0.2, head: -0.3, lx0: 1, lk0: 1.9, lx1: 0.85, lk1: 1.75 },
+    { t: 0.9, lx0: 1, lk0: 1.85, lx1: 0.8, lk1: 1.7, waist: 0.7, ax0: 0.9, ax1: 0.9, ae0: 0.3, ae1: 0.3 },
+    { t: 1 },
+  ] },
+  // Riposte (0.58 s): slip aside, punch at 0.12 s, knockdown kick at 0.3 s.
+  finRiposte: { hit: 0.517, limb: 'F0', keys: [
+    { t: 0, lx0: 0.4, lk0: 0.75, lx1: -0.35, lk1: 0.7, waist: 0.25, twist: -0.3, ax0: 0.9, ax1: 0.5, ae0: 2.1, ae1: 2.2, as0: 0.3, as1: 0.3 },
+    { t: 0.207, ease: 'out', axO: 1.62, aeO: 0, asO: -0.1, axR: 0.6, aeR: 2, twistS: -0.7, waist: 0.3, lx0: 0.7, lk0: 0.35, lx1: -0.55, lk1: 0.15 },
+    { t: 0.36, lx0: 1.5, lk0: 2.3, lx1: -0.15, lk1: 0.15, waist: -0.05, ax0: 0.9, ax1: 0.7, ae0: 1.9, ae1: 1.9 },
+    { t: 0.517, ease: 'out', lx0: 1.65, lk0: 0, lx1: -0.25, lk1: 0.2, waist: -0.48, chest: -0.2, ax0: -0.6, ax1: 0.9, ae0: 1.2, ae1: 1.6, as0: 0.5 },
+    { t: 0.75, lx0: 1.4, lk0: 0.3, waist: -0.35, ax0: -0.4, ax1: 0.9 },
+    { t: 1 },
+  ] },
+});
 CLIPS.execute = CLIPS.driver;
 CLIPS.riposte = CLIPS.cross;
 
