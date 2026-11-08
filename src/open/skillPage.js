@@ -197,6 +197,15 @@ export default class WorldHud {
     });
   }
 
+  // Rally: the grey stretch after the health that hitting back wins back. Both 0..1 of max health.
+  setRally(health, rally) {
+    const el = this.$('hp-rally');
+    if (!el) return;
+    const k = (v) => Math.round(Math.max(0, v) * 1000) / 1000;
+    put(el, 'hp', k(health), (v) => el.style.setProperty('--hp', v));
+    put(el, 'rally', k(rally), (v) => el.style.setProperty('--rally', v));
+  }
+
   setHealth(amount) {
     this.$('hp-fill').style.width = `${Math.max(0, amount) * 100}%`;
     // Low on health: the bar beats and the screen's edges run red.

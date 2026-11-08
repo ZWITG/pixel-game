@@ -46,6 +46,11 @@ export const COMBAT = {
   parried: { perfect: 1.6, plain: 1 },    // seconds a parried foe is dazed
   parryPosture: { perfect: 3, plain: 2 },
   blocked: 0.2, crushed: 0.6,
+  // Rally: health a blow took that hitting back wins back. Shares of the damage that turn grey (`hit` clean,
+  // `block` blocked, `crushed` through a broken guard); `window` seconds it holds, then it drains (`fade` of the
+  // grey a second, at least `floor` of max health). Won back: `light`/`smash` of max health per blow that lands,
+  // `parry`/`perfect` of the grey pool, an Execute all of it.
+  rally: { hit: 0.5, block: 1, crushed: 0.7, window: 2.5, fade: 0.8, floor: 0.05, light: 0.04, smash: 0.1, parry: 0.5, perfect: 1 },
   // Spirit: five pips.
   spirit: { pips: 5, hit: 0.12, smash: 0.25, parry: 0.5, perfect: 1, execute: 1, drain: 0.08, rest: 8 },
   cost: { vanish: 1, breakout: 2 },

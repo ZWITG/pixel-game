@@ -3,6 +3,7 @@ import { height as landHeight, dentAt, PLACES, SPAWN, TOWNS } from './terrain.js
 import { SPAWN_CLEAR } from './work.js';
 import { FEATURES } from '../config/features.js';
 import { COMBAT, smashFor, clampSpirit } from './combat.js';
+import { rumble } from './rumble.js';
 
 // Punching. Square throws a five-hit rush chain anywhere, at anything; Triangle branches it into a
 // smash (see combat.js). The punch itself grows in
@@ -131,6 +132,8 @@ export default class Melee {
     this.posture = 0;          // the hero's own Structure, 0..1; full is Broken
     this.postureAt = -9;
     this.broken = 0;           // seconds left Broken
+    this.rally = 0;            // grey health: points a blow took that hitting back wins back
+    this.rallyAt = -9;
     this.counterBy = 1;
     this.rollAt = -9;          // when Circle was last pressed, for a Vanish
     this.chase = null;         // a foe knocked flying, that a Vanish can catch up with
@@ -304,11 +307,40 @@ export default class Melee {
     if (this.posture < 1) return;
     const { hud, state } = this.player;
     hud.float('Broken!', state.x, state.y + 3.4, state.z, '#ff5a5a');
+    rumble(this.player, 'broken');
     this.broken = COMBAT.broken.hero;
     this.guarding = false;
     this.guardDown = COMBAT.broken.hero;
     this.posture = 0.6;
     this.active = null;
+  }
+
+  // Rally: a share of a blow's damage turns grey, and hitting back soon wins it back (COMBAT.rally).
+  bruise(taken, share) {
+    if (!FEATURES.rally) return;
+    const p = this.player, room = Math.max(0, p.body.maxHealth - p.hp);
+    this.rally = Math.min(room, this.rally + taken * share);
+    this.rallyAt = this.clock;
+  }
+
+  // Wins back grey health: `points` of it, at most what's there.
+  recover(points) {
+    if (this.rally <= 0 || points <= 0) return;
+    const p = this.player, back = Math.min(this.rally, points, p.body.maxHealth - p.hp);
+    this.rally -= back;
+    if (back <= 0) return;
+    p.hp += back;
+    this.rallyAt = this.clock;
+    p.hud.setHealth(p.hp / p.body.maxHealth);
+    if (back >= 0.5) p.hud.float(`+${Math.round(back * 10) / 10}`, p.state.x, p.state.y + 2.9, p.state.z, '#ffe08a');
+  }
+
+  // Grey health holds a moment, then drains away.
+  fadeRally(dt) {
+    if (this.rally <= 0) return;
+    const { rally } = COMBAT, max = this.player.body.maxHealth;
+    this.rally = Math.min(this.rally, Math.max(0, max - this.player.hp));
+    if (this.clock - this.rallyAt > rally.window) this.rally = Math.max(0, this.rally - Math.max(this.rally * rally.fade, max * rally.floor) * dt);
   }
 
   // A blow from this hero at their current punch, before the combo adds to it.
@@ -417,6 +449,7 @@ export default class Melee {
       const d = Math.hypot(from.x - state.x, from.z - state.z) || 1, back = vanish.behind + (from.radius ?? 1);
       this.blink(state, from.x + ((from.x - state.x) / d) * back, from.z + ((from.z - state.z) / d) * back, from);
       say('Vanish!', this.aura);
+      rumble(this.player, 'vanish');
       this.rage(COMBAT.wrath.vanish);
       this.wear(hero.vanish);
       this.countering = counter.secs;
@@ -425,6 +458,7 @@ export default class Melee {
     }
     if (this.rolling > 0 && this.rollSafe) {
       say('Dodged!', '#9fe8ff');
+      rumble(this.player, 'dodge');
       this.work.stop = 0.1;
       this.wear(hero.dodge);
       return { avoided: true };
@@ -445,6 +479,8 @@ export default class Melee {
       this.gain(perfect ? COMBAT.spirit.perfect : COMBAT.spirit.parry);
       this.rage(perfect ? COMBAT.wrath.perfect : COMBAT.wrath.parry);
       this.wear(perfect ? hero.perfect : hero.parry);
+      this.recover(this.rally * (perfect ? COMBAT.rally.perfect : COMBAT.rally.parry));
+      rumble(this.player, perfect ? 'perfect' : 'parry');
       if (from) this.monsters.wear(from, perfect ? COMBAT.parryPosture.perfect : COMBAT.parryPosture.plain);
       this.player.world.watchers?.saw(this.player, 'guard', perfect ? 'perfect' : 'plain');
       return { avoided: true, parried: true, perfect };
@@ -454,13 +490,15 @@ export default class Melee {
     this.work.burst(state.x, state.y + 1.6, state.z, ['#c9d4e2', '#ffffff'], 8, 4);
     if (!heavy) {
       this.wear(hero.block);
-      return { amount: amount * COMBAT.blocked };
+      rumble(this.player, 'block');
+      return { amount: amount * COMBAT.blocked, blocked: true };
     }
     say('Guard broken!', '#ff7a6a');
     this.guarding = false;
     this.guardDown = GUARD_DOWN;
     this.wear(hero.heavy);
-    return { amount: amount * COMBAT.crushed };
+    rumble(this.player, 'guardBroken');
+    return { amount: amount * COMBAT.crushed, crushed: true };
   }
 
   setGuard(on) {
@@ -799,6 +837,9 @@ export default class Melee {
     if (t && !t.def) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);
     if (t?.def) {
       this.player.powers.landed();
+      const max = this.player.body.maxHealth;
+      this.recover(a.name === 'execute' ? this.rally : max * (smash ? COMBAT.rally.smash : COMBAT.rally.light));
+      rumble(this.player, a.name === 'execute' ? 'execute' : smash ? 'smash' : finisher ? 'finisher' : 'jab');
       this.gain(smash ? COMBAT.spirit.smash : COMBAT.spirit.hit);
       this.rage(smash ? COMBAT.wrath.smash : COMBAT.wrath.hit);
       if (a.air) {
@@ -1044,6 +1085,7 @@ export default class Melee {
 
   update(dt, state) {
     this.work.actor = this.player;
+    this.fadeRally(dt);
     const shook = this.work.shake;
     if (this.orbAge < 9) {
       this.orbAge += dt;

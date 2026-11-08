@@ -51,4 +51,6 @@ export const FEATURES = {
   watchers: true,       // open world: the five Watchers, who learn how you fight; Insight, Trials, the Watchers tab (watchers.js)
   armies: true,         // open world: nation armies and coalitions at Calamity and Omega: march, squads, morale, Commander, supply, truce (armies.js)
   impactFrames: true,   // open world: two-tone ink frames on smashes and Perfect parries (also a Settings switch)
+  rally: true,          // open world: grey health a blow took, won back by hitting back, blocking or parrying (melee.js)
+  rumble: true,         // open world: controller rumble for hits, blocks, parries and being hurt (rumble.js; also a Settings switch)
 };

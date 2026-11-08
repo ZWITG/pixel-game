@@ -490,6 +490,7 @@ export default class Player {
       this.hp = Math.min(body.maxHealth, this.hp + REGEN * dt);
       hud.setHealth(this.hp / body.maxHealth);
     }
+    hud.setRally(this.hp / body.maxHealth, melee.rally / body.maxHealth);
   }
 
   // Mastery shows on the body; reaching a new stage is an event, and everyone near can see it.
@@ -579,6 +580,7 @@ export default class Player {
   // Beaten: wake close by with everything still in the bag, and a moment before anyone notices.
   down() {
     const { state, hud } = this;
+    this.melee.rally = 0;
     hud.gasp();
     hud.message('You came to, not far from where you fell.', true);
     this.world.realm.heroFell(this);

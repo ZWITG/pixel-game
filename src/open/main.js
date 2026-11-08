@@ -44,6 +44,7 @@ import Estates from './estates.js';
 import { lightWindows } from './architecture.js';
 import Towns from './settlements.js';
 import { nearSolids } from './solidGrid.js';
+import { haptics } from './rumble.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -262,6 +263,7 @@ function applySky(t) {
 
 // Holds the frame rate on any machine by trading resolution for speed, never the other way.
 const settings = loadSettings();
+haptics.on = settings.rumble !== false;
 const pace = { level: Number(QUERY.get('level') ?? QUALITY_LEVEL[settings.quality] ?? 0), avg: FAST, wait: SCALE_WAIT, held: 0 };
 function holdPace(dt) {
   if (QUERY.has('level') || settings.quality !== 'auto' || dt > PAUSED_FRAME) return;
@@ -808,6 +810,7 @@ if (!world.menu) menu.hide();
 // Settings the title screen and the menu in play both change.
 function applySettings() {
   setQuality(settings.quality);
+  haptics.on = settings.rumble !== false;
   document.body.classList.toggle('no-compass', !settings.compass);
 }
 function toTitle() {

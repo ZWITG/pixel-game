@@ -92,6 +92,8 @@ Press Options (or Esc) in game for the controls screen with a controller diagram
 | Conqueror branches | — | `branches.js`: three branches per Conqueror (Titan Mountain, Quake, Forge; Stormcaller Thunder, Sky, Tempest; Gravecaller Legion, Dominion, Hollow; Emberlord Pyre, Sun, Cinder; Frostwarden Frostforge, Glacier, Stillness). Powers are grouped and coloured by branch on the Powers tab; the Spirit Tree groups its boughs the same way and leaves out the ones a Conqueror doesn't grow (Titan and Emberlord: Swimming; Stormcaller: Climbing; Gravecaller: Swimming and Climbing; Frostwarden: Running). Those skills still train and keep their levels |
 | Effects kit | — | `vfx.js` (`world.vfx`): ribbon trails (fists in smashes and Surges), beams, shock rings on smashes and ultimates, domes, a spark system in one draw call, and the sky's mood (post.js `uTint`, `uGray`) |
 | Impact frames | `impactFrames` | Two-tone ink frame on smashes, Spikes and Perfect parries, plus speed lines on Vanish and Pursuit; Settings has an off switch |
+| Rally | `rally` | Grey health: half of a clean hit's damage, all of a blocked hit's chip and most of a guard break turn grey on the health bar for 2.5 s, then drain. Each blow you land wins back 4% of max health (smashes 10%), a parry half the grey, a Perfect parry or an Execute all of it |
+| Controller rumble | `rumble` | The pad rumbles with its own feel for jabs, chain finishers, smashes, Executes, Perfect and plain parries, blocks, guard breaks, Vanish, dodges, being hurt (by how hard), being Broken and ultimates; a weaker rumble never cuts a stronger one short; Settings has an off switch |
 
 The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 
@@ -148,6 +150,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [x] The Watchers (v0.40.0): the combat upgrade plan is done
 
 ## Changelog
+- 2026-11-08 v0.42.0 reasons to defend (combat feel, from the user's note that blocking and parrying didn't matter): Rally grey health you win back by hitting back, so blocking costs nothing if you answer and a Perfect parry heals what the last blow took; and controller rumble with a feel for every hit, block, parry and hurt. Settings has a Rumble switch
 - 2026-11-07 v0.41.0 the HUD and menus redesigned in the War banner style the user chose (from mockups of eight directions): a hanging Conqueror banner with the Omega numeral, iron-and-brass bars, a low-health warning, pennant menu tabs, and the same look on the trade and title screens
 - 2026-11-07 v0.40.0 the Watchers (combat upgrade, phase 10, the last): five learning foes with powers of their own, a habit model of how you fight with seven counters that learn which work, Insight, elemental wards, Watchers leading armies, and a Watchers tab with Trials and what they have learned. They learn fighting habits only: no ranks, promotions or remembered encounters
 - 2026-11-07 v0.39.0 nation armies and coalitions (combat upgrade, phase 9; the user's plan: about 40 full fighters plus 300 in squads). At Calamity a nation marches on you with its army; at Omega a coalition of three. Squads become fighters as they come near, morale breaks with its captains, Commander, machines and supply wagon, and a routed army runs and leaves a truce

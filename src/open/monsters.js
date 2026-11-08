@@ -11,6 +11,7 @@ import { makeCreature } from './creatures.js';
 import { makeWatcher } from './watcherForms.js';
 import { machineMesh, DOCTRINES } from './doctrines.js';
 import { arm, stagger, standDown, TURN_TAKERS } from './foes.js';
+import { rumble } from './rumble.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
 import { nearSolids } from './solidGrid.js';
 
@@ -370,6 +371,8 @@ export default class Monsters {
     amount = answer.amount;
     const heavy = p.body.massScale, taken = Math.max(0.5, (amount * (1 - p.body.guard)) / Math.sqrt(heavy));
     p.hp -= taken;
+    p.melee.bruise(taken, answer.blocked ? COMBAT.rally.block : answer.crushed ? COMBAT.rally.crushed : COMBAT.rally.hit);
+    if (!answer.blocked) rumble(p, 'hurt', 0.45 + (taken / p.body.maxHealth) * 4);
     p.wrath?.gain((taken / p.body.maxHealth) * COMBAT.wrath.hurt);
     // A smash in progress shrugs the blow off and carries on.
     if (!p.melee.armored) {

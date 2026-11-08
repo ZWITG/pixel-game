@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { COMBAT } from './combat.js';
+import { rumble } from './rumble.js';
 
 // Wrath, Surge and the ultimates. Wrath fills from fighting (COMBAT.wrath); full, L1 + R1 together
 // lets loose the Conqueror's ultimate, or held for a second starts Surge. An ultimate is a short
@@ -308,6 +309,7 @@ export default class Wrath {
     work.stop = 0.12;
     work.impact = COMBAT.impact * 1.5;
     work.rumble = size * 2;
+    rumble(this.p, 'quake', 0.5 + size);
     this.p.hud.flash(0.3 + size * 0.4);
   }
 
