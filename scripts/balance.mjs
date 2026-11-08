@@ -1,7 +1,7 @@
 // Balance check for the fighting core: `node scripts/balance.mjs`. Works in units of one hero
 // blow (Melee.force) against foes of the hero's own level, the way ROLES is defined, and fails
 // (exit code 1) if anything lands outside its target. Run it before committing combat changes.
-import { COMBAT, smashFor } from '../src/open/combat.js';
+import { COMBAT, smashFor, parryWear } from '../src/open/combat.js';
 import { ROLES, tierFor } from '../src/open/evolve.js';
 import { SKILLS, paceAt } from '../src/open/skills.js';
 
@@ -60,6 +60,17 @@ for (const [role, r] of Object.entries(ROLES)) {
   if (role === 'brute' || role === 'ruler' || role === 'fighter') check(share < 0.85, `${role} breaks before it falls`);
   if (role === 'ruler') check(strings > 10, 'a ruler takes more than ten strings');
   if (role === 'watcher') check(share < 0.6 && strings > 4, 'a Watcher breaks early and takes more than four strings');
+}
+
+// Parries: how many in a row break each role (a tier 0 foe, and an elder at tier 4), against light hits.
+console.log('\nParries to break (in a row: Perfect / plain; elder tier 4 in brackets)');
+const toBreak = (perfect, most) => { let n = 0, sum = 0; while (sum < most && n < 50) sum += parryWear(perfect, most, ++n); return n; };
+for (const [role, base] of Object.entries(COMBAT.posture)) {
+  const elder = base * 1.5 * 1.4, p = toBreak(true, base), q = toBreak(false, base);
+  console.log(`  ${role.padEnd(8)} structure ${String(base).padStart(3)}  ${String(p).padStart(2)} / ${String(q).padStart(2)}   (${toBreak(true, elder)} / ${toBreak(false, elder)})   light hits ${Math.ceil(base)}`);
+  if (role === 'fighter' || role === 'brute') check(p <= 2, `a ${role} breaks within two Perfect parries`);
+  if (role === 'ruler') check(p >= 3 && p <= 5 && q > p, 'a ruler takes 3 to 5 Perfect parries in a row, more plain ones');
+  check(p * 3 <= Math.ceil(base) || base <= 5, `a parry is worth at least three light hits on ${role}s`);
 }
 
 // Spirit: what a fight pays, and what defence costs.

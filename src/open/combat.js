@@ -38,13 +38,16 @@ export const COMBAT = {
   posture: { fodder: 3, fighter: 5, brute: 9, machine: 6, ruler: 40, watcher: 18 },
   postureBack: 1.2,     // points a foe gets back each second it isn't hit
   postureRest: 2,       // seconds before it starts to recover
+  postureHurt: 0.35,    // a foe near death gets Structure back only this share as fast (it scales with health left)
   broken: { foe: 1.9, hero: 1.2 },
   hero: { block: 0.12, heavy: 0.5, parry: -0.15, perfect: -0.3, vanish: -0.25, dodge: -0.08, back: 0.1, rest: 1.5 },
   // Defence windows, seconds after the guard goes up.
   parry: { perfect: 0.12, plain: 0.22 },
   counter: { perfect: 2, plain: 1.5, secs: 1.8 },
   parried: { perfect: 1.6, plain: 1 },    // seconds a parried foe is dazed
-  parryPosture: { perfect: 3, plain: 2 },
+  // Parries break Structure (v0.43.0): `base` points plus `share` of the foe's whole Structure, and each parry in a
+  // row (within `chainSecs` of the last, no hit taken between) adds `chain` more, up to `chainMost` steps.
+  parryPosture: { perfect: 3, plain: 2, share: { perfect: 0.15, plain: 0.07 }, chain: 0.35, chainMost: 3, chainSecs: 3 },
   blocked: 0.2, crushed: 0.6,
   // Rally: health a blow took that hitting back wins back. Shares of the damage that turn grey (`hit` clean,
   // `block` blocked, `crushed` through a broken guard); `window` seconds it holds, then it drains (`fade` of the
@@ -77,6 +80,12 @@ export const COMBAT = {
 };
 
 export const ROLE_POSTURE = (role) => COMBAT.posture[role] ?? COMBAT.posture.fighter;
+
+// Structure a parry takes off a foe whose whole Structure is `most`; `n` is its place in a row of parries (1 = first).
+export function parryWear(perfect, most, n = 1) {
+  const pp = COMBAT.parryPosture, kind = perfect ? 'perfect' : 'plain';
+  return (pp[kind] + pp.share[kind] * most) * (1 + pp.chain * Math.min(Math.max(0, n - 1), pp.chainMost));
+}
 
 // Which smash Triangle throws after `hits` light hits, in the air or not.
 export function smashFor(hits, air) {

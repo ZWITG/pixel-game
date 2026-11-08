@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { height as landHeight, dentAt, PLACES, SPAWN, TOWNS } from './terrain.js';
 import { SPAWN_CLEAR } from './work.js';
 import { FEATURES } from '../config/features.js';
-import { COMBAT, smashFor, clampSpirit } from './combat.js';
+import { COMBAT, smashFor, clampSpirit, parryWear } from './combat.js';
 import { rumble } from './rumble.js';
 
 // Punching. Square throws a five-hit rush chain anywhere, at anything; Triangle branches it into a
@@ -133,6 +133,8 @@ export default class Melee {
     this.postureAt = -9;
     this.broken = 0;           // seconds left Broken
     this.rally = 0;            // grey health: points a blow took that hitting back wins back
+    this.parryRow = 0;         // parries in a row (a hit taken or a long gap ends it)
+    this.parryAt = -9;
     this.rallyAt = -9;
     this.counterBy = 1;
     this.rollAt = -9;          // when Circle was last pressed, for a Vanish
@@ -469,10 +471,15 @@ export default class Melee {
     const since = this.clock - this.guardAt, perfect = since < parry.perfect + (this.grounded ? COMBAT.grounded.parry : 0);
     // A Perfect parry turns anything; a plain one only what isn't heavy.
     if (perfect || (since < parry.plain && !heavy)) {
-      say(perfect ? 'Perfect!' : 'Parry!', perfect ? '#ffffff' : '#ffd24a');
-      this.work.stop = COMBAT.stop.perfect;
-      this.work.shake = Math.max(this.work.shake, 0.2);
-      this.work.burst(state.x, state.y + 1.6, state.z, perfect ? ['#ffffff', this.aura, '#ffd24a'] : ['#ffd24a', '#ffffff'], perfect ? 28 : 18, 7);
+      // Parries in a row build: each one rings louder and takes more of the foe's Structure.
+      const pp = COMBAT.parryPosture;
+      this.parryRow = this.clock - this.parryAt < pp.chainSecs ? this.parryRow + 1 : 1;
+      this.parryAt = this.clock;
+      const row = Math.min(this.parryRow - 1, pp.chainMost);
+      say(`${perfect ? 'Perfect!' : 'Parry!'}${this.parryRow > 1 ? ` ×${this.parryRow}` : ''}`, perfect ? '#ffffff' : '#ffd24a');
+      this.work.stop = COMBAT.stop.perfect + row * 0.02;
+      this.work.shake = Math.max(this.work.shake, 0.2 + row * 0.06);
+      this.work.burst(state.x, state.y + 1.6, state.z, perfect ? ['#ffffff', this.aura, '#ffd24a'] : ['#ffd24a', '#ffffff'], (perfect ? 28 : 18) + row * 10, 7 + row * 2);
       if (perfect) this.work.impact = COMBAT.impact;
       this.countering = counter.secs;
       this.counterBy = perfect ? counter.perfect : counter.plain;
@@ -480,8 +487,11 @@ export default class Melee {
       this.rage(perfect ? COMBAT.wrath.perfect : COMBAT.wrath.parry);
       this.wear(perfect ? hero.perfect : hero.parry);
       this.recover(this.rally * (perfect ? COMBAT.rally.perfect : COMBAT.rally.parry));
-      rumble(this.player, perfect ? 'perfect' : 'parry');
-      if (from) this.monsters.wear(from, perfect ? COMBAT.parryPosture.perfect : COMBAT.parryPosture.plain);
+      rumble(this.player, row > 0 ? 'parryRow' : perfect ? 'perfect' : 'parry', row > 0 ? 0.75 + row * 0.1 : 1);
+      if (from) {
+        this.work.actor = this.player; // so a break shows and rumbles for this hero
+        this.monsters.wear(from, parryWear(perfect, this.monsters.structure(from), this.parryRow));
+      }
       this.player.world.watchers?.saw(this.player, 'guard', perfect ? 'perfect' : 'plain');
       return { avoided: true, parried: true, perfect };
     }

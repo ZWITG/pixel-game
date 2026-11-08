@@ -325,9 +325,14 @@ export default class Monsters {
   }
 
   // Wears down a monster's Structure. Full, it's Broken: dazed, open, and ready to be Executed.
+  // A foe's whole Structure, by role, elder and tier.
+  structure(e) {
+    return (e.postureMax ??= ROLE_POSTURE(roleName(e)) * (e.elder ? 1.5 : 1) * (1 + (e.tier ?? 0) * 0.1));
+  }
+
   wear(e, amount) {
     if (!amount || e.dying) return;
-    e.postureMax ??= ROLE_POSTURE(roleName(e)) * (e.elder ? 1.5 : 1) * (1 + (e.tier ?? 0) * 0.1);
+    this.structure(e);
     e.posture = Math.min(e.postureMax, (e.posture ?? 0) + amount);
     e.postureAt = this.time;
     if (e.posture < e.postureMax || e.brokenUntil > this.time) return;
@@ -338,6 +343,7 @@ export default class Monsters {
     this.work.burst(e.x, y + 2, e.z, ['#ffffff', '#ffd24a', '#ff5a5a'], 22, 8);
     const hero = this.work.actor ?? this.players[0];
     hero.hud?.float('Broken!', e.x, y + 4.5, e.z, '#ffd24a');
+    rumble(hero, 'shatter');
     hero.melee?.ring(e.x, y, e.z, e.radius + 3, '#ffd24a');
     this.work.shake = Math.max(this.work.shake, 0.18);
   }
@@ -371,6 +377,7 @@ export default class Monsters {
     amount = answer.amount;
     const heavy = p.body.massScale, taken = Math.max(0.5, (amount * (1 - p.body.guard)) / Math.sqrt(heavy));
     p.hp -= taken;
+    p.melee.parryRow = 0;
     p.melee.bruise(taken, answer.blocked ? COMBAT.rally.block : answer.crushed ? COMBAT.rally.crushed : COMBAT.rally.hit);
     if (!answer.blocked) rumble(p, 'hurt', 0.45 + (taken / p.body.maxHealth) * 4);
     p.wrath?.gain((taken / p.body.maxHealth) * COMBAT.wrath.hurt);
@@ -567,7 +574,10 @@ export default class Monsters {
       if (e.brokenUntil && e.brokenUntil <= this.time) {
         e.brokenUntil = 0;
         e.posture = e.postureMax * 0.3;
-      } else if (e.posture > 0 && !e.brokenUntil && this.time - e.postureAt > COMBAT.postureRest) e.posture = Math.max(0, e.posture - COMBAT.postureBack * dt);
+      } else if (e.posture > 0 && !e.brokenUntil && this.time - e.postureAt > COMBAT.postureRest) {
+        const whole = e.maxHp ? Math.max(0, Math.min(1, e.hp / e.maxHp)) : 1;
+        e.posture = Math.max(0, e.posture - COMBAT.postureBack * (COMBAT.postureHurt + (1 - COMBAT.postureHurt) * whole) * dt);
+      }
       // Sunk into sand or a rift: it settles into the ground, and climbs back out when it ends.
       e.sinkNow = (e.sinkNow ?? 0) + ((e.sunkUntil > this.time ? e.sinkTo ?? 1 : 0) - (e.sinkNow ?? 0)) * Math.min(1, dt * 6);
       e.group.position.y = (e.cave ? CAVE_FLOOR : this.groundY(e.x, e.z, e.group.position.y)) + e.air - e.sinkNow;

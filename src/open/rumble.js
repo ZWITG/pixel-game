@@ -13,12 +13,14 @@ export const FEELS = {
   execute: [320, 1, 0.8],
   perfect: [110, 0.25, 1],       // a Perfect parry: sharp and bright
   parry: [80, 0.15, 0.75],
+  parryRow: [130, 0.55, 1],      // the second, third... parry in a row (scaled up the row)
   block: [70, 0.45, 0.1],        // a dull thud
   guardBroken: [260, 0.9, 0.4],
   vanish: [60, 0, 0.5],
   dodge: [35, 0, 0.25],
   hurt: [140, 0.6, 0.25],        // scaled by how hard the blow was
   broken: [380, 1, 0.6],         // the hero's own Structure gives way
+  shatter: [240, 0.9, 1],        // a foe's Structure breaks
   quake: [600, 1, 0.7],          // an ultimate or a huge blast
 };
 
