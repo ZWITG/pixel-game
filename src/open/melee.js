@@ -6,6 +6,7 @@ import { COMBAT, smashFor, clampSpirit, parryWear } from './combat.js';
 import { rumble } from './rumble.js';
 import { stagger } from './foes.js';
 import { roleName } from './evolve.js';
+import { CLIPS } from './heroClips.js';
 
 // Punching. Square throws a five-hit rush chain anywhere, at anything; Triangle branches it into a
 // smash (see combat.js). The punch itself grows in
@@ -23,7 +24,8 @@ export const PUNCHES = [
 
 const FINISHER_REACH = 1.3;  // the finisher's wave goes this much further
 const HIT_AT = 0.4;          // how far through the punch the blow lands
-const SMASH_AT = 0.5;        // and through a smash
+const SMASH_AT = 0.5;
+const LIGHT_CLIPS = ['jab', 'cross', 'hook', 'knee', 'spinKick']; // the rush chain's clips; a Surge's sixth hit is 'palms'        // and through a smash
 const HOMING_MOST = 34;      // tiles per second a blow can close in on its target
 // What the body does for each smash, and for the last hit of a chain.
 const SMASH_POSE = { breaker: 'punch', launcher: 'uppercut', sweep: 'sweep', driver: 'kick', slam: 'slam', finisher: 'punch', spike: 'slam', execute: 'kick', riposte: 'kick' };
@@ -1038,7 +1040,9 @@ export default class Melee {
     const a = this.active;
     if (!a) return null;
     const arm = a.chain % 2, move = a.kind === 'smash' ? SMASH_POSE[a.name] : a.last && !a.air ? 'kick' : a.air && a.last ? 'uppercut' : 'punch';
-    return { t: a.t / a.time, chain: a.chain, arm, move, stage: this.stage, color: PUNCHES[this.stage].color };
+    // The keyframed clip for it (heroClips.js): the rush chain by place, a smash by name.
+    const clip = !FEATURES.heroClips ? null : a.kind === 'smash' ? (CLIPS[a.name] ? a.name : null) : a.air ? 'air' : LIGHT_CLIPS[a.chain] ?? 'palms';
+    return { t: a.t / a.time, chain: a.chain, arm, move, clip, stage: this.stage, color: PUNCHES[this.stage].color };
   }
 
   // Inside a cave the ground is the cave floor, whatever the land does above.

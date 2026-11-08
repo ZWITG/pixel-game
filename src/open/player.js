@@ -608,6 +608,7 @@ export default class Player {
     const { state, swim, melee } = this, pace = state.pace ?? 0;
     if (this.flinch || melee.broken > 0) return ['hurt', -0.15];
     if (this.powers.casting > 0) return [this.powers.pose, 0.05];
+    if (pose?.clip) return ['clip', 0, { arm: pose.arm, clip: pose.clip, t: pose.t }];
     if (pose) return [pose.t < 0.35 ? 'windup' : pose.move, 0, { arm: pose.arm }];
     if (melee.pursuing || melee.hover > 0) return ['rising', 0.1];
     if (melee.rolling > 0) return ['roll', (1 - melee.rolling / 0.42) * Math.PI * 2];

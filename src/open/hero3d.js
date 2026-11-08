@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toonSteps, inkMaterial, paint, ball as sphere, limb, spike, aimed, block, rock } from './kit.js';
+import { CLIPS, sampleClip } from './heroClips.js';
 
 // The heroes as jointed 3D figures in a clean anime style: toon-shaded, with a thin ink outline,
 // a scarf that streams behind them, and one set of named poses for everything they can do.
@@ -8,6 +9,7 @@ const UPPER_LEG = 0.6, LOWER_LEG = 0.62, HIP_Y = 1.27, UPPER_ARM = 0.42, LOWER_A
 const OUTLINE = 0.016;      // ink width, in model units
 const ball = (r, sx, sy, sz) => sphere(r, sx, sy, sz);
 const EASE = 16, EASE_FAST = 42; // how quickly a joint reaches its pose
+const EASE_CLIP = 60;       // a keyframed clip (heroClips.js) is followed closely, so its keys read crisp
 const TURN = 16;            // how quickly the body turns to face the way it's going
 const GHOSTS = 12;          // afterimages behind a Superspeed runner
 const GHOST_EVERY = 0.016;  // seconds between them
@@ -92,7 +94,7 @@ class Ribbon {
 
 // The joints a pose sets. Arms: forward swing, outward spread, elbow bend. Legs: forward swing,
 // knee bend, outward spread. Angles in radians.
-const blank = () => ({ waist: 0, twist: 0, chest: 0, head: 0, air: 0, ax0: 0.05, ax1: 0.05, as0: 0.12, as1: 0.12, ae0: 0.25, ae1: 0.25, lx0: 0, lx1: 0, lk0: 0.06, lk1: 0.06, ls0: 0.05, ls1: 0.05 });
+const blank = () => ({ spin: 0, lift: 0, waist: 0, twist: 0, chest: 0, head: 0, air: 0, ax0: 0.05, ax1: 0.05, as0: 0.12, as1: 0.12, ae0: 0.25, ae1: 0.25, lx0: 0, lx1: 0, lk0: 0.06, lk1: 0.06, ls0: 0.05, ls1: 0.05 });
 
 function gait(p, phase, legSwing, kneeLift, armSwing, elbow, bias = 0) {
   for (const i of [0, 1]) {
@@ -109,6 +111,8 @@ const crouch = (p, swing, knee) => set(p, { lx0: swing, lx1: swing * 0.8, lk0: k
 
 // What every motion looks like. `arm` is the punching arm, 0 or 1.
 const POSES = {
+  // A keyframed clip from heroClips.js at options.t (0..1) through the move.
+  clip: (p, t, arm, o) => sampleClip(p, o.clip, o.t, arm, blank),
   // A slow, heavy breath: chest forward, chin down, fists held away from the body, watching.
   idle: (p, t) => set(p, { waist: 0.07, chest: 0.04 + Math.sin(t * 1.3) * 0.022, head: 0.16 + Math.sin(t * 0.5) * 0.03, ax0: 0.06, ax1: 0.06, as0: 0.34 + Math.sin(t * 1.3) * 0.015, as1: 0.34 + Math.sin(t * 1.3) * 0.015, ae0: 0.32, ae1: 0.32, ls0: 0.11, ls1: 0.11 }),
   walk: (p, t) => { gait(p, t * 7.5, 0.55, 0.85, 0.5, 0.35); p.waist = 0.04; },
@@ -618,15 +622,17 @@ export default class HeroModel {
     this.lastTime = time;
     const goal = Object.assign(this.goal, blank());
     POSES[name](goal, time * run, arm, options);
-    const k = 1 - Math.exp(-dt * (name === 'punch' || name === 'windup' || name === 'uppercut' || name === 'hurt' ? EASE_FAST : EASE));
+    const k = 1 - Math.exp(-dt * (name === 'clip' ? EASE_CLIP : name === 'punch' || name === 'windup' || name === 'uppercut' || name === 'hurt' ? EASE_FAST : EASE));
     const p = this.pose;
+    // A spin that ended a full turn round is the same as none: don't unwind it.
+    if (Math.abs(goal.spin - p.spin) > Math.PI) p.spin -= Math.round((p.spin - goal.spin) / (Math.PI * 2)) * Math.PI * 2;
     for (const key in goal) p[key] += (goal[key] - p[key]) * k;
     const B = this.bones;
     // Feet stay on the ground by setting the hips to the height of the straighter leg.
     const reach = (i) => UPPER_LEG * Math.cos(p[`lx${i}`]) + LOWER_LEG * Math.cos(p[`lk${i}`] - p[`lx${i}`]);
     const stand = Math.max(reach(0), reach(1)), full = UPPER_LEG + LOWER_LEG;
     const float = this.hover ? this.hover + Math.sin(time * 2.1) * 0.05 : 0;
-    this.body.position.y = HIP_Y - (full - stand) * (1 - p.air) * (float ? 0.2 : 1) + float;
+    this.body.position.y = HIP_Y - (full - stand) * (1 - p.air) * (float ? 0.2 : 1) + float + p.lift;
     if (B.spin) B.spin.rotation[B.fan ? 'z' : 'y'] = time * (B.fan ? 0.9 : 1.3);
     if (B.fan) B.fan.scale.set(1 + Math.sin(time * 9) * 0.05, 1 + Math.sin(time * 7) * 0.04, 1);
     if (B.orbit) B.orbit.rotation.y = time * 1.9;
@@ -639,7 +645,7 @@ export default class HeroModel {
     this.yaw += turn * rise;
     this.leanNow += (lean - this.leanNow) * (name === 'roll' ? 1 : Math.min(1, dt * 14));
     this.mesh.position.set(x, y, z);
-    this.mesh.rotation.y = this.yaw;
+    this.mesh.rotation.y = this.yaw + p.spin;
     this.body.rotation.x = this.leanNow;
     B.spine.rotation.set(p.waist, p.twist * 0.5, 0);
     B.chest.rotation.set(p.chest, p.twist * 0.5, 0);
@@ -699,9 +705,12 @@ export default class HeroModel {
 
   // pose: { t, stage, color } from the melee system, or null.
   punch(pose, arm) {
-    this.flash.visible = !!pose && pose.t > 0.35 && pose.t < 0.7;
+    const clip = pose?.clip && CLIPS[pose.clip];
+    this.flash.visible = !!pose && (clip ? pose.t > clip.hit - 0.04 && pose.t < clip.hit + 0.22 : pose.t > 0.35 && pose.t < 0.7);
     if (!this.flash.visible) return;
-    this.bones[`hand${arm}`].getWorldPosition(this.flash.position);
+    const limb = clip?.limb ?? 'R';
+    if (limb[0] === 'F') this.bones[`shin${limb[1]}`].localToWorld(this.flash.position.set(0, -LOWER_LEG, 0));
+    else this.bones[`hand${limb === 'O' ? 1 - arm : arm}`].getWorldPosition(this.flash.position);
     this.flash.material.color.set(pose.color);
     this.flash.material.rotation = pose.t * 9;
     this.flash.scale.setScalar(1 + pose.stage * 0.7);
