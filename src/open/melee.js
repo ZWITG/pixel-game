@@ -1101,7 +1101,7 @@ export default class Melee {
         const tell = e.mode === 'tell' || e.mode === 'strike';
         if ((!e.turn && !tell) || e.foe !== this.player) continue;
         const dx = e.x - state.x, dz = e.z - state.z, a = Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz);
-        if (Math.abs(a) > 1.05) list.push({ a, tell });
+        if (Math.abs(a) > 1.05) list.push({ a, tell, peril: tell && !!e.peril });
       }
     }
     this.hud.setThreats(list.slice(0, 6));

@@ -12,6 +12,8 @@ import { makeWatcher } from './watcherForms.js';
 import { machineMesh, DOCTRINES } from './doctrines.js';
 import { arm, stagger, standDown, TURN_TAKERS } from './foes.js';
 import { rumble } from './rumble.js';
+import Tells from './tells.js';
+import { FEATURES } from '../config/features.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
 import { nearSolids } from './solidGrid.js';
 
@@ -79,6 +81,7 @@ export default class Monsters {
     this.waves = [];
     this.quake = null;
     this.time = 0;
+    this.tells = new Tells(scene);
     this.spawnIn = 0;
     this.evolveIn = 0;
     this.player = { x: 0, z: 0, dead: false };
@@ -175,7 +178,10 @@ export default class Monsters {
   warn(e, move) {
     const hero = e.foe;
     if (!hero) return;
-    hero.hud.float('!', e.x, e.group.position.y + 4 * e.group.scale.x * 0.4 + 2, e.z, move.heavy ? '#ff4a3a' : '#ffd24a');
+    e.peril = !!move.heavy;
+    if (FEATURES.tells) this.tells.show(e, move.heavy, hero, e.mode === 'tell' ? e.until : 0, this.time);
+    else hero.hud.float('!', e.x, e.group.position.y + 4 * e.group.scale.x * 0.4 + 2, e.z, move.heavy ? '#ff4a3a' : '#ffd24a');
+    if (move.heavy && FEATURES.tells) hero.melee.ring(e.x, e.group.position.y, e.z, e.radius + 1.5, '#ff3a2a');
     if (move.area) hero.melee.ring(e.x, e.group.position.y, e.z, move.area + e.radius, '#ff6a4a');
   }
 
@@ -490,6 +496,7 @@ export default class Monsters {
 
   update(dt) {
     this.time += dt;
+    this.tells.update(dt, this.time);
     const out = this.players.filter((p) => !p.rooms.house);
     if ((this.spawnIn -= dt) <= 0 && out.length) {
       this.spawnIn = SPAWN_EVERY;

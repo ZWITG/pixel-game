@@ -194,6 +194,7 @@ export default class WorldHud {
         el.style.setProperty('--a', `${v}rad`);
       });
       toggle(el, 'tell', t.tell);
+      toggle(el, 'peril', t.peril);
     });
   }
 

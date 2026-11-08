@@ -17,6 +17,7 @@ export const FEELS = {
   block: [70, 0.45, 0.1],        // a dull thud
   guardBroken: [260, 0.9, 0.4],
   vanish: [60, 0, 0.5],
+  peril: [90, 0.4, 0.15],        // a foe winds up a blow that breaks a guard
   dodge: [35, 0, 0.25],
   hurt: [140, 0.6, 0.25],        // scaled by how hard the blow was
   broken: [380, 1, 0.6],         // the hero's own Structure gives way
