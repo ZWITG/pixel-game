@@ -21,6 +21,7 @@ export const COMBAT = {
     finisher: { name: 'Finisher', power: 3, posture: 3, time: 0.7, react: 'fly', reach: 6 },
     spike: { name: 'Spike', power: 2, posture: 2, time: 0.42, react: 'spike' },
     execute: { name: 'Execute', power: 3.5, posture: 0, time: 0.7, react: 'fly' },
+    riposte: { name: 'Riposte', power: 1.6, posture: 0, time: 0.58, react: 'knockdown' },
   },
   repeat: 0.5,          // the same smash twice in one string: this much, and the string ends
   // How a blow throws a monster: tiles per second away, and up.
@@ -45,6 +46,9 @@ export const COMBAT = {
   parry: { perfect: 0.12, plain: 0.22 },
   counter: { perfect: 2, plain: 1.5, secs: 1.8 },
   parried: { perfect: 1.6, plain: 1 },    // seconds a parried foe is dazed
+  // Riposte (v0.47.0): after a Perfect parry, Square within `window` seconds (the world slowed for `slow`)
+  // strikes back up close: the Riposte smash (doubled by the counter) plus `base` + `share` of the foe's Structure.
+  riposte: { window: 0.65, slow: 0.45, base: 2, share: 0.12 },
   // Parries break Structure (v0.43.0): `base` points plus `share` of the foe's whole Structure, and each parry in a
   // row (within `chainSecs` of the last, no hit taken between) adds `chain` more, up to `chainMost` steps.
   parryPosture: { perfect: 3, plain: 2, share: { perfect: 0.15, plain: 0.07 }, chain: 0.35, chainMost: 3, chainSecs: 3 },

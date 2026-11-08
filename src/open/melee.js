@@ -25,7 +25,7 @@ const HIT_AT = 0.4;          // how far through the punch the blow lands
 const SMASH_AT = 0.5;        // and through a smash
 const HOMING_MOST = 34;      // tiles per second a blow can close in on its target
 // What the body does for each smash, and for the last hit of a chain.
-const SMASH_POSE = { breaker: 'punch', launcher: 'uppercut', sweep: 'sweep', driver: 'kick', slam: 'slam', finisher: 'punch', spike: 'slam', execute: 'kick' };
+const SMASH_POSE = { breaker: 'punch', launcher: 'uppercut', sweep: 'sweep', driver: 'kick', slam: 'slam', finisher: 'punch', spike: 'slam', execute: 'kick', riposte: 'kick' };
 const PURSUE_TIME = 0.18;    // seconds to fly up to a launched foe
 const LUNGE = 3;             // tiles per second, stepping into the punch
 const WAVE_SPEED = 45;       // tiles per second; things break as the wave reaches them
@@ -59,6 +59,7 @@ const FINISHERS = {
   quick: [{ at: 0, pose: 'windup' }, { at: 0.2, pose: 'kick', end: true, react: 'fly' }],
   rush: [{ at: 0, pose: 'hold' }, { at: 0.24, pose: 'punch', arm: 0, hit: true }, { at: 0.42, pose: 'punch', arm: 1, hit: true }, { at: 0.62, pose: 'windup' }, { at: 0.74, pose: 'uppercut', end: true, react: 'launch' }],
   reap: [{ at: 0, pose: 'hold' }, { at: 0.26, pose: 'sweep', hit: true }, { at: 0.5, pose: 'gather' }, { at: 0.7, pose: 'slam', end: true, react: 'bounce' }],
+  riposte: [{ at: 0, pose: 'windup' }, { at: 0.12, pose: 'punch', arm: 1, hit: true }, { at: 0.3, pose: 'kick', end: 'riposte', react: 'knockdown' }],
   giant: [{ at: 0, pose: 'gather' }, { at: 0.2, pose: 'rising', rise: 15 }, { at: 0.55, pose: 'punch', arm: 0, hit: true }, { at: 0.68, pose: 'slam', fall: true }, { at: 0.8, pose: 'slam', end: true, react: 'knockdown' }],
 };
 const FINISH_AFTER = 0.28;   // seconds the last pose holds after the Execute
@@ -152,6 +153,7 @@ export default class Melee {
     this.closeUp = 0;          // seconds the camera leans in after an Execute or a Perfect parry
     this.finishing = null;     // a paired finisher playing: { e, seq, t, next, ... }
     this.finishTurn = 0;       // alternates the two mid-size finishers
+    this.riposte = null;       // after a Perfect parry: { e, until } while Square strikes back
     this.parryAt = -9;
     this.rallyAt = -9;
     this.counterBy = 1;
@@ -225,6 +227,12 @@ export default class Melee {
   // Square: the next light hit of the rush chain, on the ground or in the air.
   punch(state) {
     if (this.finishing) return undefined;
+    const r = this.riposte;
+    if (r) {
+      this.riposte = null;
+      const e = r.e, gap = Math.hypot(e.x - state.x, e.z - state.z) - (e.radius ?? 1);
+      if (this.clock < r.until && !e.dying && this.monsters.list.includes(e) && gap < COMBAT.homing + 1.5 && !state.air) return this.finish(state, e, 'riposte');
+    }
     if (this.active) {
       this.queued = 'light'; // remembered, so mashing Square keeps the chain going
       return;
@@ -380,10 +388,10 @@ export default class Melee {
   // A paired finisher on a Broken foe: the hero seizes it and the two play one of FINISHERS together. The foe is
   // held dazed in place, the hero can't be hurt, other foes hold their attacks (foes.js), and the camera comes in
   // from the side (player.js, main.js duelFrame). The last beat is the Execute, through land() as before.
-  finish(state, e) {
+  finish(state, e, ask = null) {
     const { monsters } = this, crowd = (this.duel?.count ?? 0) >= 4;
     const big = (e.radius ?? 1) > 1.3 || !!e.def.boss || !!e.watch;
-    const kind = big ? 'giant' : crowd || (monsters.structure(e) <= 3.5) ? 'quick' : (this.finishTurn++ % 2 ? 'reap' : 'rush');
+    const kind = ask ?? (big ? 'giant' : crowd || monsters.structure(e) <= 3.5 ? 'quick' : this.finishTurn++ % 2 ? 'reap' : 'rush');
     const seq = FINISHERS[kind], total = seq[seq.length - 1].at + FINISH_AFTER;
     const dx = e.x - state.x, dz = e.z - state.z, d = Math.hypot(dx, dz) || 1;
     this.finishing = { e, kind, seq, t: 0, next: 0, total, fx: dx / d, fz: dz / d, from: [state.x, state.z], pose: { move: 'windup', arm: 0 } };
@@ -397,7 +405,7 @@ export default class Melee {
     stagger(e, total + 0.5, monsters.time, true);
     e.vel.set(0, 0);
     this.player.world.watchers?.saw(this.player, 'smash', this.hits);
-    this.work.slow = Math.max(this.work.slow ?? 0, 0.12);
+    if (kind !== 'riposte') this.work.slow = Math.max(this.work.slow ?? 0, 0.12);
     rumble(this.player, 'jab');
     return true;
   }
@@ -441,9 +449,14 @@ export default class Melee {
       rumble(this.player, 'finisher');
     }
     if (b.end) {
-      const def = COMBAT.smash.execute;
-      const a = { kind: 'smash', name: 'execute', power: def.power, chain: 4, time: def.time, hitAt: 0, target: e, t: 0, fx: f.fx, fz: f.fz, landed: true, react: b.react };
+      const name = b.end === 'riposte' ? 'riposte' : 'execute', def = COMBAT.smash[name];
+      const a = { kind: 'smash', name, power: def.power, chain: 4, time: def.time, hitAt: 0, target: e, t: 0, fx: f.fx, fz: f.fz, landed: true, react: b.react };
       this.land(a, state);
+      if (name === 'riposte' && !e.dying) {
+        const { riposte } = COMBAT;
+        this.hud.float('Riposte!', e.x, e.group.position.y + 4, e.z, '#ffffff');
+        this.monsters.wear(e, riposte.base + riposte.share * this.monsters.structure(e));
+      }
     }
   }
 
@@ -581,6 +594,14 @@ export default class Melee {
       if (perfect) {
         this.work.impact = COMBAT.impact;
         this.closeUp = 0.4;
+        // The Riposte: a moment to strike back, the world slowed so it can be read.
+        if (FEATURES.riposte && from && !from.dying && !this.player.rooms.house) {
+          this.riposte = { e: from, until: this.clock + COMBAT.riposte.window };
+          this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.riposte.slow);
+          const key = this.player.controls.device === 'pad' ? '\u25a1' : 'J';
+          this.hud.float(`${key} Riposte`, from.x, from.group.position.y + 4.6, from.z, '#ffffff');
+          this.ring(from.x, from.group.position.y, from.z, (from.radius ?? 1) + 1.2, '#ffffff');
+        }
       }
       this.countering = counter.secs;
       this.counterBy = perfect ? counter.perfect : counter.plain;

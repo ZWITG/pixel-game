@@ -52,6 +52,7 @@ export const FEATURES = {
   armies: true,         // open world: nation armies and coalitions at Calamity and Omega: march, squads, morale, Commander, supply, truce (armies.js)
   impactFrames: true,   // open world: two-tone ink frames on smashes and Perfect parries (also a Settings switch)
   rally: true,          // open world: grey health a blow took, won back by hitting back, blocking or parrying (melee.js)
+  riposte: true,        // open world: Square right after a Perfect parry strikes back up close: big damage and Structure (melee.js)
   finishers: true,      // open world: Triangle on a Broken foe plays a paired finisher (seize, beats, Execute) by foe size (melee.js)
   tells: true,          // open world: gold glint on a foe's wind-up (block or parry), red for a guard-breaking blow (dodge or Perfect parry) (tells.js)
   rumble: true,         // open world: controller rumble for hits, blocks, parries and being hurt (rumble.js; also a Settings switch)
