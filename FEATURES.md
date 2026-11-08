@@ -161,6 +161,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [x] The Watchers (v0.40.0): the combat upgrade plan is done
 
 ## Changelog
+- 2026-11-08 v0.53.1 craters are round across patch edges (the user's screenshot showed a square pit with sheer walls): dug land comes in 32-tile patches, and a blow only dug the one patch its centre landed in, so a big blast near an edge stopped dead there and left straight walls of untouched land. Now a blow digs every patch it reaches. Points on the line between two patches now belong to one of them, so the hero no longer stands on air there
 - 2026-11-08 v0.53.0 finisher, Riposte and clash animations (combat animations, part 4, the last): one keyframed clip per paired finisher and the Riposte, timed to their beats, and a braced clash pose for the hero and the foe that leans with the clash bar
 - 2026-11-08 v0.52.0 foe animations (combat animations, part 3): wind-ups by move, strikes swung through, recovery, staggers and a Broken slump for human foes; squash-and-stretch wind-ups and lunges for beasts, slimes and boars
 - 2026-11-08 v0.51.0 hero defence and hit animations (combat animations, part 2): block, guard break, parry, Perfect parry, hits by direction and weight, Vanish, Breakout and a swaying Broken pose

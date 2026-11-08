@@ -66,7 +66,8 @@ export default class Digs {
   }
 
   at(x, z) {
-    return this.list.find((p) => Math.abs(x - p.x) < HALF && Math.abs(z - p.z) < HALF) ?? null;
+    // Half-open, so a point on the line between two patches belongs to exactly one of them.
+    return this.list.find((p) => x - p.x >= -HALF && x - p.x < HALF && z - p.z >= -HALF && z - p.z < HALF) ?? null;
   }
 
   // Turns a patch of land into voxels, its middle on a grid so patches meet edge to edge.
@@ -122,7 +123,7 @@ export default class Digs {
     const waiting = p.pending ?? [];
     p.pending = null;
     for (const [x, , z, r] of p.cuts) this.bare(p, x, z, r);
-    for (const [x, y, z, r, hero, deep] of waiting) this.blast(x, y, z, r, hero, deep);
+    for (const [x, y, z, r, hero] of waiting) this.cutIn(p, x, y, z, r, hero);
     this.holes();
   }
 
@@ -172,19 +173,41 @@ export default class Digs {
   // A blow: dig if it lands in a patch, comes down hard enough to dig, or is driven into a hillside.
   blast(x, y, z, r, hero, deep) {
     const feet = hero.state.y + hero.state.air, ground = height(x, z);
-    let p = this.at(x, z);
     const into = ground > feet + HILLSIDE, down = deep > 0;
-    if (!p && !into && !down) return false;
-    p ??= this.make(x, z);
-    if (!p) return false;
-    // A patch still being built: the blow lands as soon as it's ready.
-    if (!p.vox?.ready) {
-      (p.pending ??= []).push([x, y, z, r, hero, deep]);
-      return true;
+    if (!this.at(x, z) && !into && !down) return false;
+    const cut = down ? Math.max(r, deep * 0.9) : r, cy = down ? Math.min(y, ground - r * 0.25) : y;
+    // Every patch the blow reaches, not just the one it lands in: a crater across a patch edge used to stop
+    // dead at it, leaving a square pit with sheer walls of untouched land (v0.53.1).
+    let any = false;
+    for (const [px, pz] of this.cover(x, z, cut)) {
+      const p = this.at(px, pz) ?? this.make(px, pz);
+      if (!p) continue;
+      this.cutIn(p, x, cy, z, cut, hero);
+      any = true;
     }
-    const cut = down ? Math.max(r, deep * 0.9) : r;
+    return any;
+  }
+
+  // The middles of the patches a circle of radius `r` around (x, z) reaches.
+  cover(x, z, r) {
+    const out = [], step = HALF * 2;
+    for (let cz = Math.round((z - r) / step) * step; cz <= Math.round((z + r) / step) * step; cz += step) {
+      for (let cx = Math.round((x - r) / step) * step; cx <= Math.round((x + r) / step) * step; cx += step) {
+        const nx = Math.max(cx - HALF, Math.min(x, cx + HALF)), nz = Math.max(cz - HALF, Math.min(z, cz + HALF));
+        if (Math.hypot(nx - x, nz - z) < r) out.push([cx, cz]);
+      }
+    }
+    return out;
+  }
+
+  // One patch's share of a blow. A patch still being built takes it as soon as it's ready.
+  cutIn(p, x, cy, z, cut, hero) {
+    if (!p.vox?.ready) {
+      (p.pending ??= []).push([x, cy, z, cut, hero]);
+      return;
+    }
     // Never through the bottom of the patch, nor below the water: a pit always keeps a floor of rock.
-    const low = Math.max(p.vox.vol.oy + KEEP_FLOOR, SEA_FLOOR), cy = down ? Math.min(y, ground - r * 0.25) : y;
+    const low = Math.max(p.vox.vol.oy + KEEP_FLOOR, SEA_FLOOR);
     if (this.voxels.hit(p, x, cy, z, cut, hero, null, low)) {
       this.bare(p, x, z, cut);
       this.holes();
