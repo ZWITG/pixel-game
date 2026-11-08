@@ -8,9 +8,16 @@ import { STORM } from './kits/storm.js';
 import { EMBER } from './kits/ember.js';
 import { FROST, iceMat } from './kits/frost.js';
 import { VOID } from './kits/void.js';
+import { TIME } from './kits/time.js';
+import { TIDE } from './kits/tide.js';
+import { BLIGHT } from './kits/blight.js';
+import { MIND } from './kits/mind.js';
+import { NIGHT } from './kits/night.js';
 
 // Conquerors whose kits have their own power kinds and hooks (kits/*.js).
-const KITS = { titan: TITAN, storm: STORM, ember: EMBER, frost: FROST, void: VOID };
+const KITS = { titan: TITAN, storm: STORM, ember: EMBER, frost: FROST, void: VOID, time: TIME, tide: TIDE, blight: BLIGHT, mind: MIND, night: NIGHT };
+// The second five's elements have no shell or flame of their own: light, rings and motes in two colours.
+export const LOOKS = { time: ['#7af0d0', '#f4ffe0'], water: ['#3ab8ff', '#e0f6ff'], blight: ['#9ad13a', '#3e5a10'], mind: ['#ff4ad0', '#ffd8f4'], night: ['#6a6cff', '#0c0a1e'] };
 import { Flames, makeBolt, shapeBolt } from './elementFx.js';
 
 // What a power does when it's used, by `kind`, and the light it makes. Each hero has a PowerSet;
@@ -32,7 +39,14 @@ const STRIKE_WAIT = 0.45;
 const SHADE_REACH = 15, SHADE_EVERY = 0.8;
 const TRAIL_EVERY = 3;       // tiles between patches of a fiery trail
 const SOLID_STEP = 1.5;      // tiles between checks along a dash
-const CAST_POSE = { bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam', pillar: 'slam', slab: 'throw', surf: 'dash', mail: 'gather', garden: 'slam', sand: 'slam', rift: 'slam', mountain: 'gather', ironbend: 'peak', magma: 'slam', gather: 'peak', thunder: 'peak', step: 'dash', spear: 'throw', railgun: 'gather', current: 'gather', cyclone: 'peak', magnet: 'peak', plasma: 'punch', fist: 'punch', ignite: 'peak', jet: 'dash', flare: 'slam', serpent: 'punch', inferno: 'peak', blue: 'punch', meteor: 'peak', sunlance: 'punch', supernova: 'slam', forge: 'gather', armor: 'gather', hail: 'peak', prison: 'punch', rime: 'slam', mirror: 'gather', glacier: 'slam', sea: 'slam', rise: 'gather', command: 'peak', swap: 'dash', lance: 'punch', tide: 'punch', burst: 'slam', gate: 'gather', amalgam: 'gather', reap: 'peak' };
+const CAST_POSE = {
+  // The second five (v0.54.0).
+  stop: 'gather', rewind: 'gather', wither: 'punch', echo: 'gather', quicken: 'gather', loop: 'peak', epoch: 'peak', entropy: 'slam',
+  lash: 'throw', breaker: 'slam', geyser: 'peak', orb: 'punch', maelstrom: 'peak', monsoon: 'peak', deluge: 'slam', tsunami: 'slam',
+  bile: 'throw', miasma: 'slam', locusts: 'peak', pustule: 'peak', rotland: 'slam', host: 'punch', pestilence: 'gather', deathbloom: 'slam',
+  psylance: 'punch', enthrall: 'peak', kinesis: 'throw', dread: 'peak', crush: 'punch', discord: 'peak', usurp: 'gather', sowwar: 'gather',
+  knives: 'throw', vanish: 'gather', shadowstep: 'dash', snuff: 'peak', grasp: 'slam', deathmark: 'punch', eclipse: 'peak', nightfall: 'slam',
+  bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam', pillar: 'slam', slab: 'throw', surf: 'dash', mail: 'gather', garden: 'slam', sand: 'slam', rift: 'slam', mountain: 'gather', ironbend: 'peak', magma: 'slam', gather: 'peak', thunder: 'peak', step: 'dash', spear: 'throw', railgun: 'gather', current: 'gather', cyclone: 'peak', magnet: 'peak', plasma: 'punch', fist: 'punch', ignite: 'peak', jet: 'dash', flare: 'slam', serpent: 'punch', inferno: 'peak', blue: 'punch', meteor: 'peak', sunlance: 'punch', supernova: 'slam', forge: 'gather', armor: 'gather', hail: 'peak', prison: 'punch', rime: 'slam', mirror: 'gather', glacier: 'slam', sea: 'slam', rise: 'gather', command: 'peak', swap: 'dash', lance: 'punch', tide: 'punch', burst: 'slam', gate: 'gather', amalgam: 'gather', reap: 'peak' };
 const STATUS_COLORS = { burn: ['#ff9a3a', '#ff5a2a', '#ffd070'], freeze: ['#dff4ff', '#8fe0ff'], shock: ['#fff4b0', '#ffe25a'] };
 const GLOWS = 160, PILLARS = 20, DISCS = 12, BOLTS = 18, CRYSTALS = 60, ROCKS = 60, SHELLS = 16, HOLES = 6;
 const SKY = 46;              // tiles up that falling things start
@@ -89,6 +103,21 @@ export class PowerFx {
     const ice = new THREE.MeshLambertMaterial({ color: '#d8f4ff', emissive: '#4ac0f0', emissiveIntensity: 0.9, flatShading: true });
     const black = new THREE.MeshBasicMaterial({ color: '#000000', fog: false });
     this.shells = { earth: pool(SHELLS, () => new THREE.Mesh(lump, stone)), ice: pool(SHELLS, () => new THREE.Mesh(shard, ice)), void: pool(SHELLS, () => new THREE.Mesh(ball, black)), fire: pool(SHELLS, () => new THREE.Mesh(lump, new THREE.MeshBasicMaterial({ color: '#ffb040', fog: false }))) };
+    // The second five's thrown cores (v0.54.0).
+    const solid = (color) => new THREE.MeshBasicMaterial({ color, fog: false });
+    Object.assign(this.shells, {
+      time: pool(SHELLS, () => new THREE.Mesh(shard, solid('#bffff0'))),
+      water: pool(SHELLS, () => new THREE.Mesh(ball, solid('#9ae6ff'))),
+      blight: pool(SHELLS, () => new THREE.Mesh(lump, solid('#a8d83a'))),
+      mind: pool(SHELLS, () => new THREE.Mesh(shard, solid('#ff9ae8'))),
+      night: pool(SHELLS, () => new THREE.Mesh(shard, solid('#14142a'))),
+    });
+    // The Tidebringer's water (kits/tide.js): lakes that rise over the land, and walls of sea. Built
+    // now and kept hidden, so they never compile a shader mid-fight.
+    const sea = new THREE.MeshLambertMaterial({ color: '#2a8ac8', emissive: '#0a3050', transparent: true, opacity: 0.74, depthWrite: false });
+    const crest = new THREE.MeshLambertMaterial({ color: '#7ad0f0', emissive: '#1a5070', transparent: true, opacity: 0.82, depthWrite: false });
+    this.lakes = pool(3, () => new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 56, 1), sea));
+    this.seawalls = pool(2, () => new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1, 8, 1, 1), crest));
     this.holes = pool(HOLES, () => new THREE.Mesh(ball, black));
     // Materials kits make on demand (the Frostwarden's ice weapons): a hidden stand-in each, so the
     // shader warm-up in main.js builds them before they're first needed.
@@ -226,6 +255,13 @@ export class PowerFx {
       this.lightning(top, foot, '#a8c8ff', 0.22, 0.3);
       around((px, pz) => this.lightning(foot, { x: px, y, z: pz }, '#fff48a', 0.12, 0.22));
       this.glow(x, y + 2, z, r * 1.6, '#fff6c0', 0.3, 1.5);
+    } else if (LOOKS[element]) {
+      const [a, b] = LOOKS[element];
+      this.glow(x, y + 1.2, z, r * 1.6, a, 0.45, 1.8);
+      this.glow(x, y + 1.2, z, r * 0.8, b, 0.3, 1.4);
+      this.disc(x, y, z, r * 1.2, a, 0.5);
+      around((px, pz) => this.glow(px, y + 0.6 + Math.random() * 1.5, pz, 0.9 + Math.random(), Math.random() < 0.5 ? a : b, 0.5, 0.4));
+      if (element === 'night' || element === 'blight') this.hole(x, y + r * 0.15, z, Math.max(0.6, r * 0.3), 0.45);
     } else if (element === 'void') {
       this.hole(x, y + r * 0.2, z, Math.max(0.8, r * 0.4), 0.55);
       around((px, pz) => this.lightning({ x, y: y + 1, z }, { x: px, y, z: pz }, '#9a3aff', 0.1, 0.3));
@@ -245,6 +281,7 @@ export class PowerFx {
         for (let i = 0; i < n; i++) {
           const a = (i / n) * 6.283, px = x + Math.cos(a) * radius, pz = z + Math.sin(a) * radius;
           if (element === 'fire') this.flame(px, y, pz, 3.6, 0.55, 0);
+          else if (LOOKS[element]) this.glow(px, y + 0.8, pz, 1.6, LOOKS[element][i % 2], 0.45, 0.6);
           else if (element === 'void') this.flame(px, y, pz, 3, 0.6, 1);
           else if (element === 'ice') this.crystal(px, y, pz, 2.4 + Math.random() * 2, 0.34 + Math.random() * 0.3);
           else if (element === 'earth') this.rock(px, y, pz, 0.45 + Math.random() * 0.4, 1.6);
@@ -258,6 +295,7 @@ export class PowerFx {
   aura(element, x, y, z, r) {
     const a = Math.random() * 6.283, px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
     if (element === 'fire') this.flame(px, y, pz, 2.4, 0.55, 0);
+    else if (LOOKS[element]) this.glow(px, y + 1 + Math.random() * 1.5, pz, 0.6, LOOKS[element][Math.random() < 0.7 ? 0 : 1], 0.5, 0.4);
     else if (element === 'void') this.flame(px, y, pz, 2.2, 0.6, 1);
     else if (element === 'storm') this.lightning({ x, y: y + 1.6, z }, { x: px, y: y + Math.random() * 2, z: pz }, '#fff48a', 0.08, 0.14);
     else this.glow(px, y + 1 + Math.random() * 1.5, pz, 0.5, element === 'ice' ? '#bfeaff' : '#a89070', 0.5, 0.4);
@@ -358,6 +396,7 @@ export default class PowerSet {
   // Permanent: nothing in the game calls this once a conqueror is set.
   choose(id) {
     this.id = id;
+    this.kit = [];
     this.loadout = Object.keys(CONQUERORS[id].powers).slice(0, 2).concat([null, null]);
     this.save();
   }

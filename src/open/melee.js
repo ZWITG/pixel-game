@@ -1105,6 +1105,8 @@ export default class Melee {
     }
     // A smash on a frozen foe Shatters it (the Frostwarden).
     if (smash && t?.def) force *= this.player.powers.kitDef?.smashed?.(this.player.powers, t, a) ?? 1;
+    // Any blow on a foe, for kits that bend every hit (an Ambush from the dark, a Soaked foe, Infection).
+    if (t?.def) force *= this.player.powers.kitDef?.blow?.(this.player.powers, t, a) ?? 1;
     // A Conqueror's own Finisher (the Titan's Pillar Uppercut); smashes on a sunken foe hit twice as hard.
     if (a.name === 'finisher' && t?.def) react = this.player.powers.kitDef?.finisher?.(this, t) ?? react;
     if (smash && t?.sunkUntil > this.monsters.time) {

@@ -95,8 +95,10 @@ export default class ConquerorPick {
       else if (just.back) this.act('no');
       return;
     }
-    if (just.left || just.up) this.move(-1);
-    else if (just.right || just.down) this.move(1);
+    // Two rows of five since v0.54.0: up and down change row.
+    if (just.left) this.move(-1);
+    else if (just.right) this.move(1);
+    else if (just.up || just.down) this.move(5);
     else if (just.confirm) this.act('go');
   }
 }

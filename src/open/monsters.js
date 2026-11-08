@@ -172,13 +172,15 @@ export default class Monsters {
 
   // Is there room for one more to attack this monster's hero?
   takeTurn(e) {
-    return this.list.filter((m) => m.turn && m.foe === e.foe).length < TURN_TAKERS;
+    // A foe turned on its own (a Sovereign's) fights without waiting its turn, and takes no hero's turn.
+    if (e.lured?.foe) return true;
+    return this.list.filter((m) => m.turn && m.foe === e.foe && !m.lured).length < TURN_TAKERS;
   }
 
   // The warning before an attack: a mark over its head, and a ring on the ground for an area.
   warn(e, move) {
     const hero = e.foe;
-    if (!hero) return;
+    if (!hero || e.lured?.foe) return;
     e.peril = !!move.heavy;
     if (FEATURES.tells) this.tells.show(e, move.heavy, hero, e.mode === 'tell' ? e.until : 0, this.time);
     else hero.hud.float('!', e.x, e.group.position.y + 4 * e.group.scale.x * 0.4 + 2, e.z, move.heavy ? '#ff4a3a' : '#ffd24a');
@@ -475,7 +477,7 @@ export default class Monsters {
     this.work.shake = Math.max(this.work.shake, 0.2);
     this.work.shakeAt = s;
     // Brought down in a Watcher's Trial, a hero is spared.
-    if (p.hp <= 0 && !this.world.watchers?.spare(p)) p.down();
+    if (p.hp <= 0 && !this.world.watchers?.spare(p) && !p.powers.kitDef?.spare?.(p.powers)) p.down();
     p.hud.setHealth(p.hp / p.body.maxHealth);
   }
 
@@ -596,6 +598,15 @@ export default class Monsters {
           this.player.x = decoy.x;
           this.player.z = decoy.z;
         }
+        // A kit may turn this one's mind (v0.54.0): `{ foe }` fights another foe (Enthrall, Discord),
+        // `{ lost: true }` can't find the hero at all (the Nightbringer unseen).
+        const lure = e.def.watcher ? null : hero.powers.kitDef?.lure?.(hero.powers, e) ?? null;
+        e.lured = lure;
+        if (lure?.lost) this.player.dead = true;
+        else if (lure?.foe) {
+          this.player.x = lure.foe.x;
+          this.player.z = lure.foe.z;
+        }
       }
       if (e.evolving !== undefined && !e.dying) updateEvolving(e, dt, this.time, (m, tier) => this.evolved(m, tier));
       this.pushing = e;
@@ -610,7 +621,7 @@ export default class Monsters {
         e.update(dt);
         // Ice underfoot steals most of every step.
         // Quicksand and rifts hold it too.
-        const drag = this.world.scars.drag(wasX, wasZ) * (e.sunkUntil > this.time ? 0.2 : 1);
+        const drag = this.world.scars.drag(wasX, wasZ) * (e.sunkUntil > this.time ? 0.2 : 1) * (e.slow && e.slow.until > this.time ? e.slow.k : 1);
         if (drag < 1) {
           e.group.position.x = wasX + (e.group.position.x - wasX) * drag;
           e.group.position.z = wasZ + (e.group.position.z - wasZ) * drag;

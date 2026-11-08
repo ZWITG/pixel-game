@@ -1,6 +1,7 @@
 import { PLACES, TOWNS, WORLD } from './terrain.js';
-import { powerOrder, branchOf } from './branches.js';
-import { prompt } from '../ui/glyphs.js';
+import { powerOrder, branchOf, BRANCHES } from './branches.js';
+import { ULTIMATES } from './ultimate.js';
+import { prompt, keyHtml } from '../ui/glyphs.js';
 import { QUALITY, saveSettings } from './startMenu.js';
 import { svg, MAX_RANK } from './powers.js';
 import { NATIONS, nationAt, COUNTRY } from './nations.js';
@@ -42,7 +43,7 @@ const SHAPES = {
 const TABS = [['map', 'Map'], ['nations', 'Nations'], ['powers', 'Powers'], ['gifts', 'Gifts'], ['skills', 'Skills'], ['satchel', 'Satchel'], ['watchers', 'Watchers'], ['controls', 'Controls'], ['settings', 'Settings']];
 export const SATCHEL_TAB = 5;
 const TERRITORY = 128;      // cells across the map's overlay of borders
-const POWER_COLS = 4, DIRS = ['up', 'right', 'down', 'left'], DIR_NAMES = ['Up', 'Right', 'Down', 'Left'];
+const DIRS = ['up', 'right', 'down', 'left'], DIR_NAMES = ['Up', 'Right', 'Down', 'Left'];
 // What a place is short of and has plenty of, for the map.
 function marketLine(economy, s) {
   const { short, cheap } = economy.outlook(s), name = (g) => GOODS[g].name.toLowerCase();
@@ -112,7 +113,12 @@ export default class GameMenu {
         this.at = Number(card.dataset.card);
         this.assigning = false;
         this.drawPage();
-      } else if (slot && this.assigning) this.place(Number(slot.dataset.slot));
+      } else if (slot && this.assigning) {
+        // Both pages of the cross are shown (v0.54.0): slots 4 to 7 are the L1 page.
+        const k = Number(slot.dataset.slot);
+        this.powerPage = k >= 4 ? 1 : 0;
+        this.place(k % 4);
+      }
     });
     setTimeout(() => this.survey(), SURVEY_AFTER);
   }
@@ -277,34 +283,77 @@ export default class GameMenu {
   }
 
   // The Conqueror's eight powers, and the D-pad cross they're worn on.
+  // The Conqueror's powers as a tree (v0.54.0): a column per branch, each a path of powers in the
+  // order they open, joined where they're open; both pages of the D-pad at once; the chosen power's
+  // numbers now and at the next rank; the passive and the ultimate underneath.
+  // `this.at` is still an index into powerOrder(), so equipping (place) is unchanged.
+  powerColumns(set) {
+    const ids = powerOrder(set.id, set.def.powers), own = BRANCHES[set.id]?.list ?? [];
+    const cols = own.map((b) => ({ ...b, at: b.powers.filter((id) => id in set.def.powers).sort((a, z) => set.def.powers[a].mastery - set.def.powers[z].mastery).map((id) => ids.indexOf(id)) })).filter((b) => b.at.length);
+    const placed = cols.flatMap((b) => b.at), rest = ids.map((_, i) => i).filter((i) => !placed.includes(i));
+    if (rest.length) cols.push({ name: 'Other', color: set.def.color, at: rest });
+    return cols;
+  }
+
   drawPowers() {
     const set = this.owner.powers, c = set.def;
     if (!c) {
       this.page.innerHTML = '';
       return;
     }
-    const ids = powerOrder(set.id, c.powers), pid = ids[this.at], def = c.powers[pid], rank = set.rank(pid), open = set.open(pid);
-    const page = this.powerPage ?? 0;
-    const slots = DIRS.map((dir, k) => {
-      const i = k + page * 4, worn = set.loadout[i];
-      return `<div data-slot="${k}" class="cross-${dir} ${this.assigning ? 'choosing' : ''}" style="color:${c.color}" title="${worn ? c.powers[worn].name : ''}">${worn ? svg(c.powers[worn].kind, 30) : ''}</div>`;
-    }).join('');
+    const ids = powerOrder(set.id, c.powers), pid = ids[this.at], def = c.powers[pid], rank = set.rank(pid), open = set.open(pid), mastery = set.mastery;
+    const device = this.owner.controls.device, page = this.powerPage ?? 0, br = branchOf(set.id, pid);
     const pips = (id) => Array.from({ length: MAX_RANK + 1 }, (_, i) => `<i class="${i <= set.rank(id) ? 'on' : ''}"></i>`).join('');
-    const cards = ids.map((id, i) => {
-      const q = c.powers[id], ok = set.open(id), worn = set.loadout.indexOf(id), br = branchOf(set.id, id);
-      return `<button data-card="${i}" class="${i === this.at ? 'at' : ''} ${ok ? '' : 'locked'}" style="--c:${br?.color ?? c.color}">
-        ${svg(ok ? q.kind : 'lock', 34)}<b>${q.name}</b>${br ? `<small class="branch">${br.name}</small>` : ''}<span class="pips">${ok ? pips(id) : `Mastery ${q.mastery}`}</span>${worn >= 0 ? `<em>${worn >= 4 ? 'L1 ' : ''}${DIR_NAMES[worn % 4]}</em>` : ''}
+    const cross = (pg) => `<div class="tree-cross ${pg === page ? 'on' : ''}"><div class="cross">${DIRS.map((dir, k) => {
+      const i = k + pg * 4, worn = set.loadout[i];
+      return `<div data-slot="${i}" class="cross-${dir} ${this.assigning && pg === page ? 'choosing' : ''}" style="color:${worn ? branchOf(set.id, worn)?.color ?? c.color : c.color}" title="${worn ? c.powers[worn].name : ''}">${worn ? svg(c.powers[worn].kind, 26) : ''}</div>`;
+    }).join('')}</div><small>${pg ? 'L1 + D-pad' : 'D-pad'}</small></div>`;
+    const node = (i) => {
+      const id = ids[i], q = c.powers[id], ok = set.open(id), worn = set.loadout.indexOf(id);
+      return `<button data-card="${i}" class="node ${ok ? 'open' : 'locked'} ${i === this.at ? 'at' : ''} ${worn >= 0 ? 'worn' : ''}">
+        <span class="gem">${svg(ok ? q.kind : 'lock', 24)}</span>
+        <span class="label"><b>${q.name}</b>${ok ? `<span class="pips">${pips(id)}</span>` : `<small>Mastery ${q.mastery}</small>`}</span>
+        ${worn >= 0 ? `<em>${worn >= 4 ? 'L1+' : ''}${DIR_NAMES[worn % 4]}</em>` : ''}
       </button>`;
-    }).join('');
+    };
+    const cols = this.powerColumns(set).map((b) => `<section class="tree-branch" style="--c:${b.color}"><h4>${b.name}</h4><div class="path">${b.at.map(node).join('')}</div></section>`).join('');
+    // Mastery: how far to the next power that opens.
+    const next = ids.map((id) => c.powers[id]).filter((q) => q.mastery > mastery).sort((a, z) => a.mastery - z.mastery)[0];
+    const from = Math.max(0, ...ids.map((id) => c.powers[id].mastery).filter((m) => m <= mastery));
+    const toNext = next ? (mastery - from) / Math.max(1, next.mastery - from) : 1;
+    // The chosen power's numbers, now and one rank on.
+    const scale = (r) => 1 + r * 0.4, wait = (r) => def.cool * (1 - r * 0.07);
+    const chips = [
+      def.power ? ['Power', `×${(def.power * scale(rank)).toFixed(1)}`] : null,
+      ['Wait', `${wait(rank).toFixed(1)}s`],
+      def.reach ? ['Reach', `${def.reach}`] : def.range ? ['Range', `${def.range}`] : def.width ? ['Width', `${def.width}`] : null,
+      def.secs ? ['Lasts', `${def.secs >= 60 ? `${Math.round(def.secs / 60)}m` : `${def.secs}s`}`] : null,
+    ].filter(Boolean).map(([k, v]) => `<span><small>${k}</small><b>${v}</b></span>`).join('');
     const skill = this.owner.skills.all().find((s) => s.id === set.skillOf(pid));
-    const stats = `<div class="power-bar"><i style="width:${Math.round((skill?.progress ?? 0) * 100)}%;background:${c.color}"></i></div>`;
-    this.page.innerHTML = `<div class="powers-page">
-      <div class="powers-head" style="color:${c.color}">${svg(c.emblem, 34)}<div><b>${c.name}</b><span>Mastery ${set.mastery}</span></div></div>
-      <div class="powers-main">
-        <div class="cross-wrap"><div class="cross">${slots}</div><small class="cross-page">${page ? 'L1 + D-pad' : 'D-pad'} · ${prompt('heavy', this.owner.controls.device)} other page</small></div>
-        <div class="power-grid">${cards}</div>
+    const later = rank < MAX_RANK ? `Rank ${rank + 2}: ${def.power ? `power ×${(def.power * scale(rank + 1)).toFixed(1)}, ` : ''}wait ${wait(rank + 1).toFixed(1)}s. Rank up by using it.` : 'Highest rank.';
+    const ult = ULTIMATES[set.id];
+    this.page.innerHTML = `<div class="tree-page" style="--hero:${c.color}">
+      <header class="tree-head">
+        <span class="tree-emblem">${svg(c.emblem, 38)}</span>
+        <div class="tree-title"><b>${c.name}</b><span>${c.tag}</span></div>
+        <div class="tree-mastery"><span>Mastery <b>${mastery}</b></span><div class="mbar"><i style="width:${Math.round(toNext * 100)}%"></i></div><small>${next ? `${next.name} opens at ${next.mastery}` : 'Every power is open'}</small></div>
+      </header>
+      <div class="tree-body">
+        <div class="tree-branches">${cols}</div>
+        <aside class="tree-side">
+          <div class="tree-loadout">${cross(0)}${cross(1)}</div>
+          <div class="tree-detail" style="--c:${br?.color ?? c.color}">
+            <div class="tree-name"><span class="gem">${svg(open ? def.kind : 'lock', 30)}</span><div><b>${def.name}</b><small>${br ? br.name : ''}${open ? ` · Rank ${rank + 1} of ${MAX_RANK + 1}` : ` · Opens at Mastery ${def.mastery}`}</small></div></div>
+            <p>${def.text}</p>
+            <div class="chips">${chips}</div>
+            ${open ? `<div class="power-bar"><i style="width:${Math.round((skill?.progress ?? 0) * 100)}%;background:${br?.color ?? c.color}"></i></div><small class="later">${later}</small>` : `<small class="later">${def.mastery - mastery} more Mastery: rank up the powers you have.</small>`}
+          </div>
+        </aside>
       </div>
-      <div class="power-info"><b>${def.name}</b>${open ? `<span>Rank ${rank + 1} of ${MAX_RANK + 1}</span>` : `<span>Opens at Mastery ${def.mastery}. You are at ${set.mastery}.</span>`}<p>${def.text}</p>${branchOf(set.id, pid) ? `<p style="color:${branchOf(set.id, pid).color}">${branchOf(set.id, pid).name}: ${branchOf(set.id, pid).text}</p>` : ''}${open ? stats : ''}</div>
+      <footer class="tree-foot">
+        <div class="trait"><em>Passive</em><p>${c.extra}</p></div>
+        ${ult ? `<div class="trait ult"><em>Ultimate · ${device === 'pad' ? prompt('recenter', device) : keyHtml('KeyQ')} + ${prompt('grab', device)} with full Wrath</em><b>${ult.name}</b></div>` : ''}
+      </footer>
     </div>`;
   }
 
@@ -349,10 +398,17 @@ export default class GameMenu {
       if (dir >= 0) this.place(dir);
       return;
     }
-    const n = powerOrder(set.id, set.def.powers).length, before = this.at;
-    if (just.left) this.at = (this.at + n - 1) % n;
-    if (just.right) this.at = (this.at + 1) % n;
-    if (just.up || just.down) this.at = (this.at + POWER_COLS) % n;
+    // Up and down walk a branch's path; left and right step to the next branch at the same height.
+    const cols = this.powerColumns(set), before = this.at;
+    const c = Math.max(0, cols.findIndex((b) => b.at.includes(this.at))), r = Math.max(0, cols[c].at.indexOf(this.at));
+    if (just.left || just.right) {
+      const to = cols[(c + (just.right ? 1 : cols.length - 1)) % cols.length];
+      this.at = to.at[Math.min(r, to.at.length - 1)];
+    }
+    if (just.up || just.down) {
+      const path = cols[c].at;
+      this.at = path[(r + (just.down ? 1 : path.length - 1)) % path.length];
+    }
     if (this.at !== before) this.drawPage();
     if (just.confirm) {
       const pid = powerOrder(set.id, set.def.powers)[this.at];

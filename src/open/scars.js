@@ -29,6 +29,7 @@ const ZAPS_PER_TICK = 5, ROCKS_PER_TICK = 4;
 const WET = 0.4;             // ground under this is water
 const SNOW_LINE = 285;
 const STEAM_SECS = 3, MAGMA_SECS = 7, BLIGHT_GEN = 2, MAGMA_BITE = 1.6;
+const SOAK_SECS = 40;        // how long water a Tidebringer leaves keeps the ground wet
 const REACTS_PER_TICK = 6;   // reactions shown each tick (they all still happen)
 export const REACTIONS = {
   steam: { name: 'Steam', color: '#e8f0f4' },
@@ -66,7 +67,7 @@ export default class Scars {
     const x = (i + 0.5) * CELL, z = (j + 0.5) * CELL, y = height(x, z), bad = region(x, z)[0];
     // Grass carries a fire; forest feeds it; bare badlands, roads and snow give it nothing.
     const fuel = y < 1.5 || y > SNOW_LINE || roadDistance(x, z) < 4 ? 0 : (0.45 + forest(x, z) * 0.55) * (1 - bad * 0.85);
-    c = { i, j, k, x, z, y, wet: y < WET, fuel, char: 0, frost: 0, rot: 0, burn: 0, charge: 0, rupture: 0, steam: 0, magma: 0, gen: 0, owner: null, force: 1, trees: null, shown: [] };
+    c = { i, j, k, x, z, y, wet: y < WET, fuel, char: 0, frost: 0, rot: 0, burn: 0, charge: 0, rupture: 0, steam: 0, magma: 0, soak: 0, gen: 0, owner: null, force: 1, trees: null, shown: [] };
     this.cells.set(k, c);
     return c;
   }
@@ -85,6 +86,27 @@ export default class Scars {
 
   // One cell catches. Fire and ice undo each other; water will not burn.
   take(c, kind, owner, gen, force) {
+    // The second five Conquerors (v0.54.0): water soaks and douses, blight rots, time leaves ash.
+    // Mind and night leave nothing on the land itself.
+    if (kind === 'mind' || kind === 'night') return false;
+    if (kind === 'water') {
+      if (c.burn > 0) {
+        c.burn = 0;
+        this.burning--;
+        this.react('steam', c, owner);
+      }
+      c.frost = Math.min(c.frost, 0.2);
+      c.soak = SOAK_SECS;
+      this.dirty = true;
+      return true;
+    }
+    if (kind === 'blight') kind = 'void';
+    if (kind === 'time') {
+      c.char = Math.max(c.char, 0.85);
+      if (c.fuel > 0.3) this.fellTrees(c);
+      this.dirty = true;
+      return true;
+    }
     // Void rots its way into any element already there, and sends it further.
     if (kind === 'void' && (c.burn > 0 || c.frost > 0.2 || c.charge > 0 || c.rupture > 0)) {
       c.gen += BLIGHT_GEN;
@@ -192,6 +214,7 @@ export default class Scars {
         this.fellTrees(c);
       }
     }
+    if (c.soak > 0) c.soak = Math.max(0, c.soak - dt);
     if (c.frost > 0) {
       c.frost = Math.max(0, c.frost - dt / FROST_SECS);
       if (c.gen > 0 && c.kind === 'ice') {
@@ -358,7 +381,7 @@ export default class Scars {
     this.reacts = REACTS_PER_TICK;
     for (const c of [...this.cells.values()]) {
       this.live(c);
-      const idle = !c.char && !c.frost && !c.rot && !c.burn && c.charge <= 0 && c.rupture <= 0 && c.steam <= 0 && c.magma <= 0;
+      const idle = !c.char && !c.frost && !c.rot && !c.burn && c.charge <= 0 && c.rupture <= 0 && c.steam <= 0 && c.magma <= 0 && !(c.soak > 0);
       const far = players.every((p) => Math.hypot(p.state.x - c.x, p.state.z - c.z) > STAY);
       if (idle || far) {
         if (c.burn > 0) this.burning--;

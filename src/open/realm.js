@@ -31,6 +31,7 @@ const NEAR_NATION = 900;     // tiles a raid or a field power reaches from a her
 const FIELD_GAP = 200, HUNT_GAP = 420, RAID_GAP = 240; // seconds between each, for one nation
 const SPACING = 240;         // tiles between settlements
 const CHRONICLE = 40;
+const PLAGUE_KILLS = 0.07, PLAGUE_SPREADS = 0.9, PLAGUE_REACH = 900, PLAGUE_FADES = 0.04;   // per day (v0.54.0)
 const SAY_NEAR = 700;        // tiles at which news reaches the hero as a message
 const FRONT_REACH = [260, 620]; // how far from a nation's seat toward a threat it builds
 const SWAY_FROM = 0.72, SWAY_BY = 0.56;
@@ -75,7 +76,7 @@ export default class Realm {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         day: this.day, time: this.time, news: this.news, nations: this.nations,
-        settlements: this.settlements.map((s) => ({ id: s.id, name: s.name, x: s.x, z: s.z, owner: s.owner, pop: s.pop, fixed: s.fixed, ...this.economy.save(s) })),
+        settlements: this.settlements.map((s) => ({ id: s.id, name: s.name, x: s.x, z: s.z, owner: s.owner, pop: s.pop, fixed: s.fixed, plague: s.plague || undefined, ...this.economy.save(s) })),
         runs: this.economy.saveRuns(),
         outposts: this.outposts.map(({ nation, x, z, name, done }) => ({ nation, x, z, name, done })),
       }));
@@ -419,6 +420,7 @@ export default class Realm {
         if (after === TIERS.length - 1 && owner) this.say(`${s.name} rises as the seat of a kingdom.`, '#ffd98a');
       }
     }
+    this.sicken(days);
     if (Math.random() < days * 0.5 && this.placesOf('free').length < MOST_FREE) this.found('free');
     for (const n of NATIONS) {
       if (this.world.nations.isFallen(n)) continue;
@@ -440,6 +442,28 @@ export default class Realm {
           this.say(`${s.name} has sworn itself to ${n.name}.`, n.color, s.x, s.z);
         }
       }
+    }
+  }
+
+  // Plague (v0.54.0, the Blightmother): a sick place loses people every day, and the nation that
+  // holds it loses soldiers. It travels to neighbours along the roads, and burns out slowly.
+  // `s.plague` is 0..1, saved with the settlement.
+  sicken(days) {
+    const sick = this.settlements.filter((s) => s.plague > 0);
+    for (const s of sick) {
+      const owner = s.owner === 'free' || s.owner === 'hero' ? null : this.of(s.owner);
+      s.pop = Math.max(2, s.pop * (1 - PLAGUE_KILLS * s.plague * days));
+      if (owner) owner.troops = Math.max(0, owner.troops * (1 - PLAGUE_KILLS * 0.6 * s.plague * days));
+      s.prosperity = Math.max(0.05, (s.prosperity ?? 0.6) - 0.1 * s.plague * days);
+      for (const n of this.settlements) {
+        if (n === s || n.plague >= s.plague * 0.6 || Math.hypot(n.x - s.x, n.z - s.z) > PLAGUE_REACH) continue;
+        if (Math.random() < PLAGUE_SPREADS * s.plague * days) {
+          n.plague = Math.max(n.plague ?? 0, s.plague * 0.7);
+          this.say(`Plague has reached ${n.name}.`, '#9ad13a', n.x, n.z);
+        }
+      }
+      s.plague = Math.max(0, s.plague - PLAGUE_FADES * days);
+      if (!s.plague) this.say(`The plague in ${s.name} has burnt itself out.`, '#c8d8a0', s.x, s.z);
     }
   }
 

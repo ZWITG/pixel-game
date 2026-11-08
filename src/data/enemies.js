@@ -176,9 +176,9 @@ export const ENEMIES = {
     drops: [{ item: 'dust', chance: 0.6 }, { item: 'pearl', chance: 0.05 }],
   },
   // The Watchers (open world, watchers.js): learning foes with powers of their own.
-  lantern: { name: 'The Lantern', watcher: true, plain: true, model: 'human', look: 'lantern', figure: 'lantern', sword: false, scale: 1.4, ai: 'chase', hp: 40, damage: 4, speed: 2.4, chaseSpeed: 4.2, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
-  anchor: { name: 'The Anchor', watcher: true, plain: true, model: 'human', look: 'anchor', figure: 'anchor', sword: false, scale: 1.4, ai: 'chase', hp: 40, damage: 4, speed: 2.4, chaseSpeed: 4.2, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
-  hush: { name: 'The Hush', watcher: true, plain: true, model: 'human', look: 'hush', figure: 'hush', sword: false, scale: 1.4, ai: 'chase', hp: 40, damage: 4, speed: 2.4, chaseSpeed: 4.2, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
-  echo: { name: 'The Echo', watcher: true, plain: true, model: 'human', look: 'echo', figure: 'echo', sword: false, scale: 1.4, ai: 'chase', hp: 40, damage: 4, speed: 2.4, chaseSpeed: 4.2, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
-  thornwarden: { name: 'The Thornwarden', watcher: true, plain: true, model: 'human', look: 'thornwarden', figure: 'thornwarden', sword: false, scale: 1.4, ai: 'chase', hp: 40, damage: 4, speed: 2.4, chaseSpeed: 4.2, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
+  lantern: { name: 'The Lantern', watcher: true, plain: true, model: 'human', look: 'lantern', figure: 'lantern', sword: false, scale: 1.75, ai: 'chase', hp: 40, damage: 4, speed: 3, chaseSpeed: 5.4, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
+  anchor: { name: 'The Anchor', watcher: true, plain: true, model: 'human', look: 'anchor', figure: 'anchor', sword: false, scale: 1.75, ai: 'chase', hp: 40, damage: 4, speed: 3, chaseSpeed: 5.4, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
+  hush: { name: 'The Hush', watcher: true, plain: true, model: 'human', look: 'hush', figure: 'hush', sword: false, scale: 1.75, ai: 'chase', hp: 40, damage: 4, speed: 3, chaseSpeed: 5.4, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
+  echo: { name: 'The Echo', watcher: true, plain: true, model: 'human', look: 'echo', figure: 'echo', sword: false, scale: 1.75, ai: 'chase', hp: 40, damage: 4, speed: 3, chaseSpeed: 5.4, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
+  thornwarden: { name: 'The Thornwarden', watcher: true, plain: true, model: 'human', look: 'thornwarden', figure: 'thornwarden', sword: false, scale: 1.75, ai: 'chase', hp: 40, damage: 4, speed: 3, chaseSpeed: 5.4, aggro: 60, radius: 0.6, xp: 150, spawns: false, drops: [] },
 };

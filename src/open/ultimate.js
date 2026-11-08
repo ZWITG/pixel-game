@@ -247,6 +247,196 @@ const ULTIMATES = {
   },
 };
 
+// The second five's ultimates (v0.54.0).
+const beamBetween = (u, a, b, width, color, secs) => u.world.vfx.beam(new THREE.Vector3(a.x, a.y, a.z), new THREE.Vector3(b.x, b.y, b.z), width, color, secs);
+Object.assign(ULTIMATES, {
+  time: {
+    name: 'Last Hour', secs: 3.2, color: '#7af0d0', tint: '#cfe8e0', reach: 45, gray: 0.85,
+    start(u) {
+      // Time stops for all of them; seven echoes of the Chronarch, from seven moments, cut them down.
+      u.reach = Math.min(70, this.reach + u.p.powers.mastery * 0.8);
+      u.list = u.foes(u.reach);
+      for (const e of u.list) e.frozenUntil = u.time + this.secs + 0.2;
+      u.echo = 0;
+      u.at = 0;
+      u.pose('gather');
+    },
+    tick(u, t, dt) {
+      const { state } = u.p, fx = u.world.fx;
+      if ((u.echo -= dt) > 0 || t > 2.8 || !u.list.length) return;
+      u.echo = 0.11;
+      const e = u.list[u.at++ % u.list.length], a = Math.random() * 6.283;
+      if (e.dying) return;
+      const from = { x: e.x + Math.cos(a) * 9, y: u.ground(e.x, e.z) + 3, z: e.z + Math.sin(a) * 9 };
+      beamBetween(u, from, { x: e.x, y: e.group.position.y + 1.5, z: e.z }, 0.3, '#7af0d0', 0.2);
+      fx.glow(from.x, from.y, from.z, 2.4, '#f4ffe0', 0.3, 1.2);
+      e.heldHarm = (e.heldHarm ?? 0) + u.p.body.might * 1.2;
+      u.pose(Math.random() < 0.5 ? 'punch' : 'peak');
+      u.world.work.shakeAt = state;
+    },
+    beats: [
+      [2.9, (u) => {
+        for (const e of u.list) {
+          if (e.dying) continue;
+          e.frozenUntil = 0;
+          u.strike(e.x, e.z, POWER * 0.55 + (e.heldHarm ?? 0) / u.p.body.might * 0.5, 3, 0, 'launch', e);
+          e.heldHarm = 0;
+          u.world.fx.impact('time', e.x, u.ground(e.x, e.z), e.z, 3);
+        }
+        const { state } = u.p;
+        u.world.vfx.shock(state.x, u.ground(state.x, state.z), state.z, u.reach, '#7af0d0', 0.7);
+        u.boom(0.8);
+      }],
+    ],
+  },
+  tide: {
+    name: 'The Drowned World', secs: 4, color: '#20a8e0', tint: '#2a6a9a', reach: 40,
+    start(u) {
+      const { state } = u.p;
+      u.reach = Math.min(64, this.reach + u.p.powers.mastery);
+      u.at = { x: state.x, z: state.z, y: u.ground(state.x, state.z) };
+      u.lake = u.world.fx.lakes.find((l) => !l.o.visible) ?? null;
+      if (u.lake) u.lake.o.visible = true;
+      u.list = u.foes(u.reach);
+      u.pose('peak');
+    },
+    tick(u, t) {
+      const r = u.reach, rise = Math.min(1, t / 1.4) * (t > 3.4 ? Math.max(0, (4 - t) / 0.6) : 1);
+      if (u.lake) {
+        u.lake.o.position.set(u.at.x, u.at.y - 1 + rise * 4.5, u.at.z);
+        u.lake.o.scale.set(r, 7, r);
+      }
+      // Everything under it is held, drowning, and the hero hangs above the water.
+      for (const e of u.list) {
+        if (e.dying) continue;
+        if (t < 3.2) e.frozenUntil = u.time + 0.1;
+        e.soakedUntil = u.time + 8;
+        if (Math.random() < 0.08) u.world.vfx.burst(e.x, e.group.position.y + 2, e.z, ['#e0f6ff', '#7ad0f0'], 3, 2, { up: 2 });
+      }
+      if (Math.random() < 0.5) {
+        const a = Math.random() * 6.283, d = Math.random() * r;
+        u.world.vfx.shock(u.at.x + Math.cos(a) * d, u.at.y + rise * 3.5, u.at.z + Math.sin(a) * d, 4, '#e0f6ff', 0.8);
+      }
+      u.pose(t < 3 ? 'peak' : 'slam');
+    },
+    beats: [
+      [3.2, (u) => {
+        for (const e of u.list) if (!e.dying) u.strike(e.x, e.z, POWER * 0.7, 4, 0, 'knockdown', e);
+        u.world.scars.mark('water', u.at.x, u.at.z, u.reach, u.p, 0);
+        u.world.vfx.shock(u.at.x, u.at.y + 2, u.at.z, u.reach + 4, '#e0f6ff', 0.8);
+        u.boom(0.9);
+      }],
+      [3.95, (u) => { if (u.lake) u.lake.o.visible = false; }],
+    ],
+  },
+  blight: {
+    name: 'The Great Dying', secs: 3, color: '#9ad13a', tint: '#5a7a1a', reach: 60,
+    start(u) {
+      u.reach = Math.min(90, this.reach + u.p.powers.mastery);
+      u.pose('gather');
+    },
+    tick(u, t) {
+      const { state } = u.p;
+      if (Math.random() < 0.9) {
+        const a = Math.random() * 6.283, d = Math.random() * u.reach * Math.min(1, t);
+        const x = state.x + Math.cos(a) * d, z = state.z + Math.sin(a) * d;
+        u.world.vfx.burst(x, u.ground(x, z) + 1, z, ['#9ad13a', '#c8e85a', '#3e5a10'], 8, 6, { up: 1, life: 1.2, fall: 0.2 });
+      }
+      u.pose(t < 1.2 ? 'gather' : 'slam');
+    },
+    beats: [
+      [1.2, (u) => {
+        const { state } = u.p;
+        for (const e of u.foes(u.reach)) {
+          e.infect = 5;
+          e.infectAt = u.time;
+          u.strike(e.x, e.z, POWER * 0.3, 2, 0, null, e);
+        }
+        // Every town for a long way round sickens.
+        let n = 0;
+        for (const s of u.world.realm?.settlements ?? []) {
+          if (Math.hypot(s.x - state.x, s.z - state.z) > 320) continue;
+          s.plague = Math.max(s.plague ?? 0, 0.5);
+          n++;
+        }
+        if (n) u.world.realm?.say(`The Great Dying: plague in ${n} town${n > 1 ? 's' : ''} at once.`, '#9ad13a');
+        u.world.scars.mark('blight', state.x, state.z, Math.min(40, u.reach * 0.5), u.p, 3);
+        u.world.vfx.shock(state.x, u.ground(state.x, state.z), state.z, u.reach, '#9ad13a', 1);
+        u.boom(0.7);
+      }],
+    ],
+  },
+  mind: {
+    name: 'Absolute Rule', secs: 3, color: '#ff4ad0', tint: '#ff8ae0', reach: 45,
+    start(u) {
+      u.reach = Math.min(70, this.reach + u.p.powers.mastery);
+      u.list = u.foes(u.reach);
+      // Every one of them kneels.
+      for (const e of u.list) if (!e.boss && !e.watch) e.frozenUntil = u.time + this.secs;
+      u.pose('peak');
+    },
+    tick(u) {
+      for (const e of u.list) if (!e.dying && Math.random() < 0.15) u.world.fx.glow(e.x, e.group.position.y + e.radius * 2 + 2.4, e.z, 1.4, '#ff4ad0', 0.4, 0.9);
+    },
+    beats: [
+      [2.6, (u) => {
+        const { state } = u.p;
+        // Then they rise, and they are yours.
+        for (const e of u.list) {
+          if (e.dying) continue;
+          if (e.boss || e.watch) u.strike(e.x, e.z, POWER * 0.6, 3, 0, 'knockdown', e);
+          else {
+            e.frozenUntil = 0;
+            e.turnedUntil = u.time + 20 + u.p.powers.mastery * 0.5;
+            e.turnFoe = null;
+          }
+        }
+        u.world.vfx.shock(state.x, u.ground(state.x, state.z), state.z, u.reach, '#ff4ad0', 0.9);
+        u.boom(0.6);
+      }],
+    ],
+  },
+  night: {
+    name: 'The Long Night', secs: 3.6, color: '#6a6cff', tint: '#0c0a1e', reach: 40, gray: 0.5,
+    start(u) {
+      const { state } = u.p;
+      u.reach = Math.min(64, this.reach + u.p.powers.mastery * 0.6);
+      u.list = u.foes(u.reach).sort((a, b) => Math.hypot(a.x - state.x, a.z - state.z) - Math.hypot(b.x - state.x, b.z - state.z)).slice(0, 14);
+      u.world.darkUntil = Math.max(u.world.darkUntil ?? 0, u.time + 25);
+      for (const e of u.list) e.frozenUntil = u.time + this.secs;
+      u.step = 0;
+      u.at = 0;
+      u.pose('gather');
+    },
+    tick(u, t, dt) {
+      const { state } = u.p;
+      // From one shadow to the next, each a killing stroke.
+      if ((u.step -= dt) > 0 || t > 3.2 || u.at >= u.list.length) return;
+      u.step = Math.max(0.12, 2.8 / Math.max(1, u.list.length));
+      const e = u.list[u.at++];
+      if (e.dying) return;
+      u.world.vfx.burst(state.x, state.y + 1, state.z, ['#0c0a1e', '#6a6cff'], 10, 6);
+      const a = Math.random() * 6.283;
+      state.x = e.x + Math.cos(a) * (e.radius + 1.6);
+      state.z = e.z + Math.sin(a) * (e.radius + 1.6);
+      state.dir = [e.x - state.x, e.z - state.z];
+      u.strike(e.x, e.z, POWER * (e.boss || e.watch ? 0.3 : 0.6), 2, 0, null, e);
+      u.world.vfx.burst(e.x, e.group.position.y + 1.5, e.z, ['#0c0a1e', '#d8dcff', '#6a6cff'], 16, 8);
+      u.pose(u.at % 2 ? 'punch' : 'peak');
+    },
+    beats: [
+      [3.3, (u) => {
+        for (const e of u.list) {
+          if (e.dying) continue;
+          e.frozenUntil = 0;
+          u.strike(e.x, e.z, POWER * 0.3, 3, 0, 'knockdown', e);
+        }
+        u.boom(0.7);
+      }],
+    ],
+  },
+});
+
 export default class Wrath {
   constructor(player) {
     this.p = player;

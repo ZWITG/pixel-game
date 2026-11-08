@@ -398,6 +398,18 @@ export default class Voxels {
     }
   }
 
+  // Puts out every burning structure within `r` of (x, z): a Tidebringer's rain, a Nightbringer's Snuff (v0.54.0).
+  douse(x, z, r) {
+    let out = 0;
+    for (const e of [...this.burning]) {
+      if (!e.at || Math.hypot(e.at.x - x, e.at.z - z) > r + e.reach) continue;
+      e.fire?.clear();
+      this.burning.delete(e);
+      out++;
+    }
+    return out;
+  }
+
   // Every tick: burning cubes char, light their neighbours and burn away; what they held falls.
   // Flames lick from the burning cubes, smoke rises from each burning structure, and its centre
   // goes in `fires` for the fire light.

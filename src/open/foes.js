@@ -81,6 +81,17 @@ function pickMove(e, dist) {
 function strike(monsters, e, move) {
   const hero = e.foe;
   if (!hero || e.landed) return;
+  // Turned against its own (a Sovereign's Enthrall or Discord): its blow lands on the foe it was set on.
+  if (e.lured?.foe) {
+    const f = e.lured.foe;
+    if (!f.dying && Math.hypot(f.x - e.x, f.z - e.z) < (move.area ?? move.reach) + e.radius + f.radius) {
+      e.landed = true;
+      monsters.work.actor = hero;
+      monsters.hit(f, Math.max(1, e.def.damage * move.power * 1.6), e.x, e.z, move.heavy ? 'knockdown' : null);
+    }
+    return;
+  }
+  if (e.lured) return;
   // A Gravecaller's Thralls standing in the way take the blow too, once a strike.
   if (!e.thrallsHit) {
     e.thrallsHit = true;

@@ -536,6 +536,72 @@
       #clash.losing .bar i { background: linear-gradient(#ffb0a0, #e8505a 55%, #8a1420); }
       #clash span { display: block; margin-top: 5px; font-size: 12px; }
       body.title #clash, body.in-menu #clash { display: none; }
+      /* The herald (v0.54.0): a Watcher's name called across the screen before it lands. */
+      #herald { position: fixed; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; opacity: 0; transition: opacity 0.5s; z-index: 30; }
+      #herald.show { opacity: 1; }
+      #herald::before { content: ''; position: absolute; left: 0; right: 0; top: -22px; bottom: -22px; background: linear-gradient(90deg, transparent, rgba(8, 6, 10, 0.82) 25%, rgba(8, 6, 10, 0.82) 75%, transparent); border-top: 1px solid var(--her, var(--brass)); border-bottom: 1px solid var(--her, var(--brass)); }
+      #herald b { position: relative; display: block; font: 700 clamp(30px, 6vw, 64px) var(--serif); letter-spacing: 0.32em; text-transform: uppercase; color: var(--her, var(--brass-hi)); text-shadow: 0 0 24px var(--her, #000), 0 3px 0 #000; transform: scale(1.12); transition: transform 2.6s cubic-bezier(.2,.7,.2,1); }
+      #herald.show b { transform: scale(1); }
+      #herald span { position: relative; display: block; margin-top: 6px; font: 600 clamp(13px, 1.8vw, 18px) var(--serif); letter-spacing: 0.18em; color: var(--parch); }
+      body.title #herald, body.in-menu #herald { display: none; }
+      /* The skill tree (v0.54.0): the Powers tab as three branches of connected nodes. */
+      #menu-page:has(.tree-page) { padding: 16px clamp(12px, 3vw, 44px); }
+      .tree-page { max-width: 1100px; margin: 0 auto; padding-bottom: 52px; display: flex; flex-direction: column; gap: 10px; }
+      .tree-head { display: grid; grid-template-columns: auto 1fr minmax(180px, 260px); gap: 14px; align-items: center; padding: 10px 14px; background: linear-gradient(90deg, color-mix(in srgb, var(--hero) 22%, #1c1816), #1c1816 60%); box-shadow: inset 0 0 0 1px #8a7a6255, inset 0 -2px 0 color-mix(in srgb, var(--hero) 60%, transparent); }
+      .tree-emblem { display: grid; place-items: center; width: 54px; height: 54px; color: var(--hero); background: radial-gradient(circle, color-mix(in srgb, var(--hero) 30%, transparent), transparent 70%); filter: drop-shadow(0 0 8px var(--hero)); }
+      .tree-title b { display: block; font: 800 26px var(--serif); letter-spacing: 0.08em; color: var(--parch); text-shadow: 0 2px 0 #000; }
+      .tree-title span { display: block; margin-top: 2px; font: italic 500 14px var(--sans); color: var(--parch-dim); }
+      .tree-mastery { display: flex; flex-direction: column; gap: 4px; font: 600 13px var(--serif); color: var(--parch-dim); letter-spacing: 0.06em; }
+      .tree-mastery b { font-size: 20px; color: var(--brass-hi); margin-left: 4px; }
+      .tree-mastery small { font: 500 12px var(--sans); color: var(--parch-dim); letter-spacing: 0; }
+      .mbar { height: 8px; background: #0d0a09; box-shadow: inset 0 0 0 1px #8a7a6288; }
+      .mbar i { display: block; height: 100%; background: linear-gradient(90deg, var(--brass), var(--brass-hi)); box-shadow: 0 0 10px var(--brass); }
+      .tree-body { display: grid; grid-template-columns: 1fr minmax(250px, 300px); gap: 14px; align-items: start; }
+      .tree-branches { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+      .tree-branch { padding: 8px 8px 10px; background: linear-gradient(#211c19e6, #15110fe6); box-shadow: inset 0 0 0 1px #8a7a6233, inset 0 3px 0 var(--c); }
+      .tree-branch h4 { margin: 2px 0 8px; text-align: center; font: 700 13px var(--serif); letter-spacing: 0.2em; text-transform: uppercase; color: var(--c); text-shadow: 0 0 10px color-mix(in srgb, var(--c) 50%, transparent); }
+      .tree-branch .path { display: flex; flex-direction: column; gap: 12px; }
+      #menu-page .tree-page .node { position: relative; display: grid; grid-template-columns: 42px 1fr; gap: 8px; align-items: center; width: 100%; margin: 0; padding: 6px 8px 6px 6px; border-radius: 0; text-align: left; color: var(--c); background: linear-gradient(90deg, #2a2420, #1c1816); box-shadow: inset 0 0 0 1px #8a7a6233; cursor: pointer; }
+      #menu-page .tree-page .node + .node::before { content: ''; position: absolute; left: 26px; top: -13px; width: 2px; height: 12px; background: #4a4038; }
+      #menu-page .tree-page .node.open + .node.open::before { background: var(--c); box-shadow: 0 0 6px var(--c); }
+      #menu-page .tree-page .node .gem { display: grid; place-items: center; width: 40px; height: 40px; transform: rotate(45deg) scale(0.78); background: #120f0e; box-shadow: inset 0 0 0 2px #5a4e44; }
+      #menu-page .tree-page .node .gem svg { transform: rotate(-45deg) scale(1.2); }
+      #menu-page .tree-page .node.open .gem { background: radial-gradient(circle, color-mix(in srgb, var(--c) 35%, #120f0e), #120f0e 75%); box-shadow: inset 0 0 0 2px var(--c), 0 0 10px -2px var(--c); }
+      #menu-page .tree-page .node.locked { color: #6a625a; opacity: 0.72; }
+      #menu-page .tree-page .node .label b { display: block; font: 600 13px var(--serif); line-height: 1.15; color: var(--parch); }
+      #menu-page .tree-page .node.locked .label b { color: #8a8278; }
+      #menu-page .tree-page .node .label small { font: 500 11px var(--sans); color: #8a8278; }
+      #menu-page .tree-page .node .pips { margin-top: 3px; }
+      #menu-page .tree-page .node em { position: absolute; right: 5px; top: 4px; font: 700 9px var(--serif); letter-spacing: 0.08em; text-transform: uppercase; color: var(--brass-hi); }
+      #menu-page .tree-page .node.worn .label { padding-right: 36px; }
+      #menu-page .tree-page .node.worn { box-shadow: inset 0 0 0 1px #8a7a6244, inset 3px 0 0 var(--brass); }
+      #menu-page .tree-page .node.at { background: linear-gradient(90deg, color-mix(in srgb, var(--c) 28%, #2c2622), #1c1816); box-shadow: inset 0 0 0 1px var(--c), 0 0 18px -6px var(--c); }
+      #menu-page .tree-page .node.at .gem { transform: rotate(45deg) scale(0.86); }
+      .tree-side { display: flex; flex-direction: column; gap: 10px; }
+      .tree-loadout { display: flex; justify-content: center; gap: 16px; padding: 10px 6px 6px; background: linear-gradient(#211c19e6, #15110fe6); box-shadow: inset 0 0 0 1px #8a7a6233; }
+      .tree-cross { display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: 0.55; transition: opacity 0.2s; }
+      .tree-cross.on { opacity: 1; }
+      .tree-cross small { font: 700 11px var(--serif); letter-spacing: 0.1em; color: var(--parch-dim); text-transform: uppercase; }
+      .tree-cross .cross { width: 120px; height: 120px; }
+      .tree-cross .cross div { width: 40px; height: 40px; }
+      .tree-cross .cross-up { left: 40px; top: 0; } .tree-cross .cross-down { left: 40px; top: 80px; } .tree-cross .cross-left { left: 0; top: 40px; } .tree-cross .cross-right { left: 80px; top: 40px; }
+      .tree-detail { padding: 12px 14px; background: linear-gradient(#2a2420f0, #1c1816f0); box-shadow: inset 0 0 0 1px #8a7a6244, inset 0 3px 0 var(--c); }
+      .tree-name { display: flex; gap: 10px; align-items: center; color: var(--c); }
+      .tree-name .gem { display: grid; place-items: center; width: 46px; height: 46px; flex: none; background: radial-gradient(circle, color-mix(in srgb, var(--c) 35%, #120f0e), #120f0e 75%); box-shadow: inset 0 0 0 2px var(--c); }
+      .tree-name b { display: block; font: 800 19px var(--serif); letter-spacing: 0.04em; color: var(--parch); }
+      .tree-name small { font: 600 12px var(--sans); color: var(--c); }
+      .tree-detail p { margin: 8px 0; font: 500 14px/1.4 var(--sans); color: var(--parch-dim); }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+      .chips span { display: flex; flex-direction: column; min-width: 56px; padding: 4px 8px; background: #0d0a09; box-shadow: inset 0 0 0 1px #8a7a6255; }
+      .chips small { font: 600 10px var(--serif); letter-spacing: 0.12em; text-transform: uppercase; color: #8a8278; }
+      .chips b { font: 700 15px var(--serif); color: var(--brass-hi); }
+      .tree-detail .later { display: block; margin-top: 6px; font: 500 12px var(--sans); color: #a89a86; }
+      .tree-foot { display: grid; grid-template-columns: 1fr minmax(220px, 300px); gap: 14px; }
+      .trait { padding: 10px 14px; background: linear-gradient(#211c19e6, #15110fe6); box-shadow: inset 0 0 0 1px #8a7a6233, inset 4px 0 0 var(--hero); }
+      .trait em { display: block; font: 700 11px var(--serif); font-style: normal; letter-spacing: 0.16em; text-transform: uppercase; color: var(--brass); }
+      .trait p { margin: 4px 0 0; font: 500 13px/1.4 var(--sans); color: var(--parch-dim); }
+      .trait.ult b { display: block; margin-top: 4px; font: 800 20px var(--serif); letter-spacing: 0.06em; color: var(--hero); text-shadow: 0 0 12px color-mix(in srgb, var(--hero) 60%, transparent); }
+      @media (max-width: 760px) { .tree-head, .tree-body, .tree-foot { grid-template-columns: 1fr; } .tree-title span { display: none; } }
 </style>
   </head>
   <body>
@@ -575,6 +641,7 @@
     <div id="foe" hidden><div id="foe-name"></div><div id="foe-bar"><div id="foe-fill"></div></div><div id="foe-post" class="foe-post"><u></u></div></div>
     <div id="p2-foe" hidden><div id="p2-foe-name"></div><div id="p2-foe-bar"><div id="p2-foe-fill"></div></div><div id="p2-foe-post" class="foe-post"><u></u></div></div>
     <div id="threats" class="threats p1"></div>
+    <div id="herald"><b></b><span></span></div>
     <div id="clash" hidden><b>Clash</b><div class="bar"><i></i></div><span>Mash □</span></div>
     <div id="p2-threats" class="threats p2"></div>
     <div id="lv"></div>

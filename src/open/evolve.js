@@ -20,7 +20,7 @@ export const ROLES = {
   brute: { hits: 12, bite: 0.13 },
   machine: { hits: 10, bite: 0.09 },
   ruler: { hits: 90, bite: 0.13 },
-  watcher: { hits: 45, bite: 0.11 },
+  watcher: { hits: 60, bite: 0.13 },
 };
 const ROLE_OF = { slime: 'fodder', sporeling: 'fodder', bat: 'fodder', puffcap: 'fodder', wisp: 'fodder', fireSlime: 'fodder', bomber: 'fodder', drowned: 'fodder', assassin: 'fodder', golem: 'brute', iceGuard: 'brute', chief: 'brute' };
 const GROWTH_KEPT = 0.85;     // monsters keep up with a hero's might, but only this far: strength is felt

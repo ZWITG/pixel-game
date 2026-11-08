@@ -113,6 +113,9 @@ export default class Omega {
 
   // Townsfolk run from a hero they recognise, from Menace.
   scary(x, z) {
+    // Places a power has filled with dread (a flood, a plague cloud, the dark): `world.terror` = [{ x, z, r, until }].
+    const now = this.world.monsters.time;
+    if (this.world.terror?.some((t) => t.until > now && Math.hypot(t.x - x, t.z - z) < t.r)) return true;
     return this.phase >= 2 && this.world.players.some((p) => !p.rooms.house && Math.hypot(p.state.x - x, p.state.z - z) < 16);
   }
 

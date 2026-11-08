@@ -17,11 +17,12 @@ import { COMBAT } from './combat.js';
 // Watchers don't rank up, promote each other or remember fights as stories: they share one model
 // of how you fight. `world.watchers`; saved to `lumen.watchers`; `profile()` exports the model.
 export const WATCHERS = {
-  lantern: { name: 'The Lantern', element: 'light', color: '#fff0a0', text: 'Light: blinding flashes, light-speed steps and beams.', powers: ['flash', 'beam', 'step'] },
-  anchor: { name: 'The Anchor', element: 'gravity', color: '#a88aff', text: 'Gravity: pins you to the ground, pulls you in, crushes a guard.', powers: ['pin', 'pull', 'crush'] },
-  hush: { name: 'The Hush', element: 'sound', color: '#8fd8ff', text: 'Sound: silences your powers and answers blows with shockwaves.', powers: ['silence', 'shock', 'step'] },
-  echo: { name: 'The Echo', element: 'mirror', color: null, text: 'Mirror: takes your own element and fights with your own habits.', powers: ['mimic', 'beam', 'step'] },
-  thornwarden: { name: 'The Thornwarden', element: 'blood-root', color: '#e0445a', text: 'Blood-root: drains you, roots you in place, heals from the land.', powers: ['root', 'drain', 'bloom'] },
+  // `rite`: the move it only shows Unveiled, below half health (v0.54.0).
+  lantern: { name: 'The Lantern', element: 'light', color: '#fff0a0', text: 'Light: blinding flashes, light-speed steps and beams. Unveiled, it calls down Judgement.', powers: ['flash', 'beam', 'step'], rite: 'Judgement', omen: 'The sky goes white. Something is watching.' },
+  anchor: { name: 'The Anchor', element: 'gravity', color: '#a88aff', text: 'Gravity: pins you to the ground, pulls you in, crushes a guard. Unveiled, it makes a Collapse.', powers: ['pin', 'pull', 'crush'], rite: 'Collapse', omen: 'The ground groans. Everything feels heavier.' },
+  hush: { name: 'The Hush', element: 'sound', color: '#8fd8ff', text: 'Sound: silences your powers and answers blows with shockwaves. Unveiled, it brings Dead Air.', powers: ['silence', 'shock', 'step'], rite: 'Dead Air', omen: 'Every sound in the world stops.' },
+  echo: { name: 'The Echo', element: 'mirror', color: null, text: 'Mirror: takes your own element and fights with your own habits. Unveiled, it turns Your Own Hand on you.', powers: ['mimic', 'beam', 'step'], rite: 'Your Own Hand', omen: 'Your shadow moves before you do.' },
+  thornwarden: { name: 'The Thornwarden', element: 'blood-root', color: '#e0445a', text: 'Blood-root: drains you, roots you in place, heals from the land. Unveiled, it grows a Thicket.', powers: ['root', 'drain', 'bloom'], rite: 'Thicket', omen: 'The roots under you are drinking.' },
 };
 export const ORDER = Object.keys(WATCHERS);
 
@@ -41,26 +42,34 @@ export const COUNTERS = {
 };
 
 const SAVE_KEY = 'lumen.watchers';
-const FIRST = 90, EVERY = [0, 0, 0, 480, 420, 360];   // seconds until one comes, by Omega phase
+const FIRST = 90, EVERY = [0, 0, 0, 360, 300, 240];   // seconds until one comes, by Omega phase
 const COME_FROM = 45;              // tiles out a Watcher arrives from
 const WATCH = 60;                  // tiles: near a Watcher, what the hero does counts 3x
 const FIGHTING = 40;               // a foe this close: the hero is fighting and habits count
 const FADE_EVERY = 30, FADE = 0.97;  // seconds, and how much a habit keeps each time
 const MOST_INSIGHT = 5, INSIGHT_KILL = 0.5, INSIGHT_SEEN = 0.25;
-const MOST_CHANCE = 0.7;           // no counter is ever certain
+const INSIGHT_FLOOR = 2;           // even the first one met has been watching (v0.54.0)
+const MOST_CHANCE = 0.8;           // no counter is ever certain
 const JUDGE = 2.5;                 // seconds after a counter before it's judged
-const WARD_AFTER = 6, WARD_CUT = 0.5;  // power hits of one element in a fight, and what the ward leaves
+const WARD_AFTER = 5, WARD_CUT = 0.4;  // power hits of one element in a fight, and what the ward leaves
 const TRIAL_R = 45;                // tiles: the Trial's ring
 const READ = 0.7;                  // seconds a Watcher's guard reads blows
 const MOST_LIVE = 2;
+// Dread (v0.54.0): how a Watcher comes, and its second form below half health.
+const OMEN = 3.2;                  // seconds of warning before it lands
+const UNVEIL_AT = 0.5, UNVEIL_SIZE = 1.3, UNVEIL_PACE = 0.7;   // health share, growth, and how much shorter its pauses get
+const DREAD_REACH = 26;            // tiles: inside this, the air around it pulses
+const OFF_READ = 0.35;             // its read on a smash that isn't your favourite, as a share of the full chance
+// Repel: pressed by blow after blow, it flashes and throws out a shockwave. Roll or parry it.
+const PRESSURE_HITS = 4, PRESSURE_GAP = 0.9, REPEL_TELL = 0.28, REPEL_REACH = 7, REPEL_KEEP = 0.35;
 // Its own blows. tell: warning, time: the strike, lunge: tiles a second, reach or area.
 const BLOWS = {
-  cut: { tell: 0.45, time: 0.22, lunge: 14, reach: 3.4, power: 1 },
-  rush: { tell: 0.38, time: 0.2, lunge: 10, reach: 3.2, power: 0.7, again: 2 },
-  crush: { tell: 1, time: 0.25, lunge: 8, area: 9, power: 1.8, heavy: true },
-  quick: { tell: 0.32, time: 0.2, lunge: 18, reach: 3.4, power: 0.9 },
+  cut: { tell: 0.36, time: 0.22, lunge: 15, reach: 3.6, power: 1, again: 1 },
+  rush: { tell: 0.3, time: 0.18, lunge: 11, reach: 3.4, power: 0.7, again: 2 },
+  crush: { tell: 0.8, time: 0.25, lunge: 9, area: 10, power: 1.9, heavy: true },
+  quick: { tell: 0.26, time: 0.18, lunge: 20, reach: 3.6, power: 0.9 },
 };
-const TELL = 0.8;                  // seconds of warning before a power
+const TELL = 0.65;                 // seconds of warning before a power
 const ACTS = ['jab', 'smash', 'power', 'dodge', 'guard', 'shot', 'breakout'];
 
 function fresh() {
@@ -73,6 +82,7 @@ export default class Watchers {
     this.live = [];
     this.marks = [];
     this.waves = [];
+    this.omens = [];
     this.next = FIRST;
     this.last = [];
     this.fadeIn = FADE_EVERY;
@@ -150,7 +160,7 @@ export default class Watchers {
   // The chance a counter fires for this Watcher: how well it fits, by Insight and what it learned.
   chance(e, id) {
     const w = e.watch;
-    return Math.min(MOST_CHANCE, COUNTERS[id].fit(this.habits, this) * (w.insight / MOST_INSIGHT) * this.weight(w.type, id));
+    return Math.min(MOST_CHANCE, COUNTERS[id].fit(this.habits, this) * (Math.max(INSIGHT_FLOOR, w.insight) / MOST_INSIGHT) * this.weight(w.type, id) * (w.unveiled ? 1.25 : 1));
   }
 
   // Rolls for a counter; if it fires, it's remembered and judged a moment later.
@@ -169,17 +179,44 @@ export default class Watchers {
     return unmet.length ? unmet[0] : ORDER[Math.floor(Math.random() * ORDER.length)];
   }
 
-  arrive(hero, type = this.pick(), { insight = this.insight, trial = false } = {}) {
+  // An omen first (v0.54.0): the sky takes its colour, the ground shakes, its name is called, and
+  // a ring marks where it will land. Then it comes down hard.
+  summon(hero, type = this.pick()) {
+    const a = Math.random() * 6.283, x = hero.state.x + Math.cos(a) * 18, z = hero.state.z + Math.sin(a) * 18;
+    const W = WATCHERS[type], color = W.color ?? hero.powers.def?.color ?? '#c8c8ff';
+    this.omens.push({ hero, type, x, z, left: OMEN, ring: 0, color });
+    this.world.vfx?.tint(color, 0.35, OMEN + 1.5, 0.4);
+    for (const p of this.world.players) {
+      p.hud.herald?.(W.name, this.met[type] ? 'It remembers how you fight.' : W.omen, color);
+      p.hud.flash?.(0.25);
+    }
+    this.world.work.shake = Math.max(this.world.work.shake ?? 0, 0.25);
+    this.world.work.shakeAt = hero.state;
+  }
+
+  arrive(hero, type = this.pick(), { insight = this.insight, trial = false, at = null } = {}) {
     const a = Math.random() * 6.283, d = trial ? 22 : COME_FROM;
-    const x = hero.state.x + Math.cos(a) * d, z = hero.state.z + Math.sin(a) * d;
+    const x = at?.x ?? hero.state.x + Math.cos(a) * d, z = at?.z ?? hero.state.z + Math.sin(a) * d;
     const m = this.monsters, e = m.add(type, x, z, m.danger(x, z), false);   // adopted in Monsters.add
     Object.assign(e.watch, { insight: Math.min(MOST_INSIGHT, insight), trial });
     const W = WATCHERS[type];
     this.world.vfx?.burst(x, e.group.position.y + 3, z, [e.watch.color, '#ffffff'], 40, 12);
     this.world.vfx?.shock(x, e.group.position.y, z, 16, e.watch.color, 0.8);
     if (!trial) {
-      for (const p of this.world.players) p.hud.message(`${W.name} has come. ${this.met[type] ? 'It remembers how you fight.' : 'It has been watching how you fight.'}`, true, 5000);
       this.met[type] = true;
+      if (!at) for (const p of this.world.players) p.hud.message(`${W.name} has come.`, true, 3000);
+      // It lands like a falling star: everything near is thrown down.
+      if (at) {
+        const y = e.group.position.y;
+        this.world.vfx?.shock(x, y, z, 22, e.watch.color, 1);
+        this.world.fx?.pillar(x, y, z, 3, e.watch.color, 0.6);
+        this.world.work.shake = Math.max(this.world.work.shake ?? 0, 0.7);
+        for (const p of this.world.players) {
+          if (Math.hypot(p.state.x - x, p.state.z - z) < 9 && !p.rooms.house) m.hurt(p, e.def.damage * 0.6, x, z, { heavy: true, from: e });
+        }
+        e.mode = 'rest';
+        e.until = this.time + 1.1;
+      }
     }
     return e;
   }
@@ -188,7 +225,7 @@ export default class Watchers {
   adopt(e, hero, { insight = this.insight, trial = false } = {}) {
     if (e.watch) return;
     const W = WATCHERS[e.kind], color = W.color ?? hero?.powers.def?.color ?? '#c8c8ff';
-    e.watch = { type: e.kind, insight: Math.min(MOST_INSIGHT, insight), trial, color, hits: {}, ward: null, trying: [], cool: 0, next: this.time + 1.5, power: 0, bloomHits: 0 };
+    e.watch = { type: e.kind, insight: Math.min(MOST_INSIGHT, insight), trial, color, hits: {}, ward: null, trying: [], cool: 0, next: this.time + 0.6, power: 0, bloomHits: 0 };
     e.baseGlow.set('#000000');   // their own lit parts glow; the body keeps its colours
     e.windupGlow = e.baseGlow.clone().set(color).multiplyScalar(0.45);   // the warning before a blow, in its own colour
     // The Echo's light takes the hero's colour.
@@ -211,6 +248,8 @@ export default class Watchers {
     const dist = Math.hypot(hero.x - e.x, hero.z - e.z), dx = (hero.x - e.x) / (dist || 1), dz = (hero.z - e.z) / (dist || 1);
     const angry = e.hp < e.maxHp * 0.5;
     const wait = (mode, secs) => { e.mode = mode; e.until = t + secs; };
+    // Below half health it drops its shell and shows what it is (once).
+    if (angry && !w.unveiled && !e.dying && e.mode !== 'strike') return this.unveil(e, t);
     if (e.mode === 'reeling' || e.mode === 'recover' || e.mode === 'rest' || e.mode === 'read') {
       e.vel.set(0, 0);
       if (e.mode === 'read' && (e.pulse = (e.pulse ?? 0) - 1 / 60) <= 0) {
@@ -271,7 +310,7 @@ export default class Watchers {
         wait('tell', b.tell * 0.6);
         return;
       }
-      wait('recover', angry ? 0.45 : 0.7);
+      wait('recover', angry ? 0.25 : 0.4);
       return;
     }
     if (e.mode === 'cast') {
@@ -286,11 +325,20 @@ export default class Watchers {
     // Hunting: hold a fighting distance and circle, until it's time to act.
     e.mode = 'hunt';
     const want = 8, out = dist - want;
+    if ((e.strafeIn = (e.strafeIn ?? 0) - 1 / 60) <= 0) {
+      e.strafeIn = 1 + Math.random() * 1.5;
+      e.strafe = Math.random() < 0.5 ? 1 : -1;
+    }
     const side = e.strafe ?? 1;
-    e.vel.set(dx * Math.sign(out) * Math.min(1, Math.abs(out) / 3) - dz * side * 0.6, dz * Math.sign(out) * Math.min(1, Math.abs(out) / 3) + dx * side * 0.6).multiplyScalar(dist > 20 ? e.def.chaseSpeed : e.def.speed);
-    if (t < w.next) return;
-    w.next = t + (angry ? 0.9 : 1.4) + Math.random() * 0.6;
+    e.vel.set(dx * Math.sign(out) * Math.min(1, Math.abs(out) / 3) - dz * side * 0.8, dz * Math.sign(out) * Math.min(1, Math.abs(out) / 3) + dx * side * 0.8).multiplyScalar(dist > 20 ? e.def.chaseSpeed * 1.3 : e.def.speed * 1.3);
+    // Right up against it, it doesn't wait for its moment.
+    if (t < w.next - (dist < 6 ? 0.5 : 0)) return;
+    w.next = t + ((angry ? 0.55 : 0.8) + Math.random() * 0.4) * (w.unveiled ? UNVEIL_PACE : 1);
     const W = WATCHERS[w.type];
+    if (w.unveiled && t >= w.riteAt && dist < 30) {
+      w.riteAt = t + 8 + Math.random() * 3;
+      return this.rite(e, t);
+    }
     // What it expects the hero to do next decides what it does.
     const g = this.guess();
     if (g.act && dist < 10 && (g.act === 'jab' || g.act === 'smash') && this.tries(e, 'guess')) return this.readStance(e, t, READ);
@@ -310,7 +358,7 @@ export default class Watchers {
   blow(e, kind, t) {
     const b = BLOWS[kind], m = this.monsters;
     e.move = kind;
-    e.left = kind === 'rush' && e.watch.type === 'echo' ? this.favouriteChain() - 1 : b.again ?? 0;
+    e.left = (kind === 'rush' && e.watch.type === 'echo' ? this.favouriteChain() - 1 : b.again ?? 0) + (e.watch.unveiled && !b.heavy ? 1 : 0);
     e.mode = 'tell';
     e.until = t + b.tell;
     e.vel.set(0, 0);
@@ -390,7 +438,7 @@ export default class Watchers {
 
   cast(e, power, t, angry) {
     const p = e.foe, s = p.state, m = this.monsters, w = e.watch, y = e.group.position.y, vfx = this.world.vfx;
-    const rest = (secs) => { e.mode = 'rest'; e.until = t + secs * (angry ? 0.7 : 1); };
+    const rest = (secs) => { e.mode = 'rest'; e.until = t + secs * (angry ? 0.45 : 0.65) * (w.unveiled ? UNVEIL_PACE : 1); };
     if (power === 'flash') {
       vfx?.shock(e.x, y, e.z, 12 + e.radius, w.color, 0.35);
       vfx?.burst(e.x, y + 3, e.z, ['#ffffff', w.color], 40, 16);
@@ -402,6 +450,7 @@ export default class Watchers {
       }
       return rest(1.2);
     }
+    if (power === 'rite') return this.riteGoes(e, t, rest);
     if (power === 'beam' || power === 'mimic') {
       const dx = s.x - e.x, dz = s.z - e.z, d = Math.hypot(dx, dz) || 1;
       if (power === 'mimic') {
@@ -455,6 +504,107 @@ export default class Watchers {
     return undefined;
   }
 
+  // ---- Unveiled (v0.54.0): its second form ----
+  unveil(e, t) {
+    const w = e.watch, W = WATCHERS[w.type], m = this.monsters, y = e.group.position.y, vfx = this.world.vfx;
+    w.unveiled = true;
+    w.riteAt = t + 1.4;
+    e.group.scale.multiplyScalar(UNVEIL_SIZE);
+    e.radius *= UNVEIL_SIZE;
+    e.posture = 0;
+    e.brokenUntil = 0;
+    e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.08);
+    e.mode = 'rest';
+    e.until = t + 0.8;
+    e.vel.set(0, 0);
+    e.windupGlow?.set(w.color).multiplyScalar(0.9);
+    vfx?.shock(e.x, y, e.z, 30, w.color, 1.2);
+    vfx?.shock(e.x, y + 2, e.z, 14, '#ffffff', 0.5);
+    vfx?.burst(e.x, y + 3, e.z, [w.color, '#ffffff', '#000000'], 60, 22);
+    vfx?.tint(w.color, 0.45, 2.5, 0.6);
+    this.world.work.shake = Math.max(this.world.work.shake ?? 0, 0.8);
+    this.world.work.slow = Math.max(this.world.work.slow ?? 0, 0.5);
+    for (const p of this.world.players) {
+      p.hud.herald?.(`${W.name} unveiled`, `Beware ${W.rite}`, w.color);
+      if (Math.hypot(p.state.x - e.x, p.state.z - e.z) < 12 && !p.rooms.house) m.hurt(p, e.def.damage * 0.5, e.x, e.z, { heavy: true, from: e });
+    }
+  }
+
+  // The rite starts: a long, loud warning, then riteGoes() in cast().
+  rite(e, t) {
+    const w = e.watch, W = WATCHERS[w.type];
+    e.power = 'rite';
+    e.mode = 'cast';
+    e.until = t + TELL * 1.4;
+    e.vel.set(0, 0);
+    this.monsters.warn(e, { heavy: true, area: 14 });
+    e.foe?.hud.float(`${W.rite}!`, e.x, e.group.position.y + 8, e.z, w.color);
+    this.world.vfx?.shock(e.x, e.group.position.y, e.z, 10, w.color, TELL * 1.4);
+    return undefined;
+  }
+
+  riteGoes(e, t, rest) {
+    const p = e.foe, s = p.state, w = e.watch, m = this.monsters, vfx = this.world.vfx, y = e.group.position.y;
+    if (w.type === 'lantern') {
+      // Judgement: columns of light in a widening spiral around you, then one at your feet.
+      for (let i = 0; i < 14; i++) {
+        const a = i * 0.9, r = 3 + i * 0.9;
+        this.mark(e, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, 3.5, 0.35 + i * 0.09, 1.1);
+      }
+      this.mark(e, s.x, s.z, 5, 1.75, 2.2);
+      vfx?.tint('#fff6d0', 0.4, 2, 0);
+      return rest(1.6);
+    }
+    if (w.type === 'anchor') {
+      // Collapse: a point of crushing weight drags you in; the ring around it falls, then the heart.
+      this.pulls = { p, e, left: 1.1, hard: true };
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * 6.283;
+        this.mark(e, e.x + Math.cos(a) * 9, e.z + Math.sin(a) * 9, 3.6, 0.7, 1.1);
+      }
+      this.mark(e, e.x, e.z, 7 + e.radius, 1.3, 2.4, (q) => { q.slowUntil = this.time + 2; });
+      vfx?.shock(e.x, y, e.z, 20, w.color, 1.3);
+      return rest(1.8);
+    }
+    if (w.type === 'hush') {
+      // Dead Air: no power answers you for a while, and three waves follow.
+      for (const q of this.world.players) {
+        if (Math.hypot(q.state.x - e.x, q.state.z - e.z) > 40) continue;
+        for (const pid of q.powers.loadout) if (pid) q.powers.waits[pid] = Math.max(q.powers.waits[pid] ?? 0, 5);
+        q.hud.float('Dead Air', q.state.x, q.state.y + 3.6, q.state.z, w.color);
+      }
+      for (let k = 0; k < 3; k++) this.waves.push({ e, x: e.x, z: e.z, r: e.radius - k * 16, hit: new Set() });
+      vfx?.shock(e.x, y, e.z, 50, w.color, 1.6);
+      return rest(1.6);
+    }
+    if (w.type === 'echo') {
+      // Your Own Hand: your own element, three times, where you stand and where you would roll.
+      const el = p.powers.def?.element;
+      for (let k = 0; k < 3; k++) {
+        m.quake.after(k * 0.4, () => {
+          if (e.dying || !e.foe) return;
+          if (el) this.world.fx?.impact(el, e.foe.state.x, m.groundY(e.foe.state.x, e.foe.state.z), e.foe.state.z, 7);
+          this.marksAt(e, 6.5, 0.5, 1.3, null);
+        });
+      }
+      return rest(1.8);
+    }
+    // Thicket: rooted at once, then rings of thorns closing in.
+    if (Math.hypot(s.x - e.x, s.z - e.z) < 30) {
+      p.rootUntil = this.time + 1.6;
+      p.hud.float('Rooted!', s.x, s.y + 3.4, s.z, w.color);
+    }
+    [[8, 0.6], [4.5, 1], [0, 1.4]].forEach(([r, at]) => {
+      const n = r ? 10 : 1;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * 6.283;
+        this.mark(e, s.x + Math.cos(a) * r, s.z + Math.sin(a) * r, r ? 3 : 4.5, at, 1);
+      }
+    });
+    this.drains = { e, left: 2.2, tick: 0.8, beam: null };
+    return rest(1.8);
+  }
+
   // ---- blows reaching a Watcher (monsters.hit) ----
   // Returns what's left of the blow: 0 if it read it, less behind a ward.
   struck(e, actor) {
@@ -466,7 +616,8 @@ export default class Watchers {
       const smash = act.kind === 'smash' && act.name !== 'execute' && act.name !== 'finisher';
       const fav = Number(top(this.habits.smashAt)[0]);
       // Which smash it is says how many hits came before it (COMBAT.order).
-      const reads = e.mode === 'read' || (smash && COMBAT.order.indexOf(act.name) === fav && this.tries(e, 'read'));
+      const reads = e.mode === 'read' || (smash && COMBAT.order.indexOf(act.name) === fav && this.tries(e, 'read'))
+        || (smash && Math.random() < OFF_READ && this.tries(e, 'read'));
       if (reads) {
         for (const x of w.trying) if (x.at > t - 0.1) x.won = true;
         const s = actor.state;
@@ -477,8 +628,19 @@ export default class Watchers {
         this.world.vfx?.burst(e.x, e.group.position.y + 2, e.z, ['#ffffff', w.color], 18, 8);
         // The Hush answers with a shockwave.
         if (w.type === 'hush' && Math.hypot(s.x - e.x, s.z - e.z) < 9) this.monsters.hurt(actor, e.def.damage * 0.8, e.x, e.z, { from: e });
-        this.blow(e, 'quick', t);
+        this.blow(e, w.unveiled ? 'rush' : 'quick', t);
         return 0;
+      }
+    }
+    // Blow after blow with no answer: it Repels. What lands while it gathers itself counts for less.
+    if (act && e.mode !== 'reeling' && !(e.brokenUntil > t)) {
+      w.pressure = (t - (w.pressedAt ?? -9) < PRESSURE_GAP ? w.pressure ?? 0 : 0) + 1;
+      w.pressedAt = t;
+      if (w.repelAt > t) return REPEL_KEEP;
+      if (w.pressure >= PRESSURE_HITS - (w.unveiled ? 1 : 0) && e.mode !== 'strike') {
+        w.pressure = 0;
+        this.repel(e, actor, t);
+        return REPEL_KEEP;
       }
     }
     if (e.mode === 'bloom' && ++w.bloomHits >= 3) {
@@ -495,6 +657,34 @@ export default class Watchers {
       actor.hud.message(`${WATCHERS[w.type].name} wards itself against ${el}. Change your attack.`, true, 3500);
     }
     return w.ward === el ? WARD_CUT : 1;
+  }
+
+  // A flash, then a shockwave that throws the hero back (through melee.defend, so a parry or a
+  // roll beats it), and a blow to follow.
+  repel(e, p, t) {
+    const w = e.watch, m = this.monsters, vfx = this.world.vfx;
+    w.repelAt = t + REPEL_TELL;
+    e.vel.set(0, 0);
+    vfx?.burst(e.x, e.group.position.y + 3, e.z, ['#ffffff', w.color], 24, 6, { up: 0.6, life: 0.3 });
+    this.world.fx?.glow(e.x, e.group.position.y + 3, e.z, e.radius * 4, w.color, REPEL_TELL, 1.8);
+    p.hud.float('Repel!', e.x, e.group.position.y + 6, e.z, w.color);
+    m.quake.after(REPEL_TELL, () => {
+      if (e.dying || !m.list.includes(e)) return;
+      vfx?.shock(e.x, e.group.position.y, e.z, REPEL_REACH + e.radius, w.color, 0.4);
+      this.world.work.shake = Math.max(this.world.work.shake ?? 0, 0.35);
+      for (const q of this.world.players) {
+        const dx = q.state.x - e.x, dz = q.state.z - e.z, d = Math.hypot(dx, dz) || 1;
+        if (d > REPEL_REACH + e.radius || q.rooms.house || q.state.air > 3) continue;
+        const was = q.hp;
+        m.hurt(q, e.def.damage * 0.7, e.x, e.z, { heavy: true, from: e });
+        if (q.hp < was) {
+          q.state.x += (dx / d) * 4;
+          q.state.z += (dz / d) * 4;
+          q.melee.active = null;
+        }
+      }
+      if (e.mode === 'hunt' || e.mode === 'rest' || e.mode === 'recover') this.blow(e, w.unveiled ? 'rush' : 'cut', this.time);
+    });
   }
 
   // ---- the end of one ----
@@ -623,10 +813,31 @@ export default class Watchers {
       if (!e.dying && !e.watch.trial) this.insight = Math.min(MOST_INSIGHT, this.insight + INSIGHT_SEEN);
     }
     // Sent from Scourge on; at Omega, in pairs.
-    if (om && om.phase >= 3 && !this.trial && !hero.rooms.house && !this.live.some((e) => !e.watch.trial) && (this.next -= dt) <= 0) {
+    if (om && om.phase >= 3 && !this.trial && !hero.rooms.house && !this.omens.length && !this.live.some((e) => !e.watch.trial) && (this.next -= dt) <= 0) {
       this.next = EVERY[Math.min(om.phase, 5)];
       const n = om.phase >= 5 ? MOST_LIVE : 1;
-      for (let i = 0; i < n; i++) this.arrive(hero);
+      const first = this.pick();
+      for (let i = 0; i < n; i++) this.summon(hero, i ? ORDER.filter((x) => x !== first)[Math.floor(Math.random() * (ORDER.length - 1))] : first);
+    }
+    // Omens counting down to a landing.
+    for (const o of this.omens) {
+      o.left -= dt;
+      if ((o.ring -= dt) <= 0) {
+        o.ring = 0.5;
+        for (const p of players) p.melee.ring(o.x, m.groundY(o.x, o.z), o.z, 9, o.color);
+        this.world.vfx?.shock(o.x, m.groundY(o.x, o.z), o.z, 4 + (OMEN - o.left) * 3, o.color, 0.5);
+      }
+      if (o.left <= 0) this.arrive(o.hero, o.type, { at: o });
+    }
+    this.omens = this.omens.filter((o) => o.left > 0);
+    // Dread: near one, the air pulses in its colour; Unveiled, the sky stays dark.
+    for (const e of this.live) {
+      const w = e.watch;
+      if (w.trial || e.dying || (w.pulseIn = (w.pulseIn ?? 0) - dt) > 0) continue;
+      w.pulseIn = w.unveiled ? 0.8 : 1.4;
+      if (!players.some((p) => Math.hypot(p.state.x - e.x, p.state.z - e.z) < DREAD_REACH)) continue;
+      this.world.vfx?.shock(e.x, e.group.position.y + 0.2, e.z, e.radius + (w.unveiled ? 7 : 4), w.color, 0.6);
+      if (w.unveiled) this.world.vfx?.tint(w.color, 0.22, 1.2, 0.5);
     }
     // The model fades, so it follows how you fight now.
     if ((this.fadeIn -= dt) <= 0) {
@@ -698,7 +909,7 @@ export default class Watchers {
     if (this.pulls) {
       const { p, e } = this.pulls, s = p.state, d = Math.hypot(e.x - s.x, e.z - s.z);
       if (d > e.radius + 3) {
-        const k = Math.min(1, dt * 6);
+        const k = Math.min(1, dt * (this.pulls.hard ? 9 : 6));
         s.x += (e.x - s.x) * k * 0.5;
         s.z += (e.z - s.z) * k * 0.5;
       }

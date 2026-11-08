@@ -36,7 +36,7 @@ export const COMBAT = {
   },
   wall: { power: 1.2, stun: 1.4 },  // a flung foe meeting a wall: more hurt, and stuck there a moment
   // Structure. Foes: points by role, one per light hit. The hero: a 0..1 bar.
-  posture: { fodder: 3, fighter: 5, brute: 9, machine: 6, ruler: 40, watcher: 18 },
+  posture: { fodder: 3, fighter: 5, brute: 9, machine: 6, ruler: 40, watcher: 26 },
   postureBack: 1.2,     // points a foe gets back each second it isn't hit
   postureRest: 2,       // seconds before it starts to recover
   postureHurt: 0.35,    // a foe near death gets Structure back only this share as fast (it scales with health left)

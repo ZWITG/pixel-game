@@ -45,6 +45,47 @@ export const BRANCHES = {
       B('stillness', 'Stillness', '#e4f6ff', 'All things stopping: the Crystal Prison, Shatter, and time itself.', ['prison'], ['jumping', 'woodcutting', 'frost.stillness']),
     ],
   },
+  // The second five (v0.54.0).
+  time: {
+    drop: ['swimming'],
+    list: [
+      B('hour', 'Hour', '#7af0d0', 'Holding time still and turning it back: the Still Hour, Rewind, the Time Loop.', ['stop', 'rewind', 'loop'], ['fighting', 'time.chronomancy']),
+      B('age', 'Age', '#e8c86a', 'Time as a blade: years that wither, Entropy, the Epoch that ages a town.', ['wither', 'entropy', 'epoch'], ['punching', 'mining', 'woodcutting']),
+      B('pace', 'Pace', '#bffff0', 'Your own time, bent: the Echo of yourself and the Quickening.', ['echo', 'quicken'], ['running', 'jumping', 'climbing']),
+    ],
+  },
+  tide: {
+    drop: ['climbing'],
+    list: [
+      B('current', 'Current', '#5ad8ff', 'Water as a weapon in the hand: the Lash, the Geyser, the Drowning Orb.', ['lash', 'geyser', 'orb'], ['punching', 'fighting']),
+      B('deep', 'Deep', '#20a8e0', 'The sea itself: the Breaker, the Maelstrom, the Tsunami.', ['breaker', 'maelstrom', 'tsunami'], ['swimming', 'running', 'tide.tidecraft']),
+      B('weather', 'Weather', '#bfe8ff', 'Rain and flood that change the land: the Monsoon and the Deluge.', ['monsoon', 'deluge'], ['jumping', 'mining', 'woodcutting']),
+    ],
+  },
+  blight: {
+    drop: ['swimming'],
+    list: [
+      B('fever', 'Fever', '#9ad13a', 'Infection in a foe and the Burst that sets it off: Bile, Burst, the Plague Host.', ['bile', 'pustule', 'host'], ['punching', 'fighting', 'blight.pestilence']),
+      B('swarm', 'Swarm', '#c8b84a', 'Things that carry it: the Miasma, the Locusts, the Death Bloom.', ['miasma', 'locusts', 'deathbloom'], ['running', 'jumping']),
+      B('famine', 'Famine', '#6a7a2a', 'Sickness in the land and the towns: Rotting Ground and Pestilence.', ['rotland', 'pestilence'], ['climbing', 'mining', 'woodcutting']),
+    ],
+  },
+  mind: {
+    drop: ['swimming'],
+    list: [
+      B('will', 'Will', '#ff4ad0', 'Force of mind: the Psychic Lance, Telekinesis, Mind Crush.', ['psylance', 'kinesis', 'crush'], ['punching', 'fighting']),
+      B('rule', 'Rule', '#f0d488', 'Turning the loyal: Enthrall, Discord, the Dread Word.', ['enthrall', 'discord', 'dread'], ['running', 'jumping', 'mind.dominion']),
+      B('crown', 'Crown', '#c87ab8', 'Conquest without a siege: Usurp and Sow War.', ['usurp', 'sowwar'], ['climbing', 'mining', 'woodcutting']),
+    ],
+  },
+  night: {
+    drop: ['swimming'],
+    list: [
+      B('blade', 'Blade', '#8a8cff', 'The killing stroke: Shadow Knives, the Shadowstep, the Death Mark.', ['knives', 'shadowstep', 'deathmark'], ['punching', 'fighting', 'night.shadowcraft']),
+      B('veil', 'Veil', '#c8ccff', 'Not being there: Vanish, the Umbral Grasp, Nightfall.', ['vanish', 'grasp', 'nightfall'], ['running', 'jumping', 'climbing']),
+      B('dark', 'Dark', '#4a4a8a', 'Putting out the light of the world: Snuff and the Eclipse.', ['snuff', 'eclipse'], ['mining', 'woodcutting']),
+    ],
+  },
 };
 
 // The branch a power or bough belongs to, for a Conqueror.

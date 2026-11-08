@@ -45,6 +45,20 @@ export default class WorldHud {
     this.timer = setTimeout(() => { el.className = ''; }, big ? 4200 : 2800);
   }
 
+  // A name called across the whole screen (a Watcher coming, a world-changing power). Shared by both players.
+  herald(title, sub = '', color = null) {
+    const el = $('herald');
+    if (!el) return;
+    el.querySelector('b').textContent = title;
+    el.querySelector('span').textContent = sub;
+    el.style.setProperty('--her', color ?? '');
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(WorldHud.heraldTimer);
+    WorldHud.heraldTimer = setTimeout(() => el.classList.remove('show'), 3400);
+  }
+
   // Clears the way for something bigger.
   hush() {
     this.$('toast').className = '';
