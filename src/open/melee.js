@@ -154,6 +154,7 @@ export default class Melee {
     this.parryRow = 0;         // parries in a row (a hit taken or a long gap ends it)
     this.duel = { foe: null, count: 0 }; // read by the duel camera
     this.closeUp = 0;          // seconds the camera leans in after an Execute or a Perfect parry
+    this.reaction = null;      // a reaction clip playing (heroClips.js): { clip, at, secs, arm }
     this.finishing = null;     // a paired finisher playing: { e, seq, t, next, ... }
     this.finishTurn = 0;       // alternates the two mid-size finishers
     this.riposte = null;       // after a Perfect parry: { e, until } while Square strikes back
@@ -472,6 +473,11 @@ export default class Melee {
     this.idle = 0;
   }
 
+  // Plays a reaction clip (heroClips.js) for `secs`: a block, a parry, a hit taken.
+  act(clip, secs, arm = 0) {
+    if (FEATURES.heroClips) this.reaction = { clip, at: this.clock, secs, arm };
+  }
+
   // A finisher or a clash: foes hold back, inputs wait, the camera comes in from the side.
   get staged() {
     return this.finishing ?? this.clashing;
@@ -643,6 +649,7 @@ export default class Melee {
     this.work.shake = Math.max(this.work.shake, 0.3);
     this.work.shakeAt = state;
     this.player.hud.float('Breakout!', state.x, state.y + 3.4, state.z, this.aura);
+    this.act('breakout', 0.45);
     this.player.world.watchers?.saw(this.player, 'breakout');
     return true;
   }
@@ -677,6 +684,7 @@ export default class Melee {
       const d = Math.hypot(from.x - state.x, from.z - state.z) || 1, back = vanish.behind + (from.radius ?? 1);
       this.blink(state, from.x + ((from.x - state.x) / d) * back, from.z + ((from.z - state.z) / d) * back, from);
       say('Vanish!', this.aura);
+      this.act('vanish', 0.32);
       rumble(this.player, 'vanish');
       this.rage(COMBAT.wrath.vanish);
       this.wear(hero.vanish);
@@ -731,6 +739,7 @@ export default class Melee {
       this.wear(perfect ? hero.perfect : hero.parry);
       this.recover(this.rally * (perfect ? COMBAT.rally.perfect : COMBAT.rally.parry));
       rumble(this.player, row > 0 ? 'parryRow' : perfect ? 'perfect' : 'parry', row > 0 ? 0.75 + row * 0.1 : 1);
+      this.act(perfect ? 'perfect' : 'parry', perfect ? 0.45 : 0.3);
       if (from) {
         this.work.actor = this.player; // so a break shows and rumbles for this hero
         this.monsters.wear(from, parryWear(perfect, this.monsters.structure(from), this.parryRow));
@@ -745,6 +754,7 @@ export default class Melee {
       this.wear(hero.block);
       this.rage(COMBAT.wrath.block);
       rumble(this.player, 'block');
+      this.act('blockHit', 0.3);
       return { amount: amount * COMBAT.blocked, blocked: true };
     }
     say('Guard broken!', '#ff7a6a');
@@ -752,6 +762,7 @@ export default class Melee {
     this.guardDown = GUARD_DOWN;
     this.wear(hero.heavy);
     rumble(this.player, 'guardBroken');
+    this.act('guardBreak', 0.5);
     return { amount: amount * COMBAT.crushed, crushed: true };
   }
 
@@ -1033,6 +1044,12 @@ export default class Melee {
 
   // For the sprite: null when not punching.
   get pose() {
+    const r = this.reaction;
+    if (r && !this.active && !this.staged) {
+      const t = (this.clock - r.at) / r.secs;
+      if (t < 1) return { t, arm: r.arm, move: 'clip', clip: r.clip, react: true, chain: 0, stage: this.stage, color: PUNCHES[this.stage].color };
+      this.reaction = null;
+    }
     const c = this.clashing;
     if (c) return { t: 1, chain: 4, arm: c.presses % 2, move: 'punch', stage: this.stage, color: PUNCHES[this.stage].color };
     const f = this.finishing;

@@ -128,6 +128,8 @@ const POSES = {
   rising: (p) => set(p, { air: 1, ax0: 2.5, ax1: 0.4, as1: 0.3, ae0: 0.2, ae1: 0.9, lx0: 0.95, lx1: -0.12, lk0: 1.5, lk1: 0.3, head: 0.15 }),
   falling: (p, t) => set(p, { air: 1, ax0: 0.7, ax1: 0.7, as0: 1.15, as1: 1.15, ae0: 0.5, ae1: 0.5, lx0: 0.35 + Math.sin(t * 9) * 0.05, lx1: -0.2, lk0: 0.5, lk1: 0.7 }),
   landing: (p) => { crouch(p, 1.15, 1.95); set(p, { waist: 0.5, ax0: 0.6, ax1: 0.6, as0: 0.55, as1: 0.55, ae0: 0.3, ae1: 0.3, head: -0.3 }); },
+  // Broken: knees giving way, arms hanging, swaying on the spot.
+  broken: (p, t) => { crouch(p, 0.55 + Math.sin(t * 3.1) * 0.12, 1.1 + Math.sin(t * 3.1) * 0.25); set(p, { waist: 0.45 + Math.sin(t * 2.3) * 0.1, twist: Math.sin(t * 2.3) * 0.35, head: 0.45, ax0: -0.15, ax1: -0.1, as0: 0.25, as1: 0.25, ae0: 0.3, ae1: 0.35, spin: Math.sin(t * 1.7) * 0.12 }); },
   hurt: (p) => set(p, { waist: -0.25, head: 0.3, ax0: -0.3, ax1: 0.5, as0: 0.8, as1: 0.8, ae0: 0.8, ae1: 0.6, lk0: 0.3 }),
   charge: (p, t) => { crouch(p, 0.55, 1); set(p, { waist: 0.25, ax0: 0.2, ax1: 0.2, as0: 0.45, as1: 0.45, ae0: 1.7, ae1: 1.7, twist: Math.sin(t * 26) * 0.02 }); },
   gather: (p, t) => { crouch(p, 0.75, 1.3); set(p, { waist: 0.1, chest: -0.2, ax0: -0.7, ax1: -0.7, as0: 0.95, as1: 0.95, ae0: 1.5, ae1: 1.5, twist: Math.sin(t * 34) * 0.03 }); },

@@ -121,6 +121,75 @@ export const CLIPS = {
     { t: 1, air: 1, lx0: 0.3, lk0: 0.6, lx1: 0.1, lk1: 1 },
   ] },
 };
+// Reactions (v0.51.0): played for `secs` from an event (melee.js `act`), not from a move. No `hit`, so no flash.
+// The guard pose they start from and return to.
+const GUARD = { lx0: 0.35, lx1: 0.28, lk0: 0.65, lk1: 0.58, waist: 0.12, ax0: 1.15, ax1: 0.95, as0: -0.2, as1: -0.2, ae0: 2.1, ae1: 2.1, twist: 0.1 };
+Object.assign(CLIPS, {
+  // A blow taken on the guard: the arms are driven back and the hero sinks under it.
+  blockHit: { keys: [
+    { t: 0, ...GUARD },
+    { t: 0.25, ease: 'out', ...GUARD, ax0: 1.35, ax1: 1.2, ae0: 2.35, ae1: 2.35, waist: -0.12, chest: -0.25, lk0: 0.9, lk1: 0.85, lx1: 0.1 },
+    { t: 1, ...GUARD },
+  ] },
+  // The guard smashed open: arms thrown up and wide, a step back.
+  guardBreak: { keys: [
+    { t: 0, ...GUARD },
+    { t: 0.2, ease: 'out', ax0: 2.5, ax1: 2.3, as0: 0.95, as1: 0.95, ae0: 0.4, ae1: 0.5, chest: -0.45, waist: -0.3, head: -0.2, lx0: 0.1, lk0: 0.3, lx1: -0.65, lk1: 0.5 },
+    { t: 0.6, ax0: 2.2, ax1: 2, as0: 0.8, as1: 0.8, ae0: 0.6, ae1: 0.6, chest: -0.35, waist: -0.2, lx1: -0.55, lk1: 0.5 },
+    { t: 1, waist: 0.3, ax0: 0.5, ax1: 0.4, ae0: 1.2, ae1: 1.2, lk0: 0.6, lk1: 0.6 },
+  ] },
+  // A parry: the lead arm sweeps the blow aside.
+  parry: { keys: [
+    { t: 0, ...GUARD },
+    { t: 0.3, ease: 'out', ...GUARD, ax0: 1.45, as0: 1.2, ae0: 0.6, twist: 0.5, waist: 0.05 },
+    { t: 1, ...GUARD },
+  ] },
+  // A Perfect parry: a sharper sweep, then the body coils, ready to strike back.
+  perfect: { keys: [
+    { t: 0, ...GUARD },
+    { t: 0.18, ease: 'out', ...GUARD, ax0: 1.6, as0: 1.45, ae0: 0.25, ax1: 0.6, ae1: 2.2, twist: 0.75, spin: 0.35, chest: -0.15 },
+    { t: 0.55, lx0: 0.4, lk0: 0.75, lx1: -0.35, lk1: 0.7, waist: 0.25, twist: -0.3, ax0: 0.9, ax1: 0.5, ae0: 2.1, ae1: 2.2, as0: 0.3, as1: 0.3, spin: 0.1 },
+    { t: 1 },
+  ] },
+  // Hit from the front: knocked back on the heels.
+  hurtFront: { keys: [
+    { t: 0 },
+    { t: 0.22, ease: 'out', waist: -0.35, chest: -0.3, head: 0.3, ax0: -0.3, ax1: 0.4, as0: 0.8, as1: 0.8, ae0: 0.8, ae1: 0.6, lx0: 0.15, lk0: 0.35, lx1: -0.5, lk1: 0.45 },
+    { t: 1 },
+  ] },
+  // Hit from behind: pitched forward.
+  hurtBack: { keys: [
+    { t: 0 },
+    { t: 0.22, ease: 'out', waist: 0.6, chest: 0.3, head: -0.3, ax0: -0.6, ax1: -0.5, as0: 0.7, as1: 0.7, ae0: 0.4, ae1: 0.4, lx0: 0.55, lk0: 0.7, lx1: -0.2, lk1: 0.3 },
+    { t: 1 },
+  ] },
+  // Hit from the side (R is the side struck): twisted away from it.
+  hurtSide: { keys: [
+    { t: 0 },
+    { t: 0.22, ease: 'out', twistS: -0.75, waist: 0.15, head: 0.2, axR: -0.4, asR: 1.1, aeR: 0.6, axO: 0.7, asO: 0.3, aeO: 1.3, lk0: 0.55, lk1: 0.5 },
+    { t: 1 },
+  ] },
+  // A heavy blow: knees buckle and the body is spun half round.
+  hurtHeavy: { keys: [
+    { t: 0 },
+    { t: 0.2, ease: 'out', spinS: 0.55, waist: 0.6, chest: 0.2, head: 0.35, ax0: -0.5, ax1: -0.3, as0: 0.95, as1: 0.95, ae0: 0.5, ae1: 0.5, lx0: 0.85, lk0: 1.45, lx1: 0.6, lk1: 1.3 },
+    { t: 0.6, spinS: 0.35, waist: 0.45, lx0: 0.7, lk0: 1.2, lx1: 0.5, lk1: 1.1, ax0: 0.2, ax1: 0.2, ae0: 1.2, ae1: 1.2 },
+    { t: 1 },
+  ] },
+  // Back from a Vanish: landing low behind the foe, then rising into the stance.
+  vanish: { keys: [
+    { t: 0, lx0: 1, lk0: 1.65, lx1: 0.5, lk1: 1.4, waist: 0.5, ax0: -0.6, ax1: -0.6, as0: 0.5, as1: 0.5, ae0: 0.3, ae1: 0.3 },
+    { t: 0.5, lx0: 0.7, lk0: 1.2, lx1: 0.2, lk1: 1, waist: 0.35, ax0: 0.6, ax1: 0.5, ae0: 1.8, ae1: 1.8 },
+    { t: 1 },
+  ] },
+  // Breakout: everything thrown off at once, arms flung wide.
+  breakout: { keys: [
+    { t: 0, lx0: 0.7, lk0: 1.2, lx1: 0.5, lk1: 1.1, waist: 0.5, ax0: 0.3, ax1: 0.3, as0: -0.1, as1: -0.1, ae0: 2.2, ae1: 2.2 },
+    { t: 0.25, ease: 'out', ax0: 1.3, ax1: 1.3, as0: 1.5, as1: 1.5, ae0: 0.1, ae1: 0.1, chest: -0.45, waist: -0.2, head: -0.25, lx0: 0.1, lk0: 0.1, lx1: -0.1, lk1: 0.1, lift: 0.2 },
+    { t: 0.6, ax0: 1.1, ax1: 1.1, as0: 1.3, as1: 1.3, ae0: 0.3, ae1: 0.3, chest: -0.3, lift: 0.08 },
+    { t: 1 },
+  ] },
+});
 CLIPS.execute = CLIPS.driver;
 CLIPS.riposte = CLIPS.cross;
 

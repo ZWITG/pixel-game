@@ -454,6 +454,11 @@ export default class Monsters {
     p.wrath?.gain((taken / p.body.maxHealth) * COMBAT.wrath.hurt);
     // A smash in progress shrugs the blow off and carries on.
     if (!p.melee.armored) {
+      // The hero reels the way the blow came from: knocked back, pitched forward, or twisted aside.
+      const f = Math.hypot(...s.dir) || 1, hx = fromX - s.x, hz = fromZ - s.z, hd = Math.hypot(hx, hz) || 1;
+      const ahead = (hx * s.dir[0] + hz * s.dir[1]) / (hd * f), right = (hx * s.dir[1] - hz * s.dir[0]) / (hd * f);
+      const big = taken > p.body.maxHealth * 0.2 || answer.crushed;
+      if (!answer.blocked && !answer.crushed) p.melee.act(big ? 'hurtHeavy' : ahead > 0.5 ? 'hurtFront' : ahead < -0.5 ? 'hurtBack' : 'hurtSide', big ? 0.5 : 0.35, right > 0 ? 1 : 0);
       p.flinch = 0.28;
       p.melee.active = null;
       p.melee.hover = 0;
