@@ -30,6 +30,7 @@ const GRAVITY = 22;
 const CLIMB_START = 0.45; // slopes steeper than this count as climbing practice
 const TURN_WITH_MOVE = 0.4; // radians per second the camera eases round when walking sideways
 const LOOK_RESPECT = 1.2;    // seconds after the player steers the camera before it eases again
+const DUEL_EDGE = 0.55, DUEL_BEHIND = 2.2, DUEL_TURN = 1.3; // radians off-centre the duel camera starts easing, gives up, and radians a second
 const REGEN_DELAY = 6, REGEN = 2; // seconds out of a fight, then health per second
 const JUMP_MAX = 5;          // the Jumping level that opens Flight
 // By Flight level: seconds aloft, top height, and tiles per second across and upward.
@@ -435,6 +436,11 @@ export default class Player {
       const want = Math.atan2(state.x - melee.lock.x, state.z - melee.lock.z), diff = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
       state.yaw += diff * Math.min(1, dt * 7);
       if (!state.moving && melee.rolling <= 0) state.dir = [melee.lock.x - state.x, melee.lock.z - state.z];
+    } else if (world.duelCam && !world.together && !rooms.house && this.looked > LOOK_RESPECT && melee.duel?.foe && melee.duel.count <= 2) {
+      // The duel camera: a foe drifting toward the edge of the view is eased back in, never swung round from behind.
+      const foe = melee.duel.foe, want = Math.atan2(state.x - foe.x, state.z - foe.z), diff = Math.atan2(Math.sin(want - state.yaw), Math.cos(want - state.yaw));
+      const off = Math.abs(diff);
+      if (off > DUEL_EDGE && off < DUEL_BEHIND) state.yaw += Math.sign(diff) * Math.min(off - DUEL_EDGE, DUEL_TURN * dt);
     }
     if (rooms.house) rooms.collide(state);
     else if (FEATURES.worldWork) world.work.collide(state);

@@ -207,6 +207,7 @@ export default class GameMenu {
       { label: 'Button hints', value: HINTS.find(([, id]) => id === settings.hints)[0], note: 'The list along the bottom of the screen', step: (d) => this.cycle('hints', HINTS.map(([, id]) => id), d) },
       { label: 'Compass', value: settings.compass ? 'On' : 'Off', note: 'Goals, towns and your pin', step: () => this.flip('compass') },
       { label: 'Impact frames', value: settings.impact !== false ? 'On' : 'Off', note: 'A two-tone flash on the biggest blows', step: () => this.flip('impact') },
+      { label: 'Duel camera', value: settings.duelCam !== false ? 'On' : 'Off', note: 'Closer in a one-on-one fight, turning to keep the foe in view', step: () => this.flip('duelCam') },
       { label: 'Rumble', value: settings.rumble !== false ? 'On' : 'Off', note: 'The controller shakes with blows, blocks and parries', step: () => this.flip('rumble') },
       { label: 'Return to title', value: this.sure ? 'Press again' : '', note: 'Your hero and where you stand are saved', step: () => this.leaveGame(), action: true },
     ];

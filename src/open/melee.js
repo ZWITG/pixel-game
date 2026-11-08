@@ -51,6 +51,7 @@ const SLAM_FORCE = 2.5;
 const THROW_BLAST = 7;       // tiles
 const DIVE = 46;             // tiles per second straight down
 const LOCK_FAR = 70;
+const DUEL_REACH = 16;       // tiles: foes this close and fighting the hero count toward the duel camera
 const BAR_TIME = 3;          // seconds an enemy's health bar stays up after a hit
 const WHITE = new THREE.Color('#ffffff');
 const HARD_LANDING = 10;      // tiles fallen before a stomp breaks the ground
@@ -134,6 +135,8 @@ export default class Melee {
     this.broken = 0;           // seconds left Broken
     this.rally = 0;            // grey health: points a blow took that hitting back wins back
     this.parryRow = 0;         // parries in a row (a hit taken or a long gap ends it)
+    this.duel = { foe: null, count: 0 }; // read by the duel camera
+    this.closeUp = 0;          // seconds the camera leans in after an Execute or a Perfect parry
     this.parryAt = -9;
     this.rallyAt = -9;
     this.counterBy = 1;
@@ -480,7 +483,10 @@ export default class Melee {
       this.work.stop = COMBAT.stop.perfect + row * 0.02;
       this.work.shake = Math.max(this.work.shake, 0.2 + row * 0.06);
       this.work.burst(state.x, state.y + 1.6, state.z, perfect ? ['#ffffff', this.aura, '#ffd24a'] : ['#ffd24a', '#ffffff'], (perfect ? 28 : 18) + row * 10, 7 + row * 2);
-      if (perfect) this.work.impact = COMBAT.impact;
+      if (perfect) {
+        this.work.impact = COMBAT.impact;
+        this.closeUp = 0.4;
+      }
       this.countering = counter.secs;
       this.counterBy = perfect ? counter.perfect : counter.plain;
       this.gain(perfect ? COMBAT.spirit.perfect : COMBAT.spirit.parry);
@@ -829,6 +835,7 @@ export default class Melee {
       this.rage(COMBAT.wrath.execute);
       this.hud.float('Execute!', t.x, t.group.position.y + 4, t.z, '#ff5a5a');
       this.work.slow = Math.max(this.work.slow ?? 0, COMBAT.slow.execute);
+      this.closeUp = 0.7;
     }
     // A smash on a frozen foe Shatters it (the Frostwarden).
     if (smash && t?.def) force *= this.player.powers.kitDef?.smashed?.(this.player.powers, t, a) ?? 1;
@@ -1082,8 +1089,15 @@ export default class Melee {
   // Monsters coming for this hero from outside the view, as angles off the camera's forward.
   threats(state) {
     const yaw = this.player.world.viewYaw(this.player), fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), list = [];
+    // The duel the camera frames (main.js): the foe locked on, or the nearest one fighting this hero, and how many are.
+    let near = null, best = DUEL_REACH, count = 0;
     if (FEATURES.combatCore && !this.player.rooms.house) {
       for (const e of this.monsters.within(state.x, state.z, 32)) {
+        if (e.foe === this.player && !e.dying && !(e.fleeUntil > this.monsters.time)) {
+          const d = Math.hypot(e.x - state.x, e.z - state.z) - (e.radius ?? 1);
+          if (d < DUEL_REACH) count++;
+          if (d < best) [best, near] = [d, e];
+        }
         const tell = e.mode === 'tell' || e.mode === 'strike';
         if ((!e.turn && !tell) || e.foe !== this.player) continue;
         const dx = e.x - state.x, dz = e.z - state.z, a = Math.atan2(dx * rx + dz * rz, dx * fx + dz * fz);
@@ -1091,11 +1105,14 @@ export default class Melee {
       }
     }
     this.hud.setThreats(list.slice(0, 6));
+    const lock = this.lock && !this.lock.dying ? this.lock : null;
+    this.duel = { foe: lock ?? near, count: Math.max(count, lock ? 1 : 0) };
   }
 
   update(dt, state) {
     this.work.actor = this.player;
     this.fadeRally(dt);
+    this.closeUp = Math.max(0, this.closeUp - dt);
     const shook = this.work.shake;
     if (this.orbAge < 9) {
       this.orbAge += dt;

@@ -80,6 +80,14 @@ const SHAKE_REACH = 70;
 const MAX_HILL_LIFT = 9;   // tiles the camera may climb to see over ground behind the hero
 const CAVE_LIGHT = 0.12;   // how much daylight reaches a cave
 const ROOM_CAMERA = 5.5;   // camera distance indoors
+// Duel camera (v0.44.0): fighting one or two foes, it comes in to this share of its distance and looks between
+// hero and foe; three foes, halfway; four or more, it stays out and drops back a little. Big foes and air
+// fights keep it out; Executes and Perfect parries lean it in a moment more (melee.closeUp).
+const DUEL_CLOSE = 0.62, DUEL_CROWD = 0.12, DUEL_LEAN = 0.15, DUEL_LOOK = 0.3, DUEL_LOOK_MOST = 4;
+// Tiles to the foe's edge: fully in within NEAR, not at all past FAR. Foes waiting their turn circle about
+// 8 tiles out (foes.js PRESS), so a duel stays framed while they step back between strikes.
+const DUEL_NEAR = 10, DUEL_FAR = 16;
+const DUEL_IN = 1.6, DUEL_OUT = 0.9, DUEL_OUT_CROWD = 3.5; // easing rates: in, out, and out when a crowd arrives
 const SPOT_KEY = 'lumen.spot', SPOT_EVERY = 10; // where the hero stands, and seconds between saves
 const QUALITY_LEVEL = { high: 0, balanced: 2, fast: 4 };
 const TITLE_BACK = 6.5, TITLE_SIDE = 3; // tiles behind and to the side of the hero in the title shot
@@ -264,6 +272,7 @@ function applySky(t) {
 // Holds the frame rate on any machine by trading resolution for speed, never the other way.
 const settings = loadSettings();
 haptics.on = settings.rumble !== false;
+world.duelCam = settings.duelCam !== false;
 const pace = { level: Number(QUERY.get('level') ?? QUALITY_LEVEL[settings.quality] ?? 0), avg: FAST, wait: SCALE_WAIT, held: 0 };
 function holdPace(dt) {
   if (QUERY.has('level') || settings.quality !== 'auto' || dt > PAUSED_FRAME) return;
@@ -493,7 +502,8 @@ function personal(p, dt) {
   // Eased, so starting and stopping don't bump the camera.
   p.camRun = (p.camRun ?? 0) + ((s.moving ? 1 : 0) - (p.camRun ?? 0)) * Math.min(1, dt * 2);
   const room = players.length > 1 ? split.amount : 0;
-  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) + p.camRun * SPLIT_RUN * room + rush * RUSH_PULL + cine * CINE_PULL;
+  const duel = duelFrame(p, dt, inside);
+  const far = inside ? ROOM_CAMERA : (CAMERA_DIST + (big - 1) * CAMERA_GROWTH) * (1 + SPLIT_PULL * room) * duel.scale + p.camRun * SPLIT_RUN * room + rush * RUSH_PULL + cine * CINE_PULL;
   const cx = s.x + Math.sin(s.yaw) * cp * far, cy = lookY + Math.sin(pitch) * far, cz = s.z + Math.cos(s.yaw) * cp * far;
   const need = inside ? 0 : clearance(s.x, lookY, s.z, cx, cy, cz);
   // Backed against a wall, it moves in and rises to look down past the shoulder.
@@ -510,7 +520,39 @@ function personal(p, dt) {
   if (inside) p.rooms.clampCamera(tmp, s.x, s.z);
   else tmp.y = Math.max(tmp.y, height(tmp.x, tmp.z) + 0.8, 0.8);
   p.camPos.copy(tmp);
-  p.camLook.set(s.x, lookY + AIM_ABOVE * Math.min(1, d / CAMERA_DIST) + (s.air - p.camAir) * 0.5, s.z);
+  p.camLook.set(s.x + duel.lookX, lookY + AIM_ABOVE * Math.min(1, d / CAMERA_DIST) + (s.air - p.camAir) * 0.5, s.z + duel.lookZ);
+}
+
+// How the duel camera frames this hero's fight: `scale` multiplies the camera's distance, `lookX/lookZ` move the
+// point it looks at toward the foe. Eased in slowly, out quickly, so a new attacker comes into view at once.
+function duelFrame(p, dt, inside) {
+  const { foe, count } = p.melee.duel ?? {}, s = p.state;
+  let want = 0;
+  if (!inside && foe && settings.duelCam !== false && !(p.cine > 0) && !world.together) {
+    want = count >= 4 ? -DUEL_CROWD : count === 3 ? 0.5 : 1;
+    // Only a fight at hand: a foe still closing in (or hanging back) leaves the camera out.
+    const gap = Math.hypot(foe.x - s.x, foe.z - s.z) - (foe.radius ?? 1);
+    if (want > 0) want *= Math.max(0, Math.min(1, (DUEL_FAR - gap) / (DUEL_FAR - DUEL_NEAR)));
+    // A big foe needs the room; so does a fight in the air.
+    if (want > 0) want *= Math.max(0.2, Math.min(1, 1 - ((foe.radius ?? 1) - 1.2) / 3));
+    if (want > 0 && (s.air > HOP || p.melee.hover > 0)) want *= 0.35;
+  }
+  const lean = p.melee.closeUp > 0 && want > 0 ? DUEL_LEAN : 0;
+  const rate = want > (p.camDuel ?? 0) ? DUEL_IN : want < 0 ? DUEL_OUT_CROWD : DUEL_OUT;
+  p.camDuel = (p.camDuel ?? 0) + (want - (p.camDuel ?? 0)) * Math.min(1, dt * rate);
+  p.camLean = (p.camLean ?? 0) + (lean - (p.camLean ?? 0)) * Math.min(1, dt * (lean ? 8 : 2.5));
+  const k = p.camDuel, close = Math.max(0, k);
+  const scale = k >= 0 ? 1 - (1 - DUEL_CLOSE) * k - p.camLean : 1 - k;
+  let lookX = 0, lookZ = 0;
+  if (foe && close > 0) {
+    const dx = (foe.x - s.x) * DUEL_LOOK * close, dz = (foe.z - s.z) * DUEL_LOOK * close, len = Math.hypot(dx, dz);
+    const cut = len > DUEL_LOOK_MOST ? DUEL_LOOK_MOST / len : 1;
+    lookX = dx * cut;
+    lookZ = dz * cut;
+  }
+  p.camLookX = (p.camLookX ?? 0) + (lookX - (p.camLookX ?? 0)) * Math.min(1, dt * 4);
+  p.camLookZ = (p.camLookZ ?? 0) + (lookZ - (p.camLookZ ?? 0)) * Math.min(1, dt * 4);
+  return { scale, lookX: p.camLookX, lookZ: p.camLookZ };
 }
 
 // One camera behind both heroes, pulling back as they drift apart.
@@ -811,6 +853,7 @@ if (!world.menu) menu.hide();
 function applySettings() {
   setQuality(settings.quality);
   haptics.on = settings.rumble !== false;
+  world.duelCam = settings.duelCam !== false;
   document.body.classList.toggle('no-compass', !settings.compass);
 }
 function toTitle() {
