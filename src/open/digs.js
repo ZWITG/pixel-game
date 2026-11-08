@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { height, biome, noise } from './terrain.js';
-import { shared } from './materials.js';
+import { shared, DIG_SLOTS } from './materials.js';
 import { MATERIALS } from './voxels.js';
 
 // Ground you can dig. The land stays a smooth heightmap everywhere, until a heavy blow lands or
@@ -10,7 +10,7 @@ import { MATERIALS } from './voxels.js';
 // dug too wide brings its roof down. Patches live near the heroes; what was dug is kept as a short
 // list of cuts and dug again when a hero comes back. See docs/world-upgrade-plan.md, phase 2b.
 const S = 0.5, HALF = 16, DEPTH = 10;   // tiles: voxel size, half a patch, how far down it goes
-const MOST = 6, FORGET = 260, SAVE_KEY = 'lumen.digs', MOST_CUTS = 240;
+const MOST = DIG_SLOTS, FORGET = 260, SAVE_KEY = 'lumen.digs', MOST_CUTS = 240;
 const HILLSIDE = 1.1;
 const KEEP_FLOOR = 2.5, SEA_FLOOR = 1.5;  // tiles of rock always left under a pit, and the lowest a pit may go                    // a blow this far below the land in front is a dig into it
 const ORE_PER_IRON = 10, ROCK_PER_STONE = 26;
@@ -233,17 +233,19 @@ export default class Digs {
     return vol.oy;
   }
 
-  // Patches come back as a hero nears where something was dug, and go as they leave.
+  // Patches come back as a hero nears where something was dug, and go as they leave. Only MOST can be live, so
+  // the nearest are kept and the rest wait: rebuilding every saved patch nearby and then dropping the farthest
+  // (as before v0.49.2) dropped each one before its voxels were ready, and none of the digging ever showed.
   update(dt) {
     if ((this.wait = (this.wait ?? 0) - dt) > 0) return;
     this.wait = 0.5;
-    const { players } = this.world;
-    for (const q of this.saved) {
-      if (this.at(q.x, q.z)) continue;
-      if (players.some((h) => Math.hypot(h.state.x - q.x, h.state.z - q.z) < FORGET * 0.6)) this.make(q.x, q.z);
-    }
-    for (const p of [...this.list]) {
-      if (!players.some((h) => Math.hypot(h.state.x - p.x, h.state.z - p.z) < FORGET)) this.drop(p);
-    }
+    const { players } = this.world, near = (x, z) => players.reduce((m, h) => Math.min(m, Math.hypot(h.state.x - x, h.state.z - z)), 1e9);
+    // Live patches stay until a hero is FORGET away; saved ones come back inside FORGET * 0.6.
+    const live = this.list.map((p) => ({ x: p.x, z: p.z, p, d: near(p.x, p.z) })).filter((c) => c.d < FORGET);
+    const back = this.saved.filter((q) => !this.at(q.x, q.z)).map((q) => ({ x: q.x, z: q.z, p: null, d: near(q.x, q.z) })).filter((c) => c.d < FORGET * 0.6);
+    // A live patch counts as a little nearer than it is, so two at much the same distance don't swap back and forth.
+    const want = [...live.map((c) => ({ ...c, d: c.d - HALF })), ...back].sort((a, b) => a.d - b.d).slice(0, MOST);
+    for (const p of [...this.list]) if (!want.some((c) => c.p === p)) this.drop(p);
+    for (const c of want) if (!c.p) this.make(c.x, c.z);
   }
 }

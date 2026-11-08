@@ -36,9 +36,12 @@ function scarTexture() {
 export const SCAR_GLSL = `uniform sampler2D uScars; uniform vec2 uScarAt;
   vec4 scarAt(vec2 p){ return texture2D(uScars,p/${SCAR_SIZE.toFixed(1)})*(1.-smoothstep(150.,180.,distance(p,uScarAt))); }`;
 
+// Dug patches (digs.js) the ground shaders can hide the smooth land over at once (v0.49.2: was 6).
+export const DIG_SLOTS = 10;
+
 export const shared = {
   uScars: { value: scarTexture() }, uScarAt: { value: new THREE.Vector2() },
-  uTime: { value: 0 }, uNoise: { value: noiseTexture() }, uHole: { value: new THREE.Vector3(0, 0, 0) }, uHole2: { value: new THREE.Vector3(0, 0, 0) }, uDigs: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) }, uDigMask: { value: digMask() },
+  uTime: { value: 0 }, uNoise: { value: noiseTexture() }, uHole: { value: new THREE.Vector3(0, 0, 0) }, uHole2: { value: new THREE.Vector3(0, 0, 0) }, uDigs: { value: Array.from({ length: DIG_SLOTS }, () => new THREE.Vector4()) }, uDigMask: { value: digMask() },
   uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color() }, uSkyTop: { value: new THREE.Color() }, uSkyLow: { value: new THREE.Color() }, uNight: { value: 0 },
 };
 
@@ -69,13 +72,13 @@ THREE.ShaderChunk.shadowmap_pars_fragment = THREE.ShaderChunk.shadowmap_pars_fra
 // Where the land has been dug into voxels (digs.js), the smooth ground and its grass give way.
 // `bare`: where a patch's surface was actually dug away (a mask, one row of 64 per patch), so its
 // grass goes only there.
-export const DIG_GLSL = `uniform vec4 uDigs[6]; uniform sampler2D uDigMask;
-  bool dug(vec2 p){ for(int i=0;i<6;i++){ vec4 d=uDigs[i]; if(d.z>0. && abs(p.x-d.x)<d.z && abs(p.y-d.y)<d.z) return true; } return false; }
-  bool bare(vec2 p){ for(int i=0;i<6;i++){ vec4 d=uDigs[i]; if(d.z>0. && abs(p.x-d.x)<d.z && abs(p.y-d.y)<d.z){
-    vec2 uv=(p-d.xy)/(2.*d.z)+.5; return texture2D(uDigMask,vec2(uv.x,(float(i)+uv.y)/6.)).r>.5; } } return false; }`;
+export const DIG_GLSL = `uniform vec4 uDigs[${DIG_SLOTS}]; uniform sampler2D uDigMask;
+  bool dug(vec2 p){ for(int i=0;i<${DIG_SLOTS};i++){ vec4 d=uDigs[i]; if(d.z>0. && abs(p.x-d.x)<d.z && abs(p.y-d.y)<d.z) return true; } return false; }
+  bool bare(vec2 p){ for(int i=0;i<${DIG_SLOTS};i++){ vec4 d=uDigs[i]; if(d.z>0. && abs(p.x-d.x)<d.z && abs(p.y-d.y)<d.z){
+    vec2 uv=(p-d.xy)/(2.*d.z)+.5; return texture2D(uDigMask,vec2(uv.x,(float(i)+uv.y)/${DIG_SLOTS}.)).r>.5; } } return false; }`;
 
 function digMask() {
-  const t = new THREE.DataTexture(new Uint8Array(64 * 64 * 6), 64, 64 * 6, THREE.RedFormat, THREE.UnsignedByteType);
+  const t = new THREE.DataTexture(new Uint8Array(64 * 64 * DIG_SLOTS), 64, 64 * DIG_SLOTS, THREE.RedFormat, THREE.UnsignedByteType);
   t.needsUpdate = true;
   return t;
 }

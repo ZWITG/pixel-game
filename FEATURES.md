@@ -157,6 +157,7 @@ The 2D Phaser version is kept at git tag `v0.2.0-2d`.
 - [x] The Watchers (v0.40.0): the combat upgrade plan is done
 
 ## Changelog
+- 2026-11-08 v0.49.2 fixed dug ground not showing (the user saw destruction render wrong in some places): with more than six dug patches near a hero, every half second the game rebuilt the missing ones and dropped the farthest, so each patch was dropped before its voxels were ready and none of the digging showed; the smooth, untouched ground stayed in its place. Now the nearest patches stay and the rest wait their turn, and up to ten show at once (was six)
 - 2026-11-08 v0.49.1 Wrath comes from defending, not from getting hit (combat feel, the last item on the list): losing half your health now fills 0.075 of the bar (was 0.3); Perfect parries 0.07 (was 0.04), plain parries 0.035, Vanish 0.03, and blocks now 0.01. balance.mjs checks that defending fills it faster
 - 2026-11-08 v0.49.0 foes that guard (combat feel, from the list): human fighters raise a guard against light hits, so mix in smashes, get behind them, or parry their counter-swing
 - 2026-11-08 v0.48.0 weapon clashes (combat feel; the user picked it from the list; research: lightsaber locks and anime struggles): a smash meeting a foe's strike locks the two face to face with a mash-Square clash bar; win for a big Structure break and a counter, lose and get overpowered
