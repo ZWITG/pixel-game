@@ -66,7 +66,12 @@ export default class Enemy {
       game.hud.floatText(this.x, 1.1, this.z, 'Dazed!', '#ffcd75');
     }
 
-    if (this.state === 'windup' || (this.def.ai === 'shoot' && this.vel.lengthSq() > 0.01)) {
+    if (this.guardUntil > t && this.foe?.state) {
+      // Guarding: turn to face its foe, but not instantly, so a hero who gets behind it gets through.
+      const want = Math.atan2(this.foe.state.x - this.x, this.foe.state.z - this.z), r = this.group.rotation.y;
+      const diff = Math.atan2(Math.sin(want - r), Math.cos(want - r)), most = (this.guardTurn ?? 3) * dt;
+      this.group.rotation.y = r + Math.max(-most, Math.min(most, diff));
+    } else if (this.state === 'windup' || (this.def.ai === 'shoot' && this.vel.lengthSq() > 0.01)) {
       this.group.rotation.y = Math.atan2(player.x - this.x, player.z - this.z);
     } else if (t >= this.knockUntil && this.vel.lengthSq() > 0.01) {
       this.group.rotation.y = Math.atan2(this.vel.x, this.vel.y);
@@ -173,6 +178,11 @@ export default class Enemy {
     } else if (this.def.model === 'human') {
       this.phase += dt * 9;
       walkPose(m, this.phase, moving ? 1 : 0);
+      // A raised guard: both arms up and across in front.
+      if (this.guardUntil > t && t >= (this.guardFrom ?? 0)) {
+        m.arms[0].rotation.set(-1.35, 0, 0.45);
+        m.arms[1].rotation.set(-1.5, 0, -0.45);
+      }
     } else if (this.def.model === 'wisp') {
       this.phase += dt * 3;
       m.root.position.y = 0.8 + Math.sin(this.phase) * 0.1;

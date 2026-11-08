@@ -32,6 +32,9 @@ const FIGHTERS = {
   lurker: ['hop', 'burst'],
   bat: ['hop'],
 };
+// Foes that guard (combat.js foeGuard): how likely each is to raise a guard while circling (a second) and when
+// struck by a light hit after a couple in a row.
+export const GUARDERS = { soldier: 0.3, legionary: 0.45, chief: 0.35, iceGuard: 0.4, bandit: 0.2 };
 const TURN_TAKERS = 2;       // monsters attacking one hero at a time
 const ARMY_SIGHT = 140;      // tiles an army's soldiers will come after the hero from, once in battle
 const PRESS = 8;             // tiles from a hero that those waiting their turn circle at
@@ -162,6 +165,7 @@ function think(monsters, e, t) {
   const move = !e.turn && dist < PRESS + e.radius + TURN_REACH ? monsters.takeTurn(e) : e.turn;
   if (move && !e.foe?.melee?.staged) {
     e.turn = true;
+    e.guardUntil = 0;
     const pick = pickMove(e, dist);
     if (pick) {
       e.move = pick;
@@ -174,7 +178,9 @@ function think(monsters, e, t) {
     e.vel.set(dx, dz).multiplyScalar(def.chaseSpeed);
     return;
   }
-  // Waiting their turn: keep close and circle, looking for a way in.
+  // Waiting their turn: keep close and circle, looking for a way in. Guarders now and then raise a guard.
+  const guards = GUARDERS[e.type ?? e.kind];
+  if (guards && !(e.guardUntil > t) && Math.random() < guards * 0.35 * (1 / 60)) monsters.raiseGuard?.(e);
   const out = dist - (PRESS + e.radius), side = e.strafe;
   e.vel.set(dx * Math.sign(out) * Math.min(1, Math.abs(out)) - dz * side, dz * Math.sign(out) * Math.min(1, Math.abs(out)) + dx * side).normalize().multiplyScalar(dist > PRESS * 2 ? def.chaseSpeed : def.speed);
 }

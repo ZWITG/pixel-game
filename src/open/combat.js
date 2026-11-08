@@ -53,6 +53,13 @@ export const COMBAT = {
   // each Square press adds `press`, the foe pushes back `push[role]` a second; full wins, empty loses, and after
   // `secs` whoever is ahead wins. Won: `base` + `share` of the foe's Structure, a counter, `spirit` pips. Lost:
   // `hurt` of the foe's blow and a dented guard. `every`: seconds before the same hero can clash again.
+  // Foes that guard (v0.49.0): human fighters (GUARDERS in foes.js) raise a guard while waiting their turn or
+  // after `after` light hits in a row. Light hits from the front then do `chip` of their damage (Structure still
+  // builds); after `counter` blocked hits it swings back. A smash or a chain's last hit breaks it (`breakPosture`
+  // extra Structure); blows from behind, powers and grabs go round it. `raise` seconds to lift it, `turn` radians a
+  // second it turns to face you (a Vanish behind gets through), `secs` how long it holds; `react` scales the
+  // chance of raising one mid-string.
+  foeGuard: { react: 0.5, chip: 0.2, counter: 3, after: 2, breakPosture: 2, raise: 0.35, turn: 3, secs: [1.4, 2.4], counterTell: 0.3 },
   clash: { start: 0.5, press: 0.09, secs: 2.2, base: 2, share: 0.6, spirit: 1, hurt: 0.6, every: 4, stun: 1.2,
     push: { fodder: 0.15, fighter: 0.3, brute: 0.45, machine: 0.3, ruler: 0.55, watcher: 0.5 } },
   // Parries break Structure (v0.43.0): `base` points plus `share` of the foe's whole Structure, and each parry in a

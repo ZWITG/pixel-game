@@ -10,7 +10,7 @@ import { makeFigure } from './figures.js';
 import { makeCreature } from './creatures.js';
 import { makeWatcher } from './watcherForms.js';
 import { machineMesh, DOCTRINES } from './doctrines.js';
-import { arm, stagger, standDown, TURN_TAKERS } from './foes.js';
+import { arm, stagger, standDown, TURN_TAKERS, GUARDERS } from './foes.js';
 import { rumble } from './rumble.js';
 import Tells from './tells.js';
 import { FEATURES } from '../config/features.js';
@@ -286,6 +286,7 @@ export default class Monsters {
       force *= left;
     }
     if (e.heldBy) e.heldBy.melee.drop();
+    if (this.guarded(e, force, x, z, posture)) return;
     e.takeHit(Math.round(force * this.work.actor.nature.edge(e) * 10) / 10, x, z);
     e.recoil = 1;
     this.work.skills.add('fighting', COMBAT.xp.hit);
@@ -307,6 +308,70 @@ export default class Monsters {
     this.work.actor.melee.struck = e;
     // A fight it survives can push it over the edge.
     if (!e.dying && !e.watch && e.evolving === undefined && e.tier < TIERS.length - 1 && Math.random() < HARDEN_ODDS) startEvolving(e);
+  }
+
+  // A foe raises its guard (foes.js GUARDERS): it lifts after a moment and holds a while.
+  raiseGuard(e) {
+    if (!FEATURES.foeGuard || e.dying || e.brokenUntil > this.time) return;
+    const g = COMBAT.foeGuard, [lo, hi] = g.secs;
+    e.guardFrom = this.time + g.raise;
+    e.guardUntil = e.guardFrom + lo + Math.random() * (hi - lo);
+    e.guardHits = 0;
+  }
+
+  // A blow meets a raised guard. Light hits from the front are blocked (a little damage, Structure still builds,
+  // and enough of them earn a swing back); a smash or a chain's last hit breaks it; anything else goes round it.
+  // Returns true when the blow was blocked. Guarders who aren't guarding may raise one after a few light hits.
+  guarded(e, force, x, z, posture) {
+    if (!FEATURES.foeGuard || !GUARDERS[e.type ?? e.kind]) return false;
+    const g = COMBAT.foeGuard, actor = this.work.actor, a = actor?.melee?.active;
+    const light = a?.kind === 'light' && !a.last, heavy = a && (a.kind === 'smash' || a.last);
+    const up = e.guardUntil > this.time && this.time >= (e.guardFrom ?? 0) && !(e.brokenUntil > this.time);
+    if (!up) {
+      // Hit after hit: a guarder may get its guard up for the rest of the string.
+      e.hitRow = light && this.time - (e.hitAt ?? -9) < 0.8 ? (e.hitRow ?? 0) + 1 : light ? 1 : 0;
+      e.hitAt = this.time;
+      if (e.hitRow >= g.after && e.mode !== 'tell' && e.mode !== 'strike' && Math.random() < GUARDERS[e.type ?? e.kind] * COMBAT.foeGuard.react) this.raiseGuard(e);
+      return false;
+    }
+    const r = e.group.rotation.y, front = (x - e.x) * Math.sin(r) + (z - e.z) * Math.cos(r) > 0;
+    const y = e.group.position.y + 1.4;
+    if (!front || !a) {
+      e.guardUntil = 0;
+      return false;
+    }
+    if (heavy) {
+      e.guardUntil = 0;
+      this.wear(e, g.breakPosture);
+      actor.hud.float('Guard break!', e.x, y + 2.4, e.z, '#ffd24a');
+      this.work.burst(e.x, y, e.z, ['#ffffff', '#ffd24a', '#c9d4e2'], 20, 7);
+      return false;
+    }
+    if (!light) return false;
+    // Blocked: a little damage, a spark off the guard, and Structure all the same.
+    e.takeHit(Math.round(force * g.chip * 10) / 10, x, z);
+    e.vel.set(0, 0);
+    e.knockUntil = 0;
+    this.wear(e, posture);
+    this.work.burst(e.x + (x - e.x) * 0.4, y, e.z + (z - e.z) * 0.4, ['#c9d4e2', '#ffffff'], 8, 4);
+    this.work.stop = Math.max(this.work.stop ?? 0, 0.03);
+    actor.melee.struck = e;
+    if (!(e.blockSaidAt > this.time - 1)) {
+      actor.hud.float('Blocked', e.x, y + 2.2, e.z, '#c9d4e2');
+      e.blockSaidAt = this.time;
+    }
+    rumble(actor, 'block', 0.5);
+    // Enough of that: it swings back, quick (a gold glint: parry it for a Riposte).
+    if ((e.guardHits = (e.guardHits ?? 0) + 1) >= g.counter && !e.dying && e.foe) {
+      e.guardUntil = 0;
+      e.move = 'swipe';
+      e.left = 0;
+      e.mode = 'tell';
+      e.until = this.time + g.counterTell;
+      e.vel.set(0, 0);
+      this.warn(e, { heavy: false });
+    }
+    return true;
   }
 
   // Thrown the way a blow says. Big ones shrug off anything but a stagger until their Structure breaks.
