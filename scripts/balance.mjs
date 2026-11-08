@@ -80,6 +80,11 @@ check(COMBAT.cost.vanish / perString >= 1 && COMBAT.cost.vanish / perString <= 3
 check(COMBAT.spirit.perfect >= COMBAT.cost.vanish, 'a Perfect parry pays for a Vanish');
 check(COMBAT.cost.breakout <= COMBAT.spirit.pips / 2, 'a Breakout costs at most half the bar');
 
+// Wrath: defending well should fill it faster than getting hit.
+console.log('\nWrath');
+check(COMBAT.wrath.hurt * 0.5 < COMBAT.wrath.perfect * 2, 'losing half your health fills less Wrath than two Perfect parries');
+check(COMBAT.wrath.block * 5 < COMBAT.wrath.perfect, 'five blocks fill less than one Perfect parry');
+
 // Levelling: how many fighter kills one level takes, now and with the old rules (v0.31.0).
 console.log('\nLevelling (fighter kills per hero level, about 7 blows a kill)');
 const BLOWS = 7, trains = (id, name) => SKILLS[id].trains[name] ?? 0;

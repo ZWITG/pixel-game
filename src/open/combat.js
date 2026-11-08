@@ -84,7 +84,8 @@ export const COMBAT = {
   // a kill, by role, a little more for evolved forms. See LEVEL_PACE in skills.js for the body.
   xp: { hit: 0.3, kill: { fodder: 1.5, fighter: 2.5, brute: 4, machine: 2, ruler: 25, watcher: 12 }, tier: 0.25 },
   // Wrath fills from fighting, 0..1 (ultimate.js). `hurt` is per share of the hero's health lost.
-  wrath: { hit: 0.008, smash: 0.015, execute: 0.06, perfect: 0.04, parry: 0.02, vanish: 0.02, kill: 0.025, hurt: 0.6 },
+  // v0.49.1: defending well fills it, getting hit barely does (it was `hurt: 0.6`, which rewarded taking blows).
+  wrath: { hit: 0.008, smash: 0.015, execute: 0.06, perfect: 0.07, parry: 0.035, vanish: 0.03, block: 0.01, kill: 0.025, hurt: 0.15 },
   // Surge: seconds; Spirit a second; blows this much harder; powers cool this much faster; a sixth hit.
   surge: { secs: 12, spirit: 0.25, power: 1.2, cool: 1.5, hit: 1.9, hitTime: 1.3 },
   // The Titan's Grounded: on natural ground, blows and powers this much stronger; Perfect parries this much longer.

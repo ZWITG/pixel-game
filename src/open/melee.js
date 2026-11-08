@@ -741,6 +741,7 @@ export default class Melee {
     this.work.burst(state.x, state.y + 1.6, state.z, ['#c9d4e2', '#ffffff'], 8, 4);
     if (!heavy) {
       this.wear(hero.block);
+      this.rage(COMBAT.wrath.block);
       rumble(this.player, 'block');
       return { amount: amount * COMBAT.blocked, blocked: true };
     }
