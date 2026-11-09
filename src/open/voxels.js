@@ -10,6 +10,7 @@ import { height } from './terrain.js';
 import { houseVoxels } from './blueprints.js';
 import { nationAt } from './nations.js';
 import { TOWNS } from './terrain.js';
+import { sfx } from './sound.js';
 
 // Breakable structures in the manner of Teardown: built from cubes of real materials that a blow
 // cuts exactly where it lands. After each cut the structure checks what still holds it up
@@ -499,6 +500,8 @@ export default class Voxels {
     const out = entry.vol.carve(local.x, local.y, local.z, r, only, low === undefined ? -Infinity : low - entry.group.position.y);
     if (!out.length) return 0;
     this.onCarve?.(entry, out, hero);
+    const wood = out.filter((v) => MATERIALS[v[4]]?.name === 'wood').length;
+    sfx(entry.vol.plain ? 'dirt' : wood * 2 > out.length ? 'woodBreak' : 'crumble', x, z, Math.min(1.3, 0.5 + out.length / 80));
     this.spray(entry, out, x, y, z);
     const vol = entry.vol, big = vol.mat.length > BIG, [ci, cj, ck] = vol.cell(local.x, local.y, local.z);
     const loose = vol.unsupported(vol.plain ? vol.around(ci, cj, ck, Math.ceil(r / Math.sqrt(MATERIALS[1].strength) / vol.s) + 1) : big ? vol.window(ci, cj, ck, Math.ceil(r / vol.s) + WINDOW) : null);
@@ -516,6 +519,7 @@ export default class Voxels {
     for (let i = 0; i < entry.vol.mat.length; i++) if (entry.vol.mat[i]) all.push(i);
     entry.group.updateMatrixWorld(true);
     const c = entry.group.localToWorld(new THREE.Vector3(0, 3, 0));
+    sfx('collapse', c.x, c.z);
     this.drop(entry, entry.vol.pieces(all, PIECE), hero, c.x, c.y, c.z, true);
     this.remesh(entry);
     entry.left = 0;
@@ -563,6 +567,7 @@ export default class Voxels {
   }
 
   crumble(c) {
+    sfx('debris', c.pivot.position.x, c.pivot.position.z);
     this.burst(c.pivot.position, c.vol.col.find((x) => x) ?? 0xc9bcc4, 6, 3);
     this.scene.remove(c.pivot);
     c.mesh?.geometry.dispose();

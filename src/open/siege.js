@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DOCTRINES } from './doctrines.js';
+import { sfx } from './sound.js';
 
 // Siege machines that matter (v0.38.0). Every machine has its own shot (SIEGE): it aims a moment
 // (a red line, or a red circle on the ground where it will land), leads a moving hero, and hits
@@ -78,6 +79,7 @@ export default class Siege {
     const s = p.state, d = Math.hypot(s.x - e.x, s.z - e.z);
     if (d > def.range || p.rooms.house) return;
     const ground = (x, z) => p.melee.height(x, z), fx = this.world.fx, vfx = this.world.vfx;
+    sfx('siegeFire', e.x, e.z);
     const from = { x: e.x, y: e.group.position.y + 2.4, z: e.z };
     const flight = def.flight ?? def.delay ?? (def.speed ? d / def.speed : 0.3);
     const at = this.lead(p, def.aim + flight);
@@ -178,6 +180,7 @@ export default class Siege {
   // Where an arcing shot or a burrowing one comes down.
   land(sh, g) {
     const { def, at, p } = sh, fx = this.world.fx;
+    sfx('blast', at.x, at.z, def.heavy ? 1 : 0.75);
     const d = Math.hypot(p.state.x - at.x, p.state.z - at.z);
     if (d < def.radius && p.state.air < 3) this.hurt(p, def.hit * (1 - 0.5 * d / def.radius), at.x, at.z, !!def.heavy, sh.e);
     this.world.vfx.shock(at.x, g, at.z, def.radius + 2, def.color, 0.35);

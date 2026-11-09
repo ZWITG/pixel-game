@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { FEATURES } from '../config/features.js';
 import { rumble } from './rumble.js';
+import { sfx } from './sound.js';
 
 const POOL = 12;
 const POP = 0.09, HOLD = 0.32, FADE = 0.2;   // seconds: grow, stay, shrink after the first pop
@@ -75,6 +76,7 @@ export default class Tells {
     g.flared = !strikeAt || strikeAt <= time;
     g.size = SIZE[kind] * Math.max(1, Math.sqrt(e.group.scale.x || 1));
     g.sprite.material = this.mats[kind];
+    if (!heavy) sfx('glint', e.x, e.z);
     if (!heavy || !hero) return;
     rumble(hero, 'peril');
     if (!this.toldPeril.has(hero)) {

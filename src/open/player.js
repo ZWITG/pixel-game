@@ -22,6 +22,7 @@ import Wrath from './ultimate.js';
 import SpiritArts from './spiritArts.js';
 import Rooms from './rooms.js';
 import Cave, { CaveLevel } from './cave.js';
+import { sfxAt } from './sound.js';
 
 // One hero: their own input, body, skills, bag, HUD and sprite. The world they stand in is shared.
 const STEP_GLIDE = 1.1;         // tiles: a rise or drop this small is a step the body glides over
@@ -309,6 +310,7 @@ export default class Player {
     if (dived) this.melee.landDive(state);
     state.air = state.rise = state.peak = 0;
     this.nature.landed(fell);
+    if (fell > 0.6) sfxAt(this, this.swim.inWater ? 'splash' : 'land', Math.min(1.4, 0.35 + fell * 0.08));
     this.landed = fell > 2 ? LANDING : 0;
     this.world.work.burst(state.x, y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], fell > 2 ? 12 : 5, 2 + Math.min(4, fell * 0.2));
     if (!this.rooms.house) this.melee.stomp(state, fell);
@@ -363,6 +365,7 @@ export default class Player {
       world.work.burst(state.x, state.y + 0.1, state.z, ['#c9bcc4', '#a89a8c'], 4, 2);
       state.air = 0.01;
       skills.add('jumping', 1);
+      sfxAt(this, 'jump');
       this.nature.jumpedOff();
     } else if (FEATURES.jump && just.jump && !used && !pursued && free && state.air > 0.3 && !melee.active && melee.hover <= 0) this.nature.airJump();
     const look = free ? controls.look() : { x: 0, y: 0 };

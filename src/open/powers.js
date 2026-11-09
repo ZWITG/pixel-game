@@ -19,6 +19,7 @@ const KITS = { titan: TITAN, storm: STORM, ember: EMBER, frost: FROST, void: VOI
 // The second five's elements have no shell or flame of their own: light, rings and motes in two colours.
 export const LOOKS = { time: ['#7af0d0', '#f4ffe0'], water: ['#3ab8ff', '#e0f6ff'], blight: ['#9ad13a', '#3e5a10'], mind: ['#ff4ad0', '#ffd8f4'], night: ['#6a6cff', '#0c0a1e'] };
 import { Flames, makeBolt, shapeBolt } from './elementFx.js';
+import { sfxEl } from './sound.js';
 
 // What a power does when it's used, by `kind`, and the light it makes. Each hero has a PowerSet;
 // the effects themselves are shared. Rank makes everything stronger and quicker.
@@ -235,6 +236,7 @@ export class PowerFx {
 
   // The moment an element lands.
   impact(element, x, y, z, r) {
+    sfxEl('impact', element, x, z, Math.min(1.3, 0.6 + r * 0.06));
     const n = Math.min(12, 4 + Math.round(r));
     const around = (fn) => {
       for (let i = 0; i < n; i++) {
@@ -274,6 +276,7 @@ export class PowerFx {
 
   // A ring of the element rolling outward.
   wave(element, x, y, z, r) {
+    sfxEl('wave', element, x, z, Math.min(1.2, 0.6 + r * 0.04));
     const rings = Math.max(2, Math.min(5, Math.round(r / 4)));
     for (let k = 1; k <= rings; k++) {
       const radius = (r * k) / rings, n = Math.min(14, 5 + Math.round(radius));
@@ -499,6 +502,7 @@ export default class PowerSet {
     this.keepReady = null;
     this.casting = CAST_TIME;
     this.pose = CAST_POSE[kind] ?? 'punch';
+    sfxEl('cast', this.element, player.state.x, player.state.z);
     player.skills.add(this.skillOf(pid), PRACTICE);
     return undefined;
   }

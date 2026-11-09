@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { COMBAT } from './combat.js';
 import { rumble } from './rumble.js';
+import { sfx, sfxAt, sfxEl } from './sound.js';
 
 // Wrath, Surge and the ultimates. Wrath fills from fighting (COMBAT.wrath); full, L1 + R1 together
 // lets loose the Conqueror's ultimate, or held for a second starts Surge. An ultimate is a short
@@ -463,6 +464,7 @@ export default class Wrath {
     amount *= this.world.omega?.wrathFactor() ?? 1; // feared, the hero's Wrath runs higher
     const was = this.full;
     this.wrath = Math.min(1, this.wrath + amount);
+    if (!was && this.full) sfx('wrathFull');
     if (!was && this.full) this.p.hud.message('Wrath is full! L1 + R1: ultimate. Hold them: Surge.', true);
   }
 
@@ -522,12 +524,14 @@ export default class Wrath {
     this.world.work.slow = Math.max(this.world.work.slow, 0.35);
     this.world.work.lines = 0.4;
     def.start(this);
+    sfxEl('ult', p.powers.element, p.state.x, p.state.z);
   }
 
   startSurge() {
     if (!this.canStart()) return;
     const { p } = this, color = p.powers.def.color;
     this.wrath = 0;
+    sfxAt(p, 'surge');
     this.surge = COMBAT.surge.secs;
     p.hud.message('Surge!', true, 2000);
     this.world.vfx.shock(p.state.x, this.ground(p.state.x, p.state.z), p.state.z, 16, color, 0.5);

@@ -2,6 +2,7 @@
 // standard pad with a vibrationActuator). A stronger effect isn't cut short by a weaker one. Settings switch:
 // `settings.rumble` (main.js sets `haptics.on`); feature switch: FEATURES.rumble.
 import { FEATURES } from '../config/features.js';
+import { sound } from './sound.js';
 
 export const haptics = { on: true };
 
@@ -28,6 +29,7 @@ export const FEELS = {
 const playing = new WeakMap(); // pad id -> { until, power }
 
 export function rumble(player, feel, scale = 1) {
+  sound.felt(player, feel, scale);
   if (!FEATURES.rumble || !haptics.on) return;
   const controls = player?.controls;
   if (!controls || controls.device !== 'pad') return;

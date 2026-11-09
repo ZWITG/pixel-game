@@ -1,5 +1,6 @@
 import { stagger, standDown } from './foes.js';
 import { COMBAT } from './combat.js';
+import { sfx } from './sound.js';
 
 // The Watchers: beings of the Conquerors' own kind, the world's answer to a hero who won't stop.
 // They come from Omega phase 3, march with armies from phase 4 and in pairs at phase 5. They fight
@@ -185,6 +186,7 @@ export default class Watchers {
     const a = Math.random() * 6.283, x = hero.state.x + Math.cos(a) * 18, z = hero.state.z + Math.sin(a) * 18;
     const W = WATCHERS[type], color = W.color ?? hero.powers.def?.color ?? '#c8c8ff';
     this.omens.push({ hero, type, x, z, left: OMEN, ring: 0, color });
+    sfx('omen', x, z);
     this.world.vfx?.tint(color, 0.35, OMEN + 1.5, 0.4);
     for (const p of this.world.players) {
       p.hud.herald?.(W.name, this.met[type] ? 'It remembers how you fight.' : W.omen, color);
@@ -198,6 +200,7 @@ export default class Watchers {
     const a = Math.random() * 6.283, d = trial ? 22 : COME_FROM;
     const x = at?.x ?? hero.state.x + Math.cos(a) * d, z = at?.z ?? hero.state.z + Math.sin(a) * d;
     const m = this.monsters, e = m.add(type, x, z, m.danger(x, z), false);   // adopted in Monsters.add
+    sfx('arrive', x, z);
     Object.assign(e.watch, { insight: Math.min(MOST_INSIGHT, insight), trial });
     const W = WATCHERS[type];
     this.world.vfx?.burst(x, e.group.position.y + 3, z, [e.watch.color, '#ffffff'], 40, 12);
@@ -400,6 +403,7 @@ export default class Watchers {
 
   begin(e, power, t, angry) {
     const m = this.monsters, area = { flash: 12, pull: 4, silence: 6, drain: 11, bloom: 0, crush: 9 }[power];
+    sfx('watcherCast', e.x, e.z);
     if (power === 'step') return this.step(e, t);
     if (power === 'crush') return this.blow(e, 'crush', t);
     if (power === 'shock') return this.readStance(e, t, 1.4);
@@ -509,6 +513,7 @@ export default class Watchers {
     const w = e.watch, W = WATCHERS[w.type], m = this.monsters, y = e.group.position.y, vfx = this.world.vfx;
     w.unveiled = true;
     w.riteAt = t + 1.4;
+    sfx('unveil', e.x, e.z);
     e.group.scale.multiplyScalar(UNVEIL_SIZE);
     e.radius *= UNVEIL_SIZE;
     e.posture = 0;
@@ -664,6 +669,7 @@ export default class Watchers {
   repel(e, p, t) {
     const w = e.watch, m = this.monsters, vfx = this.world.vfx;
     w.repelAt = t + REPEL_TELL;
+    sfx('repel', e.x, e.z);
     e.vel.set(0, 0);
     vfx?.burst(e.x, e.group.position.y + 3, e.z, ['#ffffff', w.color], 24, 6, { up: 0.6, life: 0.3 });
     this.world.fx?.glow(e.x, e.group.position.y + 3, e.z, e.radius * 4, w.color, REPEL_TELL, 1.8);

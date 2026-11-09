@@ -4,6 +4,7 @@ import { SPAWN_CLEAR } from './work.js';
 import { FEATURES } from '../config/features.js';
 import { COMBAT, smashFor, clampSpirit, parryWear } from './combat.js';
 import { rumble } from './rumble.js';
+import { sfx, sfxAt } from './sound.js';
 import { stagger } from './foes.js';
 import { roleName } from './evolve.js';
 import { CLIPS } from './heroClips.js';
@@ -327,6 +328,7 @@ export default class Melee {
     this.guarding = false;
     this.armored = move.kind === 'smash' && !!COMBAT.smash[move.name].armored;
     this.active = { ...move, target, t: 0, fx: state.dir[0] / len, fz: state.dir[1] / len, landed: false };
+    sfxAt(this.player, move.kind === 'smash' ? 'swingHeavy' : 'swing');
   }
 
   spend(pips) {
@@ -498,6 +500,7 @@ export default class Melee {
     this.clashing = { e, t: 0, k: clash.start, presses: 0, sparkIn: 0, fx: dx / d, fz: dz / d, push: clash.push[roleName(e)] ?? clash.push.fighter };
     this.clashAt = this.clock;
     this.active = null;
+    sfx('clash', e.x, e.z);
     this.queued = false;
     this.guarding = false;
     this.armored = true;
@@ -563,6 +566,7 @@ export default class Melee {
     this.idle = 0;
     this.hud.setClash?.(null);
     if (won === null || !c) return;
+    sfx(won ? 'clashWin' : 'guardBreak', c.e.x, c.e.z);
     const { e } = c, { clash } = COMBAT, y = e.group.position.y;
     this.player.guard = 0;
     if (won) {
@@ -601,6 +605,7 @@ export default class Melee {
     })();
     state.dir = [...this.rollDir];
     this.rolling = ROLL_TIME;
+    sfxAt(this.player, 'roll');
     this.work.burst(state.x, state.y + 0.2, state.z, ['#c9bcc4', '#a89a8c'], 6, 3);
   }
 
@@ -1120,6 +1125,8 @@ export default class Melee {
     const struck = this.blast(x, z, force, reach, crater, p.color, t, react, all, posture);
     this.skills.add('punching', struck ? 1 : AIR_PRACTICE);
     if (t && !t.def) this.skills.add(t.type === 'tree' ? 'woodcutting' : 'mining', 1);
+    if (t && !t.def) sfx(t.type === 'tree' ? 'chop' : 'mine', x, z);
+    else if (!t && crater) sfx('dirt', x, z);
     if (t?.def) {
       this.player.powers.landed();
       const max = this.player.body.maxHealth;

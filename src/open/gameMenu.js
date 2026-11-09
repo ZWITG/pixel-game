@@ -59,6 +59,8 @@ const TIER_ICONS = [['hamlet', 0.72], ['hamlet', 0.84], ['village', 1], ['town',
 const SCAR_COLORS = [['burn', '#ff7a2a', 'Burning'], ['char', '#1a1412', 'Ash'], ['frost', '#dff4ff', 'Frost and ice'], ['rot', '#7a2ac8', 'Rot']];
 const YOURS = '#f7efdf';
 const HINTS = [['Auto', 'auto'], ['Always', 'always'], ['Off', 'off']];
+const LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const level = (v) => (v ? `${v * 10}%` : 'Off');
 const ZOOMS = [1, 2.4, 5];
 const CURSOR_SPEED = 0.55;  // screens per second
 const NEAR_PX = 22;         // how close the cursor must be to read a place
@@ -215,6 +217,8 @@ export default class GameMenu {
       { label: 'Impact frames', value: settings.impact !== false ? 'On' : 'Off', note: 'A two-tone flash on the biggest blows', step: () => this.flip('impact') },
       { label: 'Duel camera', value: settings.duelCam !== false ? 'On' : 'Off', note: 'Closer in a one-on-one fight, turning to keep the foe in view', step: () => this.flip('duelCam') },
       { label: 'Rumble', value: settings.rumble !== false ? 'On' : 'Off', note: 'The controller shakes with blows, blocks and parries', step: () => this.flip('rumble') },
+      { label: 'Sound', value: level(settings.volume ?? 8), note: 'Every sound in the game', step: (d) => this.cycle('volume', LEVELS, d) },
+      { label: 'Ambience', value: level(settings.ambience ?? 6), note: 'Wind, birds, crickets, rain and fire around you', step: (d) => this.cycle('ambience', LEVELS, d) },
       { label: 'Return to title', value: this.sure ? 'Press again' : '', note: 'Your hero and where you stand are saved', step: () => this.leaveGame(), action: true },
     ];
   }

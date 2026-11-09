@@ -45,6 +45,7 @@ import { lightWindows } from './architecture.js';
 import Towns from './settlements.js';
 import { nearSolids } from './solidGrid.js';
 import { haptics } from './rumble.js';
+import { sound } from './sound.js';
 
 // World prototype: proves the look and the scale before the game's systems move here.
 const FOV = 52;
@@ -271,6 +272,9 @@ function applySky(t) {
 
 // Holds the frame rate on any machine by trading resolution for speed, never the other way.
 const settings = loadSettings();
+// Sounds are made in a worker while the game loads; they wake on the first key, click or pad press.
+sound.setVolume((settings.volume ?? 8) / 10, (settings.ambience ?? 6) / 10);
+sound.start();
 haptics.on = settings.rumble !== false;
 world.duelCam = settings.duelCam !== false;
 const pace = { level: Number(QUERY.get('level') ?? QUALITY_LEVEL[settings.quality] ?? 0), avg: FAST, wait: SCALE_WAIT, held: 0 };
@@ -756,6 +760,7 @@ function step(dt) {
     world.quake.update(dt);
   }
 
+  sound.update(dt, players, world);
   const dir = sky.material.uniforms.uSun.value;
   marks.crystals.material.opacity = 0.7 + Math.sin(shared.uTime.value * 1.4) * 0.3;
   for (const isle of marks.isles) isle.position.y += Math.sin(shared.uTime.value * 0.3 + isle.userData.bob) * 0.02;
@@ -855,6 +860,7 @@ function applySettings() {
   setQuality(settings.quality);
   haptics.on = settings.rumble !== false;
   world.duelCam = settings.duelCam !== false;
+  sound.setVolume(settings.volume / 10, settings.ambience / 10);
   document.body.classList.toggle('no-compass', !settings.compass);
 }
 function toTitle() {

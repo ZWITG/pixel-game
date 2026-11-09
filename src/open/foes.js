@@ -1,3 +1,4 @@
+import { sfx } from './sound.js';
 // How monsters fight in the open world. Nothing hurts by touch: each attack is a tell you can
 // read, a strike you can roll, block or parry, and a recovery you can punish. Monsters in a group
 // take turns, so a crowd presses you without all swinging at once.
@@ -143,6 +144,7 @@ function think(monsters, e, t) {
       e.landed = false;
       e.vel.set(dx, dz).multiplyScalar(m.lunge);
       setMode(e, 'strike', m.time, t);
+      sfx(m.heavy ? 'swingHeavy' : 'swing', e.x, e.z, 0.8, e.radius > 2.5 ? 0.7 : 0.9);
       e.thrallsHit = false;
       if (m.area) monsters.quakeAt(e, m.area);
     }

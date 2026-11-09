@@ -17,6 +17,7 @@ import { animateFoe } from './foeAnim.js';
 import { FEATURES } from '../config/features.js';
 import { armBoss, markGround, POWERS, WAVE_REACH, WAVE_SPEED } from './bosses.js';
 import { nearSolids } from './solidGrid.js';
+import { sfx } from './sound.js';
 
 // Monsters in the open world. They use the game's own Enemy class; this file is the small
 // `game` it expects, plus spawning around the hero and the hero's health.
@@ -137,6 +138,7 @@ export default class Monsters {
   fireOrb(e, dx, dz) {
     // War machines each have their own shot (siege.js).
     if (e.def.machine && this.world.siege) return this.world.siege.fire(e);
+    sfx('orb', e.x, e.z);
     const orb = makeOrb();
     orb.scale.setScalar(SIZE);
     orb.position.set(e.x, e.group.position.y + 2, e.z);
@@ -145,6 +147,7 @@ export default class Monsters {
   }
 
   onEnemyKilled(e) {
+    sfx(e.def.machine ? 'machineBreak' : e.boss || e.watch || e.radius > 2.5 ? 'foeDieBig' : 'foeDie', e.x, e.z, 1, e.def.machine ? 1 : Math.max(0.7, Math.min(1.3, 1.35 - (e.radius ?? 1) * 0.25)));
     this.world.realm.slain(e);
     // The last of a group falls in slow motion.
     const hero = this.work.actor;
@@ -291,6 +294,7 @@ export default class Monsters {
     if (e.heldBy) e.heldBy.melee.drop();
     if (this.guarded(e, force, x, z, posture)) return;
     e.takeHit(Math.round(force * this.work.actor.nature.edge(e) * 10) / 10, x, z);
+    sfx('foeHit', e.x, e.z, Math.min(1.2, 0.6 + force / 60), e.radius > 2.5 ? 0.75 : 1);
     e.recoil = 1;
     this.work.skills.add('fighting', COMBAT.xp.hit);
     this.wear(e, posture);
@@ -508,6 +512,7 @@ export default class Monsters {
   roar(e) {
     const hero = e.foe;
     if (hero) hero.hud.message(`${e.def.name} rages!`, true);
+    sfx('roar', e.x, e.z);
     this.work.shake = Math.max(this.work.shake, 0.4);
     this.work.shakeAt = (hero ?? this.players[0]).state;
     this.work.burst(e.x, e.group.position.y + 6, e.z, [e.kit.color, '#ffffff'], 40, 12);

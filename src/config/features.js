@@ -60,4 +60,5 @@ export const FEATURES = {
   finishers: true,      // open world: Triangle on a Broken foe plays a paired finisher (seize, beats, Execute) by foe size (melee.js)
   tells: true,          // open world: gold glint on a foe's wind-up (block or parry), red for a guard-breaking blow (dodge or Perfect parry) (tells.js)
   rumble: true,         // open world: controller rumble for hits, blocks, parries and being hurt (rumble.js; also a Settings switch)
+  sound: true,          // open world: synthesised sound effects and ambience, made at load in a worker (sound.js; Sound and Ambience in Settings)
 };

@@ -1,5 +1,6 @@
 import { CONQUERORS, svg } from './conquerors.js';
 import { prompt } from '../ui/glyphs.js';
+import { sfx } from './sound.js';
 
 // Choosing a Conqueror: five emblems, the one in focus stands in the world, and a second
 // screen makes sure, because there is no changing it afterward.
@@ -57,6 +58,7 @@ export default class ConquerorPick {
       return this.draw();
     }
     const id = IDS[this.at], done = this.onDone;
+    sfx('ui.confirm');
     this.owner.becomeConqueror(id);
     this.owner = null;
     this.box.hidden = true;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { COMBAT } from './combat.js';
+import { sfxAt } from './sound.js';
 
 // Spirit Arts: every Conqueror's ranged game, paid in Spirit. Hold L1 (Q) and press Square (J) for
 // a Spirit Shot; hold Triangle (U) for the Spirit Wave, a beam that charges, then pours out until
@@ -40,6 +41,7 @@ export default class SpiritArts {
     const { shot } = COMBAT.arts, { melee, powers, state } = this.p;
     if (this.cool > 0 || this.wave) return;
     if (!melee.spend(shot.cost)) return this.short();
+    sfxAt(this.p, 'spiritShot');
     this.cool = shot.every;
     this.p.world.watchers?.saw(this.p, 'shot');
     const aim = powers.aim();
@@ -54,6 +56,7 @@ export default class SpiritArts {
   waveStart() {
     if (this.wave) return;
     if (!this.p.melee.spend(COMBAT.arts.wave.cost)) return this.short();
+    sfxAt(this.p, 'spiritWave');
     this.wave = { t: 0, tick: 0, beam: null };
   }
 
