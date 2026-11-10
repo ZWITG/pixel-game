@@ -317,115 +317,105 @@ const ELEMENTS = {
       return o;
     },
   },
-  time: {
+  // The second five (v0.56.0).
+  gravity: {
     cast: () => {
-      const o = silence(0.65);
-      for (let k = 0; k < 4; k++) add(o, hiss({ dur: 0.03, f: [k % 2 ? 2100 : 3200], q: 8, mode: 'bp', d: 0.006 }), 1, k * 0.09);
-      add(o, swell(tone({ dur: 0.6, f: [500, 1500], type: 'tri', vib: [6, 0.01] }), 0.55, 2), 0.25, 0.05);
-      add(o, pings(0.6, 8, 2000, 4000, 0.1), 0.25);
+      const o = swell(tone({ dur: 0.6, f: [90, 38], a: 0.05, d: 0.3, drive: 1.6 }), 0.5, 2);
+      add(o, swell(hiss({ dur: 0.6, f: [2400, 200], q: 1.4, mode: 'bp' }), 0.5, 2.5), 0.45);
       return o;
     },
     impact: () => {
-      const o = silence(1.4);
-      // a bell played backwards, then struck
-      const rev = bell(0.5, 660, [1, 2.01, 3.5, 5.2], 0.25).reverse();
-      add(o, rev, 0.8);
-      add(o, bell(1.2, 660, [1, 2.01, 3.5, 5.2], 0.5), 0.7, 0.49);
-      add(o, thump(90, 40, 0.15), 0.6, 0.49);
-      add(o, pings(0.8, 10, 1500, 3500, 0.15), 0.3, 0.5);
+      const o = silence(1.3);
+      add(o, tone({ dur: 1.3, f: [120, 22], g: 0.4, a: 0.002, d: 0.4, drive: 2.2 }), 1);
+      add(o, thump(70, 28, 0.25), 1);
+      add(o, crunch(380, 0.12, 0.8), 0.7);
+      add(o, hiss({ dur: 1.1, f: [900, 60], g: 0.3, q: 1.5, d: 0.3 }), 0.5);
       return o;
     },
     wave: () => {
-      const n = len(1.1), o = new Float32Array(n);
-      let ph = 0;
-      for (let i = 0; i < n; i++) {
-        const t = i / SR, f = 440 * (1 + Math.sin(t * TAU * (7 - t * 5.5)) * 0.04) * (1 - t * 0.25);
-        ph += f / SR;
-        o[i] = (wave.tri(ph) * 0.6 + wave.sine(ph * 2.0) * 0.3) * envAt(t, 0.05, 0.5, 1.1);
-      }
-      add(o, whoosh(1.1, 300, 1600, 1), 0.6);
+      const o = pad(1.2, [36.7, 55], (t) => 160 + Math.sin(t * 4) * 80, { a: 0.1, d: 0.6 });
+      add(o, whoosh(1.2, 1400, 200, 1.5), 0.5);
       return o;
     },
   },
-  water: {
+  blade: {
     cast: () => {
-      const o = swell(hiss({ dur: 0.55, f: [200, 1600], q: 0.9 }), 0.4, 1.4);
-      add(o, bubbles(0.55, 10, 300, 900, 0.025), 0.6);
+      const o = whoosh(0.45, 600, 6000, 2.5);
+      add(o, bell(0.45, 3400, [1, 2.7, 5.1], 0.12), 0.35, 0.05);
       return o;
     },
     impact: () => {
-      const o = silence(1.1);
-      add(o, thump(110, 50, 0.08), 0.7);
-      add(o, hiss({ dur: 1, f: [400, 2600, 500], g: 0.07, q: 1.1, mode: 'bp', a: 0.003, d: 0.25 }), 1.3);
-      add(o, hiss({ dur: 0.9, f: [5000, 2500], mode: 'hp', a: 0.01, d: 0.2 }), 0.35);
-      add(o, bubbles(1, 22, 250, 1100, 0.03), 0.6, 0.05);
+      const o = silence(1);
+      add(o, drive(hiss({ dur: 0.12, f: [5000, 2500], mode: 'hp', d: 0.03 }), 2.5), 1);
+      add(o, bell(0.9, 2200, [1, 2.76, 5.4, 8.9], 0.35), 0.45, 0.01);
+      add(o, crunch(1600, 0.06, 1.2), 0.5);
+      add(o, thump(110, 50, 0.06), 0.4);
       return o;
     },
     wave: () => {
-      const o = swell(hiss({ dur: 1.4, f: [150, 900, 300], g: 0.6, q: 0.8, am: [1.5, 0.3] }), 0.6, 1.1);
-      add(o, swell(hiss({ dur: 1.4, f: [3000, 6000], mode: 'hp' }), 0.7), 0.3);
-      add(o, bubbles(1.4, 14, 200, 700, 0.035), 0.4);
+      const o = whoosh(1, 300, 7000, 3);
+      add(o, pings(1, 12, 3500, 7000, 0.05), 0.4);
       return o;
     },
   },
-  blight: {
+  blood: {
     cast: () => {
-      const o = svf(tone({ dur: 0.55, f: [110, 95], type: 'saw', a: 0.05, d: 0.3, am: [38, 0.9] }), 900, 2, 'bp');
-      add(o, swell(hiss({ dur: 0.55, f: [1800, 3500], q: 1.5, mode: 'bp' }), 0.3), 0.5);
-      add(o, bubbles(0.55, 8, 90, 260, 0.04), 0.5);
+      const o = swell(hiss({ dur: 0.5, f: [300, 1800], q: 1.6, mode: 'bp' }), 0.35, 1.6);
+      add(o, bubbles(0.5, 9, 120, 420, 0.03), 0.6);
+      add(o, tone({ dur: 0.5, f: [70, 50], a: 0.05, d: 0.25 }), 0.4);
       return o;
     },
     impact: () => {
       const o = silence(1.1);
-      add(o, hiss({ dur: 0.4, f: [600, 140], g: 0.25, q: 4, mode: 'bp', a: 0.002, d: 0.1, drive: 3 }), 1);
-      add(o, thump(90, 40, 0.1), 0.6);
-      add(o, bubbles(1, 18, 70, 280, 0.05), 0.7, 0.05);
-      add(o, svf(tone({ dur: 1, f: [180, 160], type: 'saw', a: 0.1, d: 0.35, am: [44, 0.9], vib: [5, 0.03] }), 1100, 3, 'bp'), 0.35, 0.1);
+      add(o, thump(85, 36, 0.14), 0.9);
+      add(o, hiss({ dur: 0.6, f: [1400, 300], g: 0.2, q: 2.5, mode: 'bp', a: 0.002, d: 0.15, drive: 2 }), 0.9);
+      add(o, bubbles(0.9, 20, 90, 380, 0.04), 0.6, 0.04);
+      add(o, crunch(900, 0.05, 1), 0.4);
       return o;
     },
     wave: () => {
-      const o = svf(hiss({ dur: 1.2, f: [2000], q: 2, mode: 'bp', a: 0.2, d: 0.6 }), 2600, 1, 'bp');
-      for (const f of [170, 205, 240]) add(o, svf(tone({ dur: 1.2, f: [f, f * 0.9], type: 'saw', a: 0.15, d: 0.5, am: [40 + rnd() * 10, 0.9], vib: [4 + rnd() * 3, 0.04] }), 1200, 2.5, 'bp'), 0.3);
+      const o = swell(hiss({ dur: 1.2, f: [200, 1100, 300], g: 0.5, q: 1.2, am: [3, 0.3] }), 0.5, 1.2);
+      add(o, pad(1.2, [41.2, 49], 300, { a: 0.1, d: 0.6 }), 0.45);
       return o;
     },
   },
-  mind: {
+  blast: {
     cast: () => {
-      const o = silence(0.6);
-      for (const f of [440, 443.5]) add(o, tone({ dur: 0.6, f: [f, f * 1.5], g: 0.5, a: 0.08, d: 0.25, am: [7, 0.7] }), 0.4);
-      add(o, swell(tone({ dur: 0.6, f: [880, 1760], vib: [9, 0.01] }), 0.5, 2), 0.2);
+      const o = swell(hiss({ dur: 0.4, f: [400, 3200], q: 0.8 }), 0.35, 1.5);
+      add(o, grains({ dur: 0.4, rate: 70, f: 2400, q: 1, d: 0.004, fade: 0.2 }), 0.6);
       return o;
     },
     impact: () => {
-      const o = silence(1.1);
-      for (const f of [300, 302.5, 449]) add(o, tone({ dur: 1, f: [f, f * 0.5], g: 0.6, a: 0.005, d: 0.3, am: [11, 0.6] }), 0.4);
-      add(o, swell(hiss({ dur: 0.3, f: [300, 3000], q: 2, mode: 'bp' }), 0.28, 2), 0.4);
-      add(o, thump(80, 45, 0.12), 0.5, 0.28);
-      return o;
+      const o = silence(1.5);
+      add(o, thump(90, 26, 0.3), 1.2);
+      add(o, crunch(500, 0.1, 0.7), 0.9);
+      add(o, hiss({ dur: 1.4, f: [3000, 120], g: 0.45, q: 0.7, a: 0.001, d: 0.45 }), 1);
+      add(o, grains({ dur: 1.2, rate: 30, f: 1600, q: 1, d: 0.01, fade: 0.6 }), 0.5, 0.1);
+      return drive(o, 1.8);
     },
     wave: () => {
-      const o = silence(1.1);
-      for (const [f, r] of [[330, 5], [495, 6.5], [660, 8]]) add(o, tone({ dur: 1.1, f: [f], a: 0.1, d: 0.5, vib: [r, 0.035] }), 0.3);
-      add(o, whoosh(1.1, 400, 2000, 2), 0.3);
+      const o = swell(hiss({ dur: 1.2, f: [300, 900, 150], g: 0.5, q: 0.7, am: [6, 0.5] }), 0.25, 1.1);
+      add(o, tone({ dur: 1.2, f: [55, 35], a: 0.05, d: 0.7, drive: 1.5 }), 0.5);
       return o;
     },
   },
-  night: {
+  dragon: {
     cast: () => {
-      const o = swell(hiss({ dur: 0.55, f: [200, 900], q: 0.9 }), 0.35, 1.3);
-      add(o, pad(0.55, [55, 82.4], 500, { a: 0.1, d: 0.3 }), 0.5);
+      const o = svf(tone({ dur: 0.6, f: [95, 70], type: 'saw', a: 0.05, d: 0.3, am: [30, 0.6] }), 700, 2, 'bp');
+      add(o, swell(hiss({ dur: 0.6, f: [400, 2600], q: 0.9 }), 0.3, 1.3), 0.6);
       return o;
     },
     impact: () => {
-      const o = silence(1.1);
-      add(o, tone({ dur: 1, f: [95, 32], g: 0.3, a: 0.002, d: 0.25, drive: 1.5 }), 1);
-      add(o, hiss({ dur: 1, f: [1600], q: 3, mode: 'bp', a: 0.01, d: 0.3, am: [13, 0.7] }), 0.4);
-      add(o, pad(1, [41.2, 61.7], 400, { a: 0.02, d: 0.4 }), 0.5);
-      return o;
+      const o = silence(1.2);
+      add(o, thump(95, 38, 0.15), 0.9);
+      add(o, swell(hiss({ dur: 1.1, f: [500, 2000, 400], g: 0.15, q: 0.9 }), 0.12, 0.9), 1);
+      add(o, svf(tone({ dur: 1.1, f: [140, 60], type: 'saw', a: 0.01, d: 0.35, am: [26, 0.7], vib: [5, 0.04] }), 900, 2.5, 'bp'), 0.5);
+      add(o, grains({ dur: 1.0, rate: 45, f: 2400, q: 1.2, d: 0.006, fade: 0.5 }), 0.6);
+      return drive(o, 1.4);
     },
     wave: () => {
-      const o = pad(1.3, [41.2, 61.7, 82.4], (t) => 200 + Math.sin((t / 1.3) * Math.PI) * 700, { a: 0.1, d: 0.7 });
-      add(o, swell(hiss({ dur: 1.3, f: [1400, 2200], q: 2.5, mode: 'bp', am: [9, 0.6] }), 0.5), 0.35);
+      const o = swell(hiss({ dur: 1.3, f: [300, 1500, 400], g: 0.4, q: 0.8, am: [7, 0.4] }), 0.35, 1);
+      add(o, svf(tone({ dur: 1.3, f: [80, 55], type: 'saw', a: 0.15, d: 0.6, am: [22, 0.6] }), 600, 2, 'bp'), 0.45);
       return o;
     },
   },

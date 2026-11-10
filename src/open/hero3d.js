@@ -191,7 +191,7 @@ export default class HeroModel {
     // A Conqueror trails a long torn cape; the plain hero, a scarf.
     const cape = {
       horns: [], bolt: [[6, 0.13, 0.1]], hood: [[14, 0.17, 0.42], [12, 0.16, 0.36]], flame: [[12, 0.16, 0.13]], ice: [[14, 0.17, 0.46], [13, 0.17, 0.4]],
-      clock: [[12, 0.16, 0.3], [10, 0.15, 0.22]], wave: [[13, 0.17, 0.34]], plague: [[14, 0.17, 0.46], [12, 0.16, 0.4]], crown: [[15, 0.17, 0.52]], moon: [[13, 0.16, 0.3], [11, 0.15, 0.22]],
+      halo: [[13, 0.17, 0.4], [11, 0.16, 0.3]], blades: [[12, 0.16, 0.18]], thorns: [[15, 0.17, 0.5], [12, 0.16, 0.3]], fuse: [[10, 0.15, 0.2]], wyrm: [[9, 0.15, 0.24]],
     }[look.crest];
     this.ribbons = (cape ?? [[11, 0.16, 0.22], [8, 0.15, 0.17]]).map(([count, link, width]) => new Ribbon(scene, cloth, count, link, width));
     if (look.tail) this.ribbons.push(new Ribbon(scene, new THREE.MeshToonMaterial({ color: look.hair, gradientMap: toonSteps, side: THREE.DoubleSide }), 10, 0.15, 0.2));
@@ -404,43 +404,33 @@ export default class HeroModel {
       sword.forEach((g) => g.rotateZ(0.78));
       this.skin(worn, sword);
       this.shine(worn, [paint(block(0.04, 1.7, 0.06).translate(0, 0.1, 0).rotateZ(0.78), C.glow)]);
-    } else if (C.crest === 'clock') {
-      // A great clock face on the back, its hands always moving, and a pendulum of light.
-      this.skin(worn, [paint(new THREE.CylinderGeometry(0.5, 0.5, 0.05, 36).rotateX(Math.PI / 2).translate(0, 0.32, -0.06), C.coatDark), paint(new THREE.TorusGeometry(0.5, 0.04, 6, 36).translate(0, 0.32, -0.03), C.trim)]);
-      this.shine(worn, [
-        paint(new THREE.TorusGeometry(0.42, 0.012, 6, 36).translate(0, 0.32, 0), C.glow),
-        ...Array.from({ length: 12 }, (_, i) => paint(ball(i % 3 ? 0.018 : 0.034, 1, 1, 1).translate(Math.cos((i / 12) * 6.283) * 0.42, 0.32 + Math.sin((i / 12) * 6.283) * 0.42, 0.01), C.iris)),
-        paint(block(0.03, 0.34, 0.02).translate(0, 0.17, 0).rotateZ(0.6).translate(0, 0.32, 0.02), C.glow),
-        paint(block(0.03, 0.24, 0.02).translate(0, 0.12, 0).rotateZ(-1.9).translate(0, 0.32, 0.02), C.gold),
-        paint(block(0.012, 0.6, 0.012).translate(0, -0.2, 0.02), C.gold),
-        paint(ball(0.07, 1, 1, 0.4).translate(0, -0.5, 0.02), C.glow),
-      ]);
-    } else if (C.crest === 'wave') {
-      // A trident of sea-glass across the back.
-      const trident = [paint(limb(0.03, 0.03, 2.1).translate(0, 0.05, 0), '#d8e8ec'), paint(block(0.4, 0.05, 0.05).translate(0, 1.05, 0), C.trim)];
-      const tines = [-0.18, 0, 0.18].map((x) => paint(aimed(spike(0.045, x ? 0.34 : 0.46, 4), x, 1.08, 0, x * 0.4, 1, 0), C.glow));
-      trident.forEach((g) => g.rotateZ(-0.7));
-      tines.forEach((g) => g.rotateZ(-0.7));
-      this.skin(worn, trident);
-      this.shine(worn, tines);
-    } else if (C.crest === 'plague') {
-      // A censer of green smoke on a long staff, and blisters of light on the shoulders.
-      const staff = [paint(limb(0.03, 0.035, 1.9).translate(0.32, 0.25, -0.04), '#3a2a1a'), paint(new THREE.TorusGeometry(0.1, 0.02, 5, 12).translate(0.32, 1.22, -0.04), C.trim), paint(limb(0.008, 0.008, 0.3).translate(0.32, 1.05, -0.04), C.trim)];
-      this.skin(worn, staff);
-      this.shine(worn, [paint(new THREE.OctahedronGeometry(0.11).scale(1, 1.3, 1).translate(0.32, 0.86, -0.04), C.glow)]);
-      this.shine(chest, [-1, 1].flatMap((s) => [paint(ball(0.05, 1, 1, 1).translate(s * 0.36, 0.62, 0.04), C.glow), paint(ball(0.035, 1, 1, 1).translate(s * 0.42, 0.56, -0.06), C.iris)]));
-    } else if (C.crest === 'crown') {
-      // A sceptre at the back, and a third eye open on the brow.
-      this.skin(worn, [paint(limb(0.035, 0.03, 1.4).rotateZ(0.5).translate(-0.2, 0.3, -0.05), C.gold)]);
-      this.shine(worn, [paint(new THREE.OctahedronGeometry(0.12).translate(-0.53, 0.92, -0.05), C.glow)]);
-      this.shine(B.head, [paint(ball(0.03, 1, 1.5, 0.5).translate(0, 0.33, 0.27), C.glow)]);
-    } else if (C.crest === 'moon') {
-      // An eclipse behind the shoulders, and two curved knives at the hips.
-      this.skin(worn, [paint(new THREE.CylinderGeometry(0.42, 0.42, 0.04, 36).rotateX(Math.PI / 2).translate(0, 0.42, -0.08), '#000000')]);
-      this.shine(worn, [paint(new THREE.TorusGeometry(0.44, 0.03, 6, 40).translate(0, 0.42, -0.06), C.glow), paint(new THREE.TorusGeometry(0.5, 0.008, 4, 40).translate(0, 0.42, -0.06), C.gold)]);
+    } else if (C.crest === 'halo') {
+      // A small black star held behind the back, with a ring of light around it.
+      this.skin(worn, [paint(ball(0.3, 1, 1, 1).translate(0, 0.42, -0.12), '#05040c')]);
+      this.shine(worn, [paint(new THREE.TorusGeometry(0.44, 0.03, 6, 40).rotateX(0.5).translate(0, 0.42, -0.12), C.glow), paint(new THREE.TorusGeometry(0.56, 0.01, 4, 40).rotateX(-0.4).translate(0, 0.42, -0.12), C.gold)]);
+    } else if (C.crest === 'blades') {
+      // A fan of seven swords behind the shoulders, like wings of steel.
+      const fan = [];
+      for (let i = 0; i < 7; i++) {
+        const a = -1.1 + (i / 6) * 2.2;
+        fan.push(paint(aimed(spike(0.055, 1.2, 4), Math.sin(a) * 0.2, 0.2, 0, Math.sin(a), Math.cos(a) * 0.9 + 0.3, -0.25).scale(1, 1, 0.35), C.hairHi));
+      }
+      this.skin(worn, fan);
+      this.shine(worn, [-1, 1].map((s) => paint(block(0.025, 0.9, 0.02).rotateZ(s * -0.6).translate(s * 0.36, 0.62, 0.02), C.glow)));
+    } else if (C.crest === 'thorns') {
+      // Three drops of blood hanging in the air behind the shoulders, and thorns down both forearms.
+      this.shine(worn, [[0, 0.7, 0.16], [-0.36, 0.42, 0.12], [0.36, 0.42, 0.12]].map(([x, y, r]) => paint(ball(r, 1, 1.35, 1).translate(x, y, -0.1), C.glow)));
+      for (const i of [0, 1]) this.skin(B[`fore${i}`], [0, 1, 2].map((k) => paint(aimed(spike(0.035, 0.16, 4), 0, -0.08 - k * 0.1, -0.08, 0, -0.3, -1), C.trim)));
+    } else if (C.crest === 'fuse') {
+      // A bandolier of glowing charges across the chest, and heavy gauntlets.
+      this.skin(chest, [paint(block(0.1, 0.95, 0.06).rotateZ(0.7).translate(0, 0.3, 0.2), C.wrap)]);
+      this.shine(chest, Array.from({ length: 5 }, (_, i) => paint(ball(0.05, 1, 1.3, 1).translate(-0.24 + i * 0.12, 0.08 + i * 0.11, 0.24), i % 2 ? C.glow : C.gold)));
+      for (const i of [0, 1]) this.skin(B[`hand${i}`], [paint(block(0.2, 0.2, 0.22).translate(0, 0.02, 0), C.coatDark), paint(block(0.22, 0.05, 0.24).translate(0, 0.1, 0), C.trim)]);
+    } else if (C.crest === 'wyrm') {
+      // Wings of light folded on the back, ribbed like a dragon's.
       for (const s of [-1, 1]) {
-        const knife = Array.from({ length: 5 }, (_, i) => paint(block(0.05 - i * 0.006, 0.12, 0.02).rotateZ(s * i * 0.18).translate(s * (0.3 + i * 0.012), -0.42 - i * 0.1, 0.12), i ? C.gold : C.trim));
-        this.skin(worn, knife);
+        const ribs = [0, 1, 2, 3].map((k) => paint(aimed(spike(0.03, 1.1 - k * 0.18, 4), s * 0.12, 0.3, 0, s * (0.6 + k * 0.35), 1 - k * 0.2, -0.2), k ? C.glow : C.trim));
+        this.shine(worn, ribs);
       }
     } else {
       // A great shield of ice on the arm, and a crystal longsword at the back.
@@ -633,76 +623,65 @@ export default class HeroModel {
     this.shine(rack, [[0, 0.5, 1.1], [-0.42, 0.28, 0.9], [0.42, 0.28, 0.9], [-0.74, -0.06, 0.72], [0.74, -0.06, 0.72]].map(([x, y, length], i) => paint(new THREE.OctahedronGeometry(0.15).scale(0.62, length * 3.1, 0.62).rotateZ(-x * 0.32).translate(x, y, i * 0.012), i % 2 ? C.hairHi : C.glow)));
   }
 
-  // ---- the second five (v0.54.0) ----
-  // Chronarch: a brass mask over the eyes and a dial of hours turning above the head.
-  clock(chest, head) {
-    const C = this.look, H = 0.2;
-    chest.scale.set(0.94, 1.06, 0.92);
-    this.skin(head, [paint(ball(0.275, 1, 0.55, 1.04).translate(0, H + 0.11, -0.01), C.trim), paint(new THREE.BoxGeometry(0.34, 0.07, 0.06).translate(0, H + 0.03, 0.25), C.gold)]);
-    const dial = this.bone('spin', head, 0, H + 0.46, 0);
-    this.shine(dial, [
-      paint(new THREE.TorusGeometry(0.36, 0.016, 6, 44).rotateX(Math.PI / 2), C.glow),
-      ...Array.from({ length: 12 }, (_, i) => {
-        const a = (i / 12) * 6.283;
-        return paint(aimed(spike(0.022, i % 3 ? 0.08 : 0.16), Math.cos(a) * 0.36, 0, Math.sin(a) * 0.36, Math.cos(a), 0.35, Math.sin(a)), i % 3 ? C.iris : C.gold);
-      }),
-    ]);
-  }
-
-  // Tidebringer: a fin of sea-glass from brow to nape, and fins at the ears.
-  wave(chest, head) {
+  // ---- the second five (v0.56.0) ----
+  // Starcrusher: close dark hair and a ring of stones turning slowly above the head.
+  halo(chest, head) {
     const C = this.look, H = 0.2;
     chest.scale.set(1.04, 1.04, 1.02);
-    this.skin(head, [paint(ball(0.275, 1, 0.62, 1.06).translate(0, H + 0.1, -0.02), C.coatDark)]);
-    this.shine(head, [
-      ...Array.from({ length: 6 }, (_, i) => paint(aimed(spike(0.05, 0.36 - Math.abs(i - 2) * 0.05, 4), 0, H + 0.24 - i * 0.015, 0.16 - i * 0.08, 0, 1, -0.5 - i * 0.12), i % 2 ? C.glow : C.hairHi)),
-      ...[-1, 1].map((s) => paint(aimed(spike(0.05, 0.26, 4), s * 0.26, H + 0.04, -0.04, s, 0.5, -0.6), C.glow)),
-    ]);
+    this.skin(head, [paint(ball(0.28, 1, 0.66, 1.06).translate(0, H + 0.1, -0.02), C.hair)]);
+    const ring = this.bone('spin', head, 0, H + 0.42, -0.04);
+    this.shine(ring, [paint(new THREE.TorusGeometry(0.34, 0.016, 6, 40).rotateX(Math.PI / 2), C.glow)]);
+    this.skin(ring, Array.from({ length: 6 }, (_, i) => {
+      const a = (i / 6) * 6.283;
+      return paint(rock(0.06 + (i % 2) * 0.03).translate(Math.cos(a) * 0.34, Math.sin(i * 1.7) * 0.05, Math.sin(a) * 0.34), '#2a2640');
+    }));
   }
 
-  // Blightmother: a beaked plague mask under a wide, tattered hat.
-  plague(chest, head) {
+  // Skycleaver: long white hair tied back, a steel band across the brow.
+  blades(chest, head) {
     const C = this.look, H = 0.2;
-    chest.scale.set(1, 1.08, 0.98);
-    const brim = new THREE.CylinderGeometry(0.52, 0.56, 0.035, 18, 1);
-    const pos = brim.attributes.position;
-    for (let i = 0; i < pos.count; i++) pos.setY(i, pos.getY(i) - Math.max(0, Math.sin(Math.atan2(pos.getZ(i), pos.getX(i)) * 5)) * 0.05 * Math.hypot(pos.getX(i), pos.getZ(i)));
-    brim.computeVertexNormals();
-    this.skin(head, [
-      paint(brim.translate(0, H + 0.26, -0.02), C.coatDark),
-      paint(new THREE.CylinderGeometry(0.2, 0.26, 0.32, 14).translate(0, H + 0.42, -0.02), C.coatDark),
-      paint(new THREE.CylinderGeometry(0.265, 0.265, 0.05, 14).translate(0, H + 0.3, -0.02), C.trim),
-      paint(new THREE.ConeGeometry(0.1, 0.46, 8).rotateX(Math.PI / 2).translate(0, H - 0.06, 0.44), C.wrap),
-    ]);
-    this.shine(head, [-1, 1].map((s) => paint(new THREE.TorusGeometry(0.05, 0.014, 5, 12).translate(s * 0.1, H + 0.04, 0.27), C.glow)));
+    chest.scale.set(0.94, 1.06, 0.92);
+    this.skin(head, [paint(ball(0.28, 1, 0.72, 1.08).translate(0, H + 0.08, -0.04), C.hair), paint(limb(0.07, 0.03, 0.7).rotateX(0.5).translate(0, H - 0.12, -0.36), C.hair)]);
+    this.skin(head, [paint(new THREE.TorusGeometry(0.272, 0.024, 5, 28).rotateX(Math.PI / 2).translate(0, H + 0.1, 0), C.trim)]);
+    this.shine(head, [paint(new THREE.BoxGeometry(0.22, 0.026, 0.03).translate(0, H + 0.1, 0.27), C.glow)]);
   }
 
-  // Sovereign: a crown of floating blades turning above the head, and long pale hair.
-  crown(chest, head) {
+  // Sanguinarch: long pale hair under a crown of blood thorns.
+  thorns(chest, head) {
     const C = this.look, H = 0.2;
     chest.scale.set(0.96, 1.08, 0.94);
-    const ring = this.bone('spin', head, 0, H + 0.4, 0);
-    this.shine(ring, [
-      paint(new THREE.TorusGeometry(0.3, 0.02, 6, 36).rotateX(Math.PI / 2), C.gold),
-      ...Array.from({ length: 7 }, (_, i) => {
-        const a = (i / 7) * 6.283;
-        return paint(aimed(spike(0.04, i % 2 ? 0.22 : 0.34, 4), Math.cos(a) * 0.3, 0.02, Math.sin(a) * 0.3, Math.cos(a) * 0.15, 1, Math.sin(a) * 0.15), i % 2 ? C.gold : C.glow);
-      }),
-    ]);
-    this.skin(head, [paint(ball(0.28, 1, 0.7, 1.08).translate(0, H + 0.08, -0.05), C.hair), paint(limb(0.2, 0.06, 0.62).translate(0, H - 0.3, -0.2), C.hair)]);
+    this.skin(head, [paint(ball(0.28, 1, 0.7, 1.08).translate(0, H + 0.08, -0.05), C.hair), paint(limb(0.2, 0.08, 0.7).translate(0, H - 0.34, -0.2), C.hair)]);
+    this.skin(head, [paint(new THREE.TorusGeometry(0.27, 0.02, 5, 24).rotateX(Math.PI / 2).translate(0, H + 0.18, -0.02), C.trim)]);
+    this.shine(head, Array.from({ length: 9 }, (_, i) => {
+      const a = (i / 9) * 6.283;
+      return paint(aimed(spike(0.03, i % 2 ? 0.14 : 0.24, 4), Math.cos(a) * 0.27, H + 0.2, Math.sin(a) * 0.27 - 0.02, Math.cos(a) * 0.4, 1, Math.sin(a) * 0.4), C.glow);
+    }));
   }
 
-  // Nightbringer: a crescent moon worn as horns, and a mask with no mouth.
-  moon(chest, head) {
+  // Cataclyst: wild spiked hair with burning tips, and blast goggles pushed up on the brow.
+  fuse(chest, head) {
     const C = this.look, H = 0.2;
-    chest.scale.set(0.9, 1.08, 0.88);
-    for (const i of [0, 1]) this.bones[`arm${i}`].scale.set(0.86, 1.1, 0.86);
-    this.skin(head, [paint(ball(0.28, 1, 0.9, 1.06).translate(0, H + 0.02, -0.01), C.coatDark)]);
-    const arc = Array.from({ length: 9 }, (_, i) => {
-      const a = -1.25 + (i / 8) * 2.5, x = Math.sin(a) * 0.36, y = H + 0.3 + Math.cos(a) * 0.18;
-      return paint(aimed(spike(0.05 - Math.abs(a) * 0.012, 0.16 + Math.abs(a) * 0.14, 4), x, y, -0.04, Math.sin(a) * 1.4, Math.cos(a), 0), i % 2 ? C.glow : C.gold);
-    });
-    this.shine(head, arc);
+    chest.scale.set(1.02, 1.04, 1);
+    this.skin(head, [paint(ball(0.28, 1, 0.66, 1.06).translate(0, H + 0.1, -0.02), C.hair)]);
+    this.skin(head, Array.from({ length: 7 }, (_, i) => {
+      const a = -1.2 + (i / 6) * 2.4;
+      return paint(aimed(spike(0.07, 0.3, 4), Math.sin(a) * 0.2, H + 0.22, -0.06, Math.sin(a) * 0.6, 1, -0.5), i % 2 ? C.hairHi : C.hair);
+    }));
+    for (const s of [-1, 1]) {
+      this.skin(head, [paint(new THREE.TorusGeometry(0.06, 0.018, 5, 14).translate(s * 0.1, H + 0.2, 0.25), C.trim)]);
+      this.shine(head, [paint(new THREE.CircleGeometry(0.05, 12).translate(s * 0.1, H + 0.2, 0.256), C.glow)]);
+    }
+  }
+
+  // Wyrmsire: horns swept back from the brow, spines at the jaw, and slit eyes of light.
+  wyrm(chest, head) {
+    const C = this.look, H = 0.2;
+    chest.scale.set(1.08, 1.06, 1.04);
+    this.skin(head, [paint(ball(0.28, 1, 0.64, 1.06).translate(0, H + 0.1, -0.03), C.hair)]);
+    for (const s of [-1, 1]) {
+      this.skin(head, [paint(aimed(spike(0.06, 0.5, 5), s * 0.16, H + 0.2, -0.04, s * 0.3, 0.6, -1), C.trim), paint(aimed(spike(0.04, 0.22, 4), s * 0.24, H + 0.02, -0.06, s * 0.6, 0.2, -1), C.trim)]);
+      this.shine(head, [paint(new THREE.BoxGeometry(0.08, 0.02, 0.02).rotateZ(s * -0.3).translate(s * 0.1, H + 0.01, 0.262), C.glow)]);
+    }
   }
 
   headParts() {

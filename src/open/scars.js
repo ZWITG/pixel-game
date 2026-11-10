@@ -29,7 +29,7 @@ const ZAPS_PER_TICK = 5, ROCKS_PER_TICK = 4;
 const WET = 0.4;             // ground under this is water
 const SNOW_LINE = 285;
 const STEAM_SECS = 3, MAGMA_SECS = 7, BLIGHT_GEN = 2, MAGMA_BITE = 1.6;
-const SOAK_SECS = 40;        // how long water a Tidebringer leaves keeps the ground wet
+const SOAK_SECS = 40;        // how long water keeps the ground wet
 const REACTS_PER_TICK = 6;   // reactions shown each tick (they all still happen)
 export const REACTIONS = {
   steam: { name: 'Steam', color: '#e8f0f4' },
@@ -86,9 +86,23 @@ export default class Scars {
 
   // One cell catches. Fire and ice undo each other; water will not burn.
   take(c, kind, owner, gen, force) {
-    // The second five Conquerors (v0.54.0): water soaks and douses, blight rots, time leaves ash.
-    // Mind and night leave nothing on the land itself.
-    if (kind === 'mind' || kind === 'night') return false;
+    // The second five Conquerors (v0.56.0): gravity cracks the land like earth, blasts and dragonfire
+    // burn and scorch, blood stains it dark, and a blade's cut fells what grows and splits the ground.
+    if (kind === 'gravity') kind = 'earth';
+    if (kind === 'blood') {
+      c.char = Math.max(c.char, 0.6);
+      this.dirty = true;
+      return true;
+    }
+    if (kind === 'blade') {
+      if (c.fuel > 0.3) this.fellTrees(c);
+      kind = 'earth';
+    }
+    if (kind === 'blast' || kind === 'dragon') {
+      c.char = Math.max(c.char, kind === 'blast' ? 0.5 : 0.3);
+      kind = 'fire';
+    }
+    // Water (no Conqueror of its own since v0.56.0) soaks and douses; time (the same) leaves ash.
     if (kind === 'water') {
       if (c.burn > 0) {
         c.burn = 0;

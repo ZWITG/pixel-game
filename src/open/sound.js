@@ -419,7 +419,7 @@ class Sound {
 export const sound = new Sound();
 export const sfx = (name, x, z, gain = 1, rate = 1) => sound.play(name, x, z, gain, rate);
 // An element's sound: kind is cast, impact, wave or ult (soundWorker.js ELEMENTS).
-const ELEMENTS = new Set(['earth', 'storm', 'void', 'fire', 'ice', 'time', 'water', 'blight', 'mind', 'night']);
+const ELEMENTS = new Set(['earth', 'storm', 'void', 'fire', 'ice', 'gravity', 'blade', 'blood', 'blast', 'dragon']);
 export const sfxEl = (kind, element, x, z, gain = 1) => sound.play(`${kind}.${ELEMENTS.has(element) ? element : 'earth'}`, x, z, gain);
 // A sound where a hero stands.
 export const sfxAt = (p, name, gain = 1, rate = 1) => (p?.state ? sound.play(name, p.state.x, p.state.z, gain, rate) : null);

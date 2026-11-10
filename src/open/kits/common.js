@@ -1,4 +1,4 @@
-// Helpers the second five Conquerors' kits share (v0.54.0): kits/time.js, tide.js, blight.js, mind.js, night.js.
+// Helpers the second five Conquerors' kits share (v0.56.0): kits/gravity.js, blade.js, blood.js, blast.js, dragon.js.
 // Same shape as the first five: each power `kind` is called as kit[kind](set, job, aim); lasting effects
 // go on set.kit as { update(dt) → false when done, busy }.
 export const near = (set, x, z, r) => set.player.melee.monsters.within(x, z, r);

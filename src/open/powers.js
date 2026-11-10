@@ -8,16 +8,18 @@ import { STORM } from './kits/storm.js';
 import { EMBER } from './kits/ember.js';
 import { FROST, iceMat } from './kits/frost.js';
 import { VOID } from './kits/void.js';
-import { TIME } from './kits/time.js';
-import { TIDE } from './kits/tide.js';
-import { BLIGHT } from './kits/blight.js';
-import { MIND } from './kits/mind.js';
-import { NIGHT } from './kits/night.js';
+import { GRAVITY } from './kits/gravity.js';
+import { BLADE } from './kits/blade.js';
+import { BLOOD } from './kits/blood.js';
+import { BLAST } from './kits/blast.js';
+import { DRAGON } from './kits/dragon.js';
 
 // Conquerors whose kits have their own power kinds and hooks (kits/*.js).
-const KITS = { titan: TITAN, storm: STORM, ember: EMBER, frost: FROST, void: VOID, time: TIME, tide: TIDE, blight: BLIGHT, mind: MIND, night: NIGHT };
+const KITS = { titan: TITAN, storm: STORM, ember: EMBER, frost: FROST, void: VOID, gravity: GRAVITY, blade: BLADE, blood: BLOOD, blast: BLAST, dragon: DRAGON };
 // The second five's elements have no shell or flame of their own: light, rings and motes in two colours.
-export const LOOKS = { time: ['#7af0d0', '#f4ffe0'], water: ['#3ab8ff', '#e0f6ff'], blight: ['#9ad13a', '#3e5a10'], mind: ['#ff4ad0', '#ffd8f4'], night: ['#6a6cff', '#0c0a1e'] };
+export const LOOKS = { gravity: ['#8a7aff', '#e8e4ff'], blade: ['#bfe4ff', '#7fe8ff'], blood: ['#ff2a3a', '#7a0010'], blast: ['#ffb030', '#fff4c0'], dragon: ['#3aff9a', '#e8ffd0'] };
+// The v0.54.0 Conquerors were replaced in v0.56.0: a save that chose one wakes as its successor.
+const RETIRED = { time: 'gravity', tide: 'blade', blight: 'blood', mind: 'blast', night: 'dragon' };
 import { Flames, makeBolt, shapeBolt } from './elementFx.js';
 import { sfxEl } from './sound.js';
 
@@ -41,12 +43,12 @@ const SHADE_REACH = 15, SHADE_EVERY = 0.8;
 const TRAIL_EVERY = 3;       // tiles between patches of a fiery trail
 const SOLID_STEP = 1.5;      // tiles between checks along a dash
 const CAST_POSE = {
-  // The second five (v0.54.0).
-  stop: 'gather', rewind: 'gather', wither: 'punch', echo: 'gather', quicken: 'gather', loop: 'peak', epoch: 'peak', entropy: 'slam',
-  lash: 'throw', breaker: 'slam', geyser: 'peak', orb: 'punch', maelstrom: 'peak', monsoon: 'peak', deluge: 'slam', tsunami: 'slam',
-  bile: 'throw', miasma: 'slam', locusts: 'peak', pustule: 'peak', rotland: 'slam', host: 'punch', pestilence: 'gather', deathbloom: 'slam',
-  psylance: 'punch', enthrall: 'peak', kinesis: 'throw', dread: 'peak', crush: 'punch', discord: 'peak', usurp: 'gather', sowwar: 'gather',
-  knives: 'throw', vanish: 'gather', shadowstep: 'dash', snuff: 'peak', grasp: 'slam', deathmark: 'punch', eclipse: 'peak', nightfall: 'slam',
+  // The second five (v0.56.0).
+  press: 'slam', repulse: 'slam', pull: 'peak', lift: 'peak', hundred: 'slam', skyfall: 'peak', singularity: 'gather',
+  crescent: 'punch', cross: 'punch', draw: 'dash', cuts: 'peak', swordrain: 'peak', halo: 'gather', cleave: 'slam', horizon: 'punch',
+  bloodlance: 'punch', scythe: 'slam', hemorrhage: 'peak', thornfield: 'slam', bloodrain: 'peak', feast: 'gather', giant: 'slam', bloodmoon: 'peak',
+  palm: 'punch', sticky: 'throw', mines: 'throw', carpet: 'slam', rocket: 'dash', clap: 'punch', cluster: 'throw', grand: 'gather',
+  breath: 'punch', claws: 'punch', tailsweep: 'slam', wingbeat: 'peak', dive: 'slam', roar: 'peak', skyfire: 'dash', wyrmform: 'gather',
   bolt: 'punch', nova: 'slam', strike: 'peak', buff: 'gather', zone: 'peak', orbit: 'peak', wall: 'slam', pillar: 'slam', slab: 'throw', surf: 'dash', mail: 'gather', garden: 'slam', sand: 'slam', rift: 'slam', mountain: 'gather', ironbend: 'peak', magma: 'slam', gather: 'peak', thunder: 'peak', step: 'dash', spear: 'throw', railgun: 'gather', current: 'gather', cyclone: 'peak', magnet: 'peak', plasma: 'punch', fist: 'punch', ignite: 'peak', jet: 'dash', flare: 'slam', serpent: 'punch', inferno: 'peak', blue: 'punch', meteor: 'peak', sunlance: 'punch', supernova: 'slam', forge: 'gather', armor: 'gather', hail: 'peak', prison: 'punch', rime: 'slam', mirror: 'gather', glacier: 'slam', sea: 'slam', rise: 'gather', command: 'peak', swap: 'dash', lance: 'punch', tide: 'punch', burst: 'slam', gate: 'gather', amalgam: 'gather', reap: 'peak' };
 const STATUS_COLORS = { burn: ['#ff9a3a', '#ff5a2a', '#ffd070'], freeze: ['#dff4ff', '#8fe0ff'], shock: ['#fff4b0', '#ffe25a'] };
 const GLOWS = 160, PILLARS = 20, DISCS = 12, BOLTS = 18, CRYSTALS = 60, ROCKS = 60, SHELLS = 16, HOLES = 6;
@@ -104,19 +106,20 @@ export class PowerFx {
     const ice = new THREE.MeshLambertMaterial({ color: '#d8f4ff', emissive: '#4ac0f0', emissiveIntensity: 0.9, flatShading: true });
     const black = new THREE.MeshBasicMaterial({ color: '#000000', fog: false });
     this.shells = { earth: pool(SHELLS, () => new THREE.Mesh(lump, stone)), ice: pool(SHELLS, () => new THREE.Mesh(shard, ice)), void: pool(SHELLS, () => new THREE.Mesh(ball, black)), fire: pool(SHELLS, () => new THREE.Mesh(lump, new THREE.MeshBasicMaterial({ color: '#ffb040', fog: false }))) };
-    // The second five's thrown cores (v0.54.0).
+    // The second five's thrown cores (v0.56.0): dark weights, swords, blood, charges, dragonfire.
     const solid = (color) => new THREE.MeshBasicMaterial({ color, fog: false });
+    const sword = new THREE.ConeGeometry(0.16, 3.2, 4).scale(1, 1, 0.25).rotateX(Math.PI / 2);
     Object.assign(this.shells, {
-      time: pool(SHELLS, () => new THREE.Mesh(shard, solid('#bffff0'))),
-      water: pool(SHELLS, () => new THREE.Mesh(ball, solid('#9ae6ff'))),
-      blight: pool(SHELLS, () => new THREE.Mesh(lump, solid('#a8d83a'))),
-      mind: pool(SHELLS, () => new THREE.Mesh(shard, solid('#ff9ae8'))),
-      night: pool(SHELLS, () => new THREE.Mesh(shard, solid('#14142a'))),
+      gravity: pool(SHELLS, () => new THREE.Mesh(lump, solid('#1a1630'))),
+      blade: pool(SHELLS, () => new THREE.Mesh(sword, solid('#e8f8ff'))),
+      blood: pool(SHELLS, () => new THREE.Mesh(shard, solid('#ff2a3a'))),
+      blast: pool(SHELLS, () => new THREE.Mesh(ball, solid('#fff0a0'))),
+      dragon: pool(SHELLS, () => new THREE.Mesh(lump, solid('#7affc0'))),
     });
-    // The Tidebringer's water (kits/tide.js): lakes that rise over the land, and walls of sea. Built
-    // now and kept hidden, so they never compile a shader mid-fight.
-    const sea = new THREE.MeshLambertMaterial({ color: '#2a8ac8', emissive: '#0a3050', transparent: true, opacity: 0.74, depthWrite: false });
-    const crest = new THREE.MeshLambertMaterial({ color: '#7ad0f0', emissive: '#1a5070', transparent: true, opacity: 0.82, depthWrite: false });
+    // Water that rises over the land (the Sanguinarch's Red Sea), and walls of it. Built now and
+    // kept hidden, so they never compile a shader mid-fight.
+    const sea = new THREE.MeshLambertMaterial({ color: '#a01020', emissive: '#3a0008', transparent: true, opacity: 0.8, depthWrite: false });
+    const crest = new THREE.MeshLambertMaterial({ color: '#ff3a4a', emissive: '#5a0010', transparent: true, opacity: 0.85, depthWrite: false });
     this.lakes = pool(3, () => new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 56, 1), sea));
     this.seawalls = pool(2, () => new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1, 8, 1, 1), crest));
     this.holes = pool(HOLES, () => new THREE.Mesh(ball, black));
@@ -263,7 +266,7 @@ export class PowerFx {
       this.glow(x, y + 1.2, z, r * 0.8, b, 0.3, 1.4);
       this.disc(x, y, z, r * 1.2, a, 0.5);
       around((px, pz) => this.glow(px, y + 0.6 + Math.random() * 1.5, pz, 0.9 + Math.random(), Math.random() < 0.5 ? a : b, 0.5, 0.4));
-      if (element === 'night' || element === 'blight') this.hole(x, y + r * 0.15, z, Math.max(0.6, r * 0.3), 0.45);
+      if (element === 'gravity') this.hole(x, y + r * 0.15, z, Math.max(0.6, r * 0.3), 0.45);
     } else if (element === 'void') {
       this.hole(x, y + r * 0.2, z, Math.max(0.8, r * 0.4), 0.55);
       around((px, pz) => this.lightning({ x, y: y + 1, z }, { x: px, y, z: pz }, '#9a3aff', 0.1, 0.3));
@@ -306,11 +309,15 @@ export class PowerFx {
 
   update(dt) {
     this.flames.update(dt);
+    // Run what's due after the list is rebuilt, so anything a callback schedules (an after inside an
+    // after) lands in the new list instead of being lost with the old one.
+    const due = [];
     this.later = this.later.filter((l) => {
       if ((l.left -= dt) > 0) return true;
-      l.fn();
+      due.push(l);
       return false;
     });
+    for (const l of due) l.fn();
     this.falling = this.falling.filter((f) => {
       f.left -= dt;
       const k = Math.max(0, f.left / f.secs), y = f.y + k * SKY;
@@ -372,7 +379,11 @@ export default class PowerSet {
     this.trailed = 0;
     try {
       const saved = JSON.parse(localStorage.getItem(saveKey));
-      if (saved && CONQUERORS[saved.id]) {
+      if (saved && RETIRED[saved.id]) {
+        this.id = RETIRED[saved.id];
+        this.loadout = Object.keys(CONQUERORS[this.id].powers).slice(0, 2).concat([null, null]);
+        this.retired = saved.id;
+      } else if (saved && CONQUERORS[saved.id]) {
         this.id = saved.id;
         this.loadout = saved.loadout ?? [];
       }
@@ -840,6 +851,11 @@ export default class PowerSet {
 
   update(dt) {
     if (!this.id) return;
+    if (this.retired) {
+      this.player.hud.message(`The Conqueror you chose is gone from the world. You wake as the ${this.def.name}.`, true);
+      this.retired = null;
+      this.save();
+    }
     const cool = this.player.wrath?.surge > 0 ? COMBAT.surge.cool : 1; // a Surge cools powers faster
     for (const pid of Object.keys(this.waits)) this.waits[pid] = Math.max(0, this.waits[pid] - dt * cool);
     this.casting = Math.max(0, this.casting - dt);

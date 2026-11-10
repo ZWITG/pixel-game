@@ -45,45 +45,45 @@ export const BRANCHES = {
       B('stillness', 'Stillness', '#e4f6ff', 'All things stopping: the Crystal Prison, Shatter, and time itself.', ['prison'], ['jumping', 'woodcutting', 'frost.stillness']),
     ],
   },
-  // The second five (v0.54.0).
-  time: {
+  // The second five (v0.56.0).
+  gravity: {
     drop: ['swimming'],
     list: [
-      B('hour', 'Hour', '#7af0d0', 'Holding time still and turning it back: the Still Hour, Rewind, the Time Loop.', ['stop', 'rewind', 'loop'], ['fighting', 'time.chronomancy']),
-      B('age', 'Age', '#e8c86a', 'Time as a blade: years that wither, Entropy, the Epoch that ages a town.', ['wither', 'entropy', 'epoch'], ['punching', 'mining', 'woodcutting']),
-      B('pace', 'Pace', '#bffff0', 'Your own time, bent: the Echo of yourself and the Quickening.', ['echo', 'quicken'], ['running', 'jumping', 'climbing']),
+      B('weight', 'Weight', '#8a7aff', 'Crushing what is under you: Downforce, Hundredfold, Skyfall.', ['press', 'hundred', 'skyfall'], ['punching', 'fighting', 'gravity.crushing']),
+      B('field', 'Field', '#c8beff', 'Pushing and pulling the world: Repulse, Attraction, Weightless.', ['repulse', 'pull', 'lift'], ['jumping', 'running', 'climbing']),
+      B('star', 'Star', '#4a3aa8', 'Stone made to orbit and a star made to fall in: the Debris Ring and the Singularity.', ['orbit', 'singularity'], ['mining', 'woodcutting']),
     ],
   },
-  tide: {
+  blade: {
+    drop: ['swimming'],
+    list: [
+      B('edge', 'Edge', '#bfe4ff', 'The flying cut: Crescent, Cross Cut, the Horizon Cut.', ['crescent', 'cross', 'horizon'], ['punching', 'fighting', 'blade.swordcraft']),
+      B('draw', 'Draw', '#7fe8ff', 'Speed of the hand: the Flash Draw, Thousand Cuts, the Blade Halo.', ['draw', 'cuts', 'halo'], ['running', 'jumping', 'climbing']),
+      B('steel', 'Steel', '#8aa0b8', 'Swords from the sky and a cut through the land: Sword Rain and Earthcleave.', ['swordrain', 'cleave'], ['mining', 'woodcutting']),
+    ],
+  },
+  blood: {
+    drop: ['swimming'],
+    list: [
+      B('vein', 'Vein', '#ff2a3a', 'Blood as a weapon: Piercing Blood, the Red Scythe, Hemorrhage.', ['lance', 'scythe', 'hemorrhage'], ['punching', 'fighting', 'blood.hemomancy']),
+      B('thorn', 'Thorn', '#c81a2a', 'Blood made solid: Thornfield and the Blood Colossus.', ['thornfield', 'giant'], ['jumping', 'climbing', 'mining']),
+      B('moon', 'Moon', '#7a0010', 'Blood from the sky and the feast after: Crimson Rain, Feast, the Blood Moon.', ['bloodrain', 'feast', 'bloodmoon'], ['running', 'woodcutting']),
+    ],
+  },
+  blast: {
+    drop: ['swimming'],
+    list: [
+      B('spark', 'Spark', '#ffb030', 'Explosions from the hand: Blast Palm, Rocket Leap, Shock Clap.', ['palm', 'rocket', 'clap'], ['punching', 'fighting', 'running']),
+      B('fuse', 'Fuse', '#ff7a2a', 'Explosions that wait: Sticky Charge, Firefly Mines, the Cluster Bomb.', ['sticky', 'mines', 'cluster'], ['jumping', 'climbing', 'blast.pyrotechnics']),
+      B('ruin', 'Ruin', '#fff0a0', 'Explosions that end towns: Carpet Blast and the Grand Detonation.', ['carpet', 'grand'], ['mining', 'woodcutting']),
+    ],
+  },
+  dragon: {
     drop: ['climbing'],
     list: [
-      B('current', 'Current', '#5ad8ff', 'Water as a weapon in the hand: the Lash, the Geyser, the Drowning Orb.', ['lash', 'geyser', 'orb'], ['punching', 'fighting']),
-      B('deep', 'Deep', '#20a8e0', 'The sea itself: the Breaker, the Maelstrom, the Tsunami.', ['breaker', 'maelstrom', 'tsunami'], ['swimming', 'running', 'tide.tidecraft']),
-      B('weather', 'Weather', '#bfe8ff', 'Rain and flood that change the land: the Monsoon and the Deluge.', ['monsoon', 'deluge'], ['jumping', 'mining', 'woodcutting']),
-    ],
-  },
-  blight: {
-    drop: ['swimming'],
-    list: [
-      B('fever', 'Fever', '#9ad13a', 'Infection in a foe and the Burst that sets it off: Bile, Burst, the Plague Host.', ['bile', 'pustule', 'host'], ['punching', 'fighting', 'blight.pestilence']),
-      B('swarm', 'Swarm', '#c8b84a', 'Things that carry it: the Miasma, the Locusts, the Death Bloom.', ['miasma', 'locusts', 'deathbloom'], ['running', 'jumping']),
-      B('famine', 'Famine', '#6a7a2a', 'Sickness in the land and the towns: Rotting Ground and Pestilence.', ['rotland', 'pestilence'], ['climbing', 'mining', 'woodcutting']),
-    ],
-  },
-  mind: {
-    drop: ['swimming'],
-    list: [
-      B('will', 'Will', '#ff4ad0', 'Force of mind: the Psychic Lance, Telekinesis, Mind Crush.', ['psylance', 'kinesis', 'crush'], ['punching', 'fighting']),
-      B('rule', 'Rule', '#f0d488', 'Turning the loyal: Enthrall, Discord, the Dread Word.', ['enthrall', 'discord', 'dread'], ['running', 'jumping', 'mind.dominion']),
-      B('crown', 'Crown', '#c87ab8', 'Conquest without a siege: Usurp and Sow War.', ['usurp', 'sowwar'], ['climbing', 'mining', 'woodcutting']),
-    ],
-  },
-  night: {
-    drop: ['swimming'],
-    list: [
-      B('blade', 'Blade', '#8a8cff', 'The killing stroke: Shadow Knives, the Shadowstep, the Death Mark.', ['knives', 'shadowstep', 'deathmark'], ['punching', 'fighting', 'night.shadowcraft']),
-      B('veil', 'Veil', '#c8ccff', 'Not being there: Vanish, the Umbral Grasp, Nightfall.', ['vanish', 'grasp', 'nightfall'], ['running', 'jumping', 'climbing']),
-      B('dark', 'Dark', '#4a4a8a', 'Putting out the light of the world: Snuff and the Eclipse.', ['snuff', 'eclipse'], ['mining', 'woodcutting']),
+      B('fire', 'Fire', '#3aff9a', 'Dragonfire: Dragon Breath, Skyfire, the Roar.', ['breath', 'skyfire', 'roar'], ['punching', 'fighting', 'dragon.wyrmcraft']),
+      B('body', 'Body', '#c8a040', "The wyrm's body: Rending Claws, the Tail Sweep, Wyrm Form.", ['claws', 'tail', 'wyrmform'], ['running', 'mining', 'woodcutting']),
+      B('sky', 'Sky', '#bfffe0', 'Wings: the Wingbeat and the Dragon Dive.', ['wings', 'dive'], ['jumping', 'swimming']),
     ],
   },
 };
